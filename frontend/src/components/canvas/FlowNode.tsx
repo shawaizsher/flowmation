@@ -1,0 +1,122 @@
+import { memo } from 'react';
+import { Handle, Position, NodeProps } from 'reactflow';
+import { useStore } from '../../store';
+import NodeIcon from './NodeIcon';
+
+const statusColors: Record<string, string> = {
+  running: 'border-yellow-400 shadow-yellow-400/20 shadow-lg',
+  success: 'border-green-400 shadow-green-400/20 shadow-lg',
+  failed: 'border-red-400 shadow-red-400/20 shadow-lg',
+  skipped: 'border-gray-500',
+};
+
+const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
+  running: { bg: 'bg-yellow-400/20', text: 'text-yellow-400', label: '● Running' },
+  success: { bg: 'bg-green-400/20', text: 'text-green-400', label: '✓ Done' },
+  failed: { bg: 'bg-red-400/20', text: 'text-red-400', label: '✗ Failed' },
+  skipped: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: '○ Skipped' },
+};
+
+// Category-specific top-bar accent colors
+const categoryAccent: Record<string, string> = {
+  triggers:  'from-yellow-400 to-amber-500',
+  google:    'from-blue-400 to-blue-600',
+  ai:        'from-purple-400 to-violet-600',
+  social:    'from-pink-400 to-rose-500',
+  messaging: 'from-green-400 to-emerald-500',
+  databases: 'from-orange-400 to-orange-600',
+  cloud:     'from-cyan-400 to-sky-500',
+  http:      'from-indigo-400 to-indigo-600',
+  files:     'from-amber-400 to-yellow-600',
+  transform: 'from-teal-400 to-teal-600',
+  logic:     'from-slate-400 to-slate-500',
+  crm:       'from-emerald-400 to-green-600',
+  payments:  'from-lime-400 to-green-500',
+  analytics: 'from-rose-400 to-pink-600',
+  utilities: 'from-gray-400 to-gray-500',
+};
+
+function getCategoryFromType(type: string): string {
+  if (type.startsWith('trigger_')) return 'triggers';
+  if (type.startsWith('google_') || type.startsWith('youtube_')) return 'google';
+  if (type.startsWith('openai_') || type.startsWith('anthropic_') || type.startsWith('huggingface_') || type.startsWith('ai_') || type.startsWith('whisper_')) return 'ai';
+  if (type.startsWith('twitter_') || type.startsWith('instagram_') || type.startsWith('linkedin_') || type.startsWith('reddit_')) return 'social';
+  if (type.startsWith('slack_') || type.startsWith('discord_') || type.startsWith('telegram_') || type.startsWith('whatsapp_') || type.startsWith('email_') || type.startsWith('twilio_')) return 'messaging';
+  if (type.startsWith('postgres_') || type.startsWith('mysql_') || type.startsWith('mongodb_') || type.startsWith('redis_') || type.startsWith('firebase_') || type.startsWith('supabase_')) return 'databases';
+  if (type.startsWith('aws_') || type.startsWith('github_') || type.startsWith('docker_') || type.startsWith('vercel_')) return 'cloud';
+  if (type.startsWith('http_') || type.startsWith('graphql_') || type.startsWith('rest_') || type.startsWith('soap_')) return 'http';
+  if (type.startsWith('file_') || type.startsWith('csv_') || type.startsWith('pdf_') || type.startsWith('ftp_')) return 'files';
+  if (type.startsWith('transform_') || type.startsWith('json_') || type.startsWith('xml_') || type.startsWith('code_')) return 'transform';
+  if (type.startsWith('logic_') || type.startsWith('error_')) return 'logic';
+  if (type.startsWith('salesforce_') || type.startsWith('hubspot_') || type.startsWith('airtable_') || type.startsWith('notion_')) return 'crm';
+  if (type.startsWith('stripe_') || type.startsWith('paypal_')) return 'payments';
+  if (type.startsWith('google_analytics') || type.startsWith('mixpanel_') || type.startsWith('segment_')) return 'analytics';
+  if (type.startsWith('util_')) return 'utilities';
+  return 'utilities';
+}
+
+function FlowNode({ data, selected, id }: NodeProps) {
+  const nodeStatuses = useStore((s) => s.nodeStatuses);
+  const status = nodeStatuses[id] as string | undefined;
+  const category = getCategoryFromType(data.type || '');
+  const accent = categoryAccent[category] || 'from-brand-400 to-brand-600';
+
+  return (
+    <div
+      className={`group relative min-w-[180px] max-w-[240px] rounded-xl border-2 bg-surface-card overflow-hidden transition-all ${
+        selected
+          ? 'border-brand-500 shadow-lg shadow-brand-500/20'
+          : status && statusColors[status]
+          ? statusColors[status]
+          : 'border-[#1e2d42] hover:border-[#2a3f5e]'
+      }`}
+    >
+      {/* Category accent bar */}
+      <div className={`h-[3px] w-full bg-gradient-to-r ${accent}`} />
+
+      {/* Input handle */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!h-2.5 !w-2.5 !rounded-full !border-2 !border-[#1e2d42] !bg-brand-400 transition-colors group-hover:!border-brand-400"
+      />
+
+      {/* Node content */}
+      <div className="flex items-center gap-3 px-3 py-3">
+        <NodeIcon nodeType={data.type || ''} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-foreground" title={data.label}>
+            {data.label}
+          </div>
+          <div className="truncate text-xs text-foreground-muted">{data.type}</div>
+        </div>
+      </div>
+
+      {/* Status badge */}
+      {status && statusBadge[status] && (
+        <div className={`mx-3 mb-2.5 flex items-center justify-center rounded-md px-2 py-1 ${statusBadge[status].bg}`}>
+          <span className={`text-xs font-medium ${statusBadge[status].text}`}>
+            {statusBadge[status].label}
+          </span>
+        </div>
+      )}
+
+      {/* Running pulse */}
+      {status === 'running' && (
+        <div className="absolute -right-1 -top-1 h-3 w-3">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-50" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-yellow-400" />
+        </div>
+      )}
+
+      {/* Output handle */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!h-2.5 !w-2.5 !rounded-full !border-2 !border-[#1e2d42] !bg-brand-400 transition-colors group-hover:!border-brand-400"
+      />
+    </div>
+  );
+}
+
+export default memo(FlowNode);

@@ -1,0 +1,119 @@
+import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import {
+  Zap,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { useState } from 'react';
+import { useStore } from '../store';
+import toast from 'react-hot-toast';
+
+const navItems = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
+];
+
+export default function AppShell() {
+  const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { user, logout } = useStore();
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out');
+    navigate('/login');
+  };
+
+  return (
+    <div className="flex h-screen bg-surface-base overflow-hidden">
+      {/* ── Sidebar ── */}
+      <aside
+        className={`flex flex-col border-r border-surface-border bg-surface-card transition-all duration-300 ${
+          collapsed ? 'w-[68px]' : 'w-[220px]'
+        }`}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 px-4 py-5 border-b border-surface-border">
+          <div className="w-8 h-8 min-w-[32px] rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/25">
+            <Zap size={16} className="text-white" />
+          </div>
+          {!collapsed && (
+            <span className="font-display text-lg font-bold tracking-tight text-foreground truncate">
+              Flowa
+            </span>
+          )}
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 px-2 py-4 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                  isActive
+                    ? 'bg-brand-500/15 text-brand-400 shadow-sm'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                }`
+              }
+            >
+              <item.icon size={18} className="min-w-[18px]" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Bottom section: user + collapse + logout */}
+        <div className="border-t border-surface-border px-2 py-3 space-y-1">
+          {/* User info */}
+          {user && (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="w-8 h-8 min-w-[32px] rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-xs font-bold uppercase">
+                {user.name?.charAt(0) || 'U'}
+              </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 w-full"
+          >
+            <LogOut size={18} className="min-w-[18px]" />
+            {!collapsed && <span>Logout</span>}
+          </button>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-all duration-200 w-full"
+          >
+            {collapsed ? (
+              <ChevronRight size={18} className="min-w-[18px]" />
+            ) : (
+              <>
+                <ChevronLeft size={18} className="min-w-[18px]" />
+                <span>Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Main content ── */}
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
