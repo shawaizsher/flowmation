@@ -123,7 +123,7 @@ function evaluateCondition(condition, context) {
 /**
  * Execute a single workflow
  */
-async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsManager = null) {
+async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsManager = null, credentials = {}) {
   const startTime = Date.now();
   let executionStatus = 'success';
   let executionError = null;
@@ -163,7 +163,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
       triggerPayload,
       nodeOutputs: {},
       executionId,
-      workflowId
+      workflowId,
+      credentials
     };
 
     // Track completion
@@ -269,6 +270,15 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         try {
           // Resolve variables in config
           const resolvedConfig = resolveVariables(nodeConfig, context);
+
+          // ── Inject per-user credentials into config ──
+          // If the node has a credentialId, look up the credential values
+          // from the credentials map sent by the frontend
+          const credentialId = node.data?.credentialId;
+          if (credentialId && credentials[credentialId]) {
+            resolvedConfig._credentials = credentials[credentialId].values;
+            resolvedConfig._credentialServiceId = credentials[credentialId].serviceId;
+          }
 
           // Gather input from upstream nodes
           const input = {};

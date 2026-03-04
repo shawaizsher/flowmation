@@ -71,8 +71,8 @@ export const workflowApi = {
   duplicate: (workspaceId: string, id: string) =>
     api.post(`/workspaces/${workspaceId}/workflows/${id}/duplicate`),
 
-  execute: (workspaceId: string, id: string, inputData?: Record<string, unknown>) =>
-    api.post(`/workspaces/${workspaceId}/workflows/${id}/execute`, { inputData }),
+  execute: (workspaceId: string, id: string, inputData?: Record<string, unknown>, credentials?: Record<string, { serviceId: string; values: Record<string, string> }>) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/execute`, { inputData, credentials }),
 
   getPresence: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}/presence`),

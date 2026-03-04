@@ -22,7 +22,7 @@ function getQueue() {
 /**
  * Add an execution job to the queue
  */
-async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPayload }) {
+async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPayload, credentials }) {
   // Create execution record first
   const result = await query(
     `INSERT INTO executions (workflow_id, workspace_id, trigger_type, trigger_payload, status)
@@ -40,7 +40,8 @@ async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPa
     workflowId,
     workspaceId,
     triggerType,
-    triggerPayload: triggerPayload || {}
+    triggerPayload: triggerPayload || {},
+    credentials: credentials || {}
   }, {
     jobId: executionId
   });

@@ -1,7 +1,14 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { useStore } from '../../store';
 import NodeIcon from './NodeIcon';
+import { nodeCatalog } from '../../data/nodeCatalog';
+
+// Build a type → short summary lookup once
+const summaryMap: Record<string, string> = {};
+for (const n of nodeCatalog) {
+  summaryMap[n.type] = n.description;
+}
 
 const statusColors: Record<string, string> = {
   running: 'border-yellow-400 shadow-yellow-400/20 shadow-lg',
@@ -60,6 +67,7 @@ function FlowNode({ data, selected, id }: NodeProps) {
   const status = nodeStatuses[id] as string | undefined;
   const category = getCategoryFromType(data.type || '');
   const accent = categoryAccent[category] || 'from-brand-400 to-brand-600';
+  const summary = summaryMap[data.type || ''] || '';
 
   return (
     <div
@@ -73,6 +81,15 @@ function FlowNode({ data, selected, id }: NodeProps) {
     >
       {/* Category accent bar */}
       <div className={`h-[3px] w-full bg-gradient-to-r ${accent}`} />
+
+      {/* Summary / "What this does" label */}
+      {summary && (
+        <div className="px-3 pt-2 pb-0">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground-muted/70 line-clamp-2">
+            {summary}
+          </p>
+        </div>
+      )}
 
       {/* Input handle */}
       <Handle

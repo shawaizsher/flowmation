@@ -14,11 +14,11 @@ async function start() {
     logger.info('🔧 Starting Flowa worker...');
 
     const worker = createWorker(async (job) => {
-      const { executionId, workflowId, triggerPayload } = job.data;
+      const { executionId, workflowId, triggerPayload, credentials } = job.data;
       logger.info(`Processing execution ${executionId} for workflow ${workflowId}`);
 
       const wsManager = getWSManager();
-      const result = await executeWorkflow(executionId, workflowId, triggerPayload, wsManager);
+      const result = await executeWorkflow(executionId, workflowId, triggerPayload, wsManager, credentials);
 
       return result;
     });

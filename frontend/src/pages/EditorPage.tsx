@@ -331,7 +331,19 @@ function EditorCanvas() {
         toast('Execution timed out — backend may be offline', { icon: '⏱️', duration: 4000 });
       }, 15000);
 
-      const res = await workflowApi.execute(workspaceId, id);
+      // ── Collect per-user credentials for all nodes that have a credentialId ──
+      const credentialsMap: Record<string, { serviceId: string; values: Record<string, string> }> = {};
+      for (const n of nodes) {
+        const credId = n.data.credentialId as string | undefined;
+        if (credId && !credentialsMap[credId]) {
+          const cred = credentialStore.getCredentialById(credId);
+          if (cred) {
+            credentialsMap[credId] = { serviceId: cred.serviceId, values: cred.values };
+          }
+        }
+      }
+
+      const res = await workflowApi.execute(workspaceId, id, undefined, credentialsMap);
       setExecutionId(res.data.executionId);
       toast.success('Execution started');
     } catch (err: any) {
@@ -366,7 +378,6 @@ function EditorCanvas() {
     };
 
     setNodes((nds) => [...nds, newNode]);
-    setLeftPanel('none');
   };
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
@@ -580,7 +591,7 @@ function EditorCanvas() {
       {/* ── Main area with panels ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel: Node palette */}
-        {leftPanel === 'nodes' && (
+        {/* Left panel: always visible */}
           <div className="w-80 shrink-0 flex flex-col border-r border-surface-border bg-surface-card">
             {/* Search header */}
             <div className="p-3 pb-2 border-b border-surface-border">
@@ -651,7 +662,6 @@ function EditorCanvas() {
               )}
             </div>
           </div>
-        )}
 
         {/* Canvas */}
         <div className="relative flex-1">

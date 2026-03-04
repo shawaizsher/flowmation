@@ -403,13 +403,16 @@ registry.register('aiPrompt', {
   },
   execute: async ({ config, input }) => {
     const model = config.model || 'claude-3-5-sonnet-20241022';
+    // Per-user credentials (from Credentials Manager) with fallback to global env
+    const userCreds = config._credentials || {};
 
     if (model.startsWith('claude')) {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error('ANTHROPIC_API_KEY not configured');
+      const apiKey = userCreds.apiKey || userCreds.api_key || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('Anthropic API key not configured — add it in Credentials Manager or set ANTHROPIC_API_KEY in .env');
       }
       const Anthropic = require('@anthropic-ai/sdk');
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const client = new Anthropic({ apiKey });
       const response = await client.messages.create({
         model,
         max_tokens: config.maxTokens || 1024,
@@ -422,11 +425,12 @@ registry.register('aiPrompt', {
         model
       };
     } else {
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error('OPENAI_API_KEY not configured');
+      const apiKey = userCreds.apiKey || userCreds.api_key || process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error('OpenAI API key not configured — add it in Credentials Manager or set OPENAI_API_KEY in .env');
       }
       const OpenAI = require('openai');
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const client = new OpenAI({ apiKey });
       const response = await client.chat.completions.create({
         model,
         temperature: config.temperature || 0.7,
@@ -442,6 +446,62 @@ registry.register('aiPrompt', {
         model
       };
     }
+  }
+});
+
+// ── Gemini Chat ──
+registry.register('gemini_chat', {
+  label: 'Gemini Chat',
+  description: 'Chat with Google Gemini models',
+  category: 'ai',
+  icon: '✨',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'response', type: 'string' }, { name: 'tokensUsed', type: 'number' }],
+  configSchema: {
+    model: { type: 'select', options: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'], default: 'gemini-2.0-flash' },
+    systemPrompt: { type: 'textarea', label: 'System Prompt', default: 'You are a helpful assistant.' },
+    message: { type: 'textarea', label: 'User Message', required: true },
+    temperature: { type: 'number', label: 'Temperature', default: 0.7 },
+    maxTokens: { type: 'number', label: 'Max Tokens', default: 2048 }
+  },
+  execute: async ({ config }) => {
+    // Per-user credentials (from Credentials Manager) with fallback to global env
+    const userCreds = config._credentials || {};
+    const apiKey = userCreds.apiKey || userCreds.api_key || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured — add it in Credentials Manager or set GEMINI_API_KEY in .env');
+    }
+
+    const model = config.model || 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: config.message || '' }] }],
+      systemInstruction: config.systemPrompt ? { parts: [{ text: config.systemPrompt }] } : undefined,
+      generationConfig: {
+        temperature: config.temperature ?? 0.7,
+        maxOutputTokens: config.maxTokens || 2048,
+      },
+    };
+
+    const res = await axios.post(url, body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+    });
+
+    const candidate = res.data.candidates?.[0];
+    if (!candidate) {
+      throw new Error(res.data.error?.message || 'No response from Gemini API');
+    }
+
+    const text = candidate.content?.parts?.map(p => p.text).join('') || '';
+    const usage = res.data.usageMetadata || {};
+
+    return {
+      response: text,
+      tokensUsed: (usage.promptTokenCount || 0) + (usage.candidatesTokenCount || 0),
+      model,
+    };
   }
 });
 
@@ -461,12 +521,15 @@ registry.register('aiClassify', {
     const text = data[config.textField] || JSON.stringify(data);
     const categories = config.categories.split(',').map(c => c.trim());
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+    // Per-user credentials with fallback to global env
+    const userCreds = config._credentials || {};
+    const apiKey = userCreds.apiKey || userCreds.api_key || process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('Anthropic API key not configured — add it in Credentials Manager or set ANTHROPIC_API_KEY in .env');
     }
 
     const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 100,
@@ -497,12 +560,15 @@ registry.register('aiSummarize', {
     const data = Object.values(input)[0] || {};
     const text = data[config.textField] || JSON.stringify(data);
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
+    // Per-user credentials with fallback to global env
+    const userCreds = config._credentials || {};
+    const apiKey = userCreds.apiKey || userCreds.api_key || process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('Anthropic API key not configured — add it in Credentials Manager or set ANTHROPIC_API_KEY in .env');
     }
 
     const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 500,

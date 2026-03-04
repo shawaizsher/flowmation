@@ -242,7 +242,8 @@ router.post('/:id/execute', async (req, res) => {
       workflowId: req.params.id,
       workspaceId: req.workspaceId,
       triggerType: 'manual',
-      triggerPayload: req.body.payload || {}
+      triggerPayload: req.body.payload || {},
+      credentials: req.body.credentials || {}
     });
 
     res.json({ executionId });
