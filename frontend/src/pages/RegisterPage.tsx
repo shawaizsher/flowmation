@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Zap, Eye, EyeOff, ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -15,6 +15,8 @@ export default function RegisterPage() {
   const [workspaceName, setWorkspaceName] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,9 +30,16 @@ export default function RegisterPage() {
         email,
         password,
       });
-      setAuth(data.token, data.user, data.workspace ?? { id: '', name: '', slug: '', role: '' });
-      toast.success('Account created!');
-      navigate('/dashboard');
+
+      if (data.emailVerificationRequired) {
+        setEmailSent(true);
+        toast.success('Check your email for a verification link!');
+      } else {
+        // Fallback in case verification is disabled
+        setAuth(data.token, data.user, data.workspace ?? { id: '', name: '', slug: '', role: '' });
+        toast.success('Account created!');
+        navigate('/dashboard');
+      }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } }).response?.data?.error ??
@@ -38,6 +47,21 @@ export default function RegisterPage() {
       toast.error(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await authApi.resendVerification(email);
+      toast.success('Verification email resent!');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } }).response?.data?.error ??
+        'Failed to resend';
+      toast.error(msg);
+    } finally {
+      setResending(false);
     }
   };
 
@@ -63,6 +87,40 @@ export default function RegisterPage() {
 
         {/* Card */}
         <div className="card p-8">
+          {emailSent ? (
+            /* ── Email sent confirmation ── */
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-brand-500/10 flex items-center justify-center mb-4">
+                <Mail size={32} className="text-brand-500" />
+              </div>
+              <h2 className="font-display text-xl font-bold text-foreground mb-1">Check your email</h2>
+              <p className="text-sm text-foreground-muted mb-2">
+                We sent a verification link to
+              </p>
+              <p className="text-sm font-semibold text-foreground mb-6">{email}</p>
+              <p className="text-xs text-foreground-muted mb-6 max-w-xs">
+                Click the link in the email to verify your account. The link expires in 24 hours.
+              </p>
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="inline-flex items-center gap-2 text-sm text-brand-500 hover:text-brand-400 font-medium transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={resending ? 'animate-spin' : ''} />
+                {resending ? 'Sending…' : 'Resend verification email'}
+              </button>
+              <div className="mt-6 pt-4 border-t border-surface-border w-full">
+                <Link
+                  to="/login"
+                  className="text-sm text-foreground-muted hover:text-foreground transition-colors"
+                >
+                  Back to Sign In
+                </Link>
+              </div>
+            </div>
+          ) : (
+            /* ── Registration form ── */
+            <>
           <h2 className="font-display text-xl font-bold text-foreground text-center mb-1">
             Create your account
           </h2>
@@ -145,6 +203,8 @@ export default function RegisterPage() {
               Sign in
             </Link>
           </p>
+            </>
+          )}
         </div>
       </div>
     </div>

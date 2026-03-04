@@ -57,8 +57,8 @@ router.post('/:id/versions', async (req, res) => {
 
     const result = await query(
       `INSERT INTO workflow_versions (workflow_id, version, graph, label, message, is_named, created_by)
-       VALUES ($1, $2, $3, $4, $5, true, $6)
-       RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, 1, $6)`,
       [wf.id, wf.version, JSON.stringify(wf.graph), label, message || '', req.user.id]
     );
 
@@ -191,9 +191,11 @@ router.post('/:id/versions/:v/restore', async (req, res) => {
 
       // Save current state as auto-checkpoint
       await client.query(
-        `INSERT INTO workflow_versions (workflow_id, version, graph, label, message, is_named, created_by)
-         VALUES ($1, $2, $3, $4, $5, false, $6)
-         ON CONFLICT (workflow_id, version) DO NOTHING`,
+        `IF NOT EXISTS (SELECT 1 FROM workflow_versions WHERE workflow_id = $1 AND version = $2)
+         BEGIN
+           INSERT INTO workflow_versions (workflow_id, version, graph, label, message, is_named, created_by)
+           VALUES ($1, $2, $3, $4, $5, 0, $6)
+         END`,
         [workflow.id, workflow.version, JSON.stringify(workflow.graph),
          `Auto-save before restore to v${targetVersion}`, 'Auto-checkpoint before restore', req.user.id]
       );
@@ -201,15 +203,16 @@ router.post('/:id/versions/:v/restore', async (req, res) => {
       // Apply restored graph and bump version
       const newVersion = workflow.version + 1;
       const updated = await client.query(
-        `UPDATE workflows SET graph = $1, version = $2, updated_at = NOW()
-         WHERE id = $3 RETURNING *`,
+        `UPDATE workflows SET graph = $1, version = $2, updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE id = $3`,
         [JSON.stringify(target.rows[0].graph), newVersion, workflow.id]
       );
 
       // Record the restore as a named version
       await client.query(
         `INSERT INTO workflow_versions (workflow_id, version, graph, label, message, is_named, created_by)
-         VALUES ($1, $2, $3, $4, $5, true, $6)`,
+         VALUES ($1, $2, $3, $4, $5, 1, $6)`,
         [workflow.id, newVersion, JSON.stringify(target.rows[0].graph),
          `Restored from v${targetVersion}`, `Restored by ${req.user.name}`, req.user.id]
       );

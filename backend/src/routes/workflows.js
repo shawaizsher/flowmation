@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
 
     if (search) {
       params.push(`%${search}%`);
-      sql += ` AND (w.name ILIKE $${params.length} OR w.description ILIKE $${params.length})`;
+      sql += ` AND (w.name LIKE $${params.length} OR w.description LIKE $${params.length})`;
     }
 
     if (status) {
@@ -51,8 +51,8 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5)`,
       [
         req.workspaceId,
         name,
@@ -113,9 +113,11 @@ router.put('/:id', async (req, res) => {
       // Snapshot current version before update
       if (graph && JSON.stringify(graph) !== JSON.stringify(workflow.graph)) {
         await client.query(
-          `INSERT INTO workflow_versions (workflow_id, version, graph, created_by)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (workflow_id, version) DO NOTHING`,
+          `IF NOT EXISTS (SELECT 1 FROM workflow_versions WHERE workflow_id = $1 AND version = $2)
+           BEGIN
+             INSERT INTO workflow_versions (workflow_id, version, graph, created_by)
+             VALUES ($1, $2, $3, $4)
+           END`,
           [workflow.id, workflow.version, JSON.stringify(workflow.graph), req.user.id]
         );
       }
@@ -130,9 +132,9 @@ router.put('/:id', async (req, res) => {
              status = COALESCE($4, status),
              tags = COALESCE($5, tags),
              version = $6,
-             updated_at = NOW()
-         WHERE id = $7 AND workspace_id = $8
-         RETURNING *`,
+             updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE id = $7 AND workspace_id = $8`,
         [
           name || null,
           description !== undefined ? description : null,
@@ -172,7 +174,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM workflows WHERE id = $1 AND workspace_id = $2 RETURNING id',
+      'DELETE FROM workflows OUTPUT DELETED.id WHERE id = $1 AND workspace_id = $2',
       [req.params.id, req.workspaceId]
     );
 
@@ -203,8 +205,8 @@ router.post('/:id/duplicate', async (req, res) => {
     const wf = original.rows[0];
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
+       OUTPUT INSERTED.*
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         req.workspaceId,
         `${wf.name} (copy)`,
@@ -257,7 +259,7 @@ router.get('/:id/presence', async (req, res) => {
       `SELECT we.user_id, u.name, u.email, we.last_seen
        FROM workflow_editors we
        JOIN users u ON we.user_id = u.id
-       WHERE we.workflow_id = $1 AND we.last_seen > NOW() - INTERVAL '5 minutes'`,
+       WHERE we.workflow_id = $1 AND we.last_seen > DATEADD(minute, -5, GETDATE())`,
       [req.params.id]
     );
 

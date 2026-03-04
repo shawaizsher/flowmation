@@ -137,9 +137,12 @@ class WebSocketManager {
     // Update DB
     try {
       await query(
-        `INSERT INTO workflow_editors (workflow_id, user_id, socket_id, last_seen)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (workflow_id, user_id) DO UPDATE SET socket_id = $3, last_seen = NOW()`,
+        `MERGE INTO workflow_editors AS target
+         USING (SELECT $1 AS workflow_id, $2 AS user_id, $3 AS socket_id) AS source
+         ON target.workflow_id = source.workflow_id AND target.user_id = source.user_id
+         WHEN MATCHED THEN UPDATE SET socket_id = source.socket_id, last_seen = GETDATE()
+         WHEN NOT MATCHED THEN INSERT (workflow_id, user_id, socket_id, last_seen) 
+         VALUES (source.workflow_id, source.user_id, source.socket_id, GETDATE());`,
         [workflowId, client.userId, socketId]
       );
     } catch (e) { /* non-critical */ }

@@ -147,7 +147,7 @@ export default function LandingPage() {
               '--duration': `${8 + (i % 4) * 3}s`,
               width: `${2 + (i % 2)}px`,
               height: `${2 + (i % 2)}px`,
-              background: i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(139,92,246,0.08)',
+              background: i % 2 === 0 ? 'rgba(139,92,246,0.08)' : 'rgba(139,92,246,0.06)',
             } as React.CSSProperties}
           />
         ))}
@@ -254,7 +254,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Marquee — Integration logos ── */}
-      <section className="relative z-10 py-10 overflow-hidden border-y border-white/[0.06]">
+      <section className="relative z-10 py-10 overflow-hidden border-y border-surface-border">
         <p className="text-center text-xs font-medium uppercase tracking-widest text-foreground-muted mb-6">
           Connects with your favorite tools
         </p>
@@ -341,7 +341,7 @@ export default function LandingPage() {
 
       {/* ── CTA Section ── */}
       <section className="relative z-10 max-w-4xl mx-auto px-6 pb-28 text-center">
-        <div className="rounded-3xl p-14 relative overflow-hidden border border-white/[0.06] bg-surface-card">
+        <div className="rounded-3xl p-14 relative overflow-hidden border border-surface-border bg-surface-card">
           {/* Background glow */}
           <div className="absolute inset-0 animate-aurora opacity-20 pointer-events-none rounded-3xl" />
           <div className="glow-dot animate-morph-blob w-[250px] h-[250px] bg-brand-500/[0.06] -top-24 -right-24" />
@@ -367,7 +367,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-white/[0.06] py-10 text-center">
+      <footer className="relative z-10 border-t border-surface-border py-10 text-center">
         <span className="font-display text-sm font-medium text-foreground-muted">
           &copy; {new Date().getFullYear()} Flowa
         </span>

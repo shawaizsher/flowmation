@@ -2,12 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
-const { Pool } = require('pg');
 
 const logger = require('./utils/logger');
 const { initDb } = require('./db');
 const { initRedis } = require('./db/redis');
 const { initWebSocket } = require('./services/websocket');
+const { initEmail } = require('./services/email');
 
 const authRoutes = require('./routes/auth');
 const workflowRoutes = require('./routes/workflows');
@@ -133,6 +133,7 @@ async function start() {
   try {
     await initDb();
     await initRedis();
+    await initEmail();
     initWebSocket(server);
 
     server.listen(PORT, () => {

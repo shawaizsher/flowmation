@@ -95,9 +95,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
       `UPDATE executions
-       SET status = 'cancelled', finished_at = NOW()
-       WHERE id = $1 AND workspace_id = $2 AND status IN ('pending', 'running')
-       RETURNING id`,
+       SET status = 'cancelled', finished_at = GETDATE()
+       OUTPUT INSERTED.id
+       WHERE id = $1 AND workspace_id = $2 AND status IN ('pending', 'running')`,
       [req.params.id, req.workspaceId]
     );
 

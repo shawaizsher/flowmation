@@ -441,9 +441,13 @@ body {
 
 /* ── NEW animation utility classes ── */
 .animate-aurora {
-  background: linear-gradient(135deg, #27272A, #18181B, #1a1a2e, #16161a, #1e1e28, #27272A);
+  background: linear-gradient(135deg, #E8E0F0, #D4D0E8, #C8D8F0, #D8D4E8, #E0DCF0, #E8E0F0);
   background-size: 400% 400%;
   animation: aurora 15s ease infinite;
+}
+.dark .animate-aurora {
+  background: linear-gradient(135deg, #27272A, #18181B, #1a1a2e, #16161a, #1e1e28, #27272A);
+  background-size: 400% 400%;
 }
 
 .animate-morph-blob {

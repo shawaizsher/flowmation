@@ -23,7 +23,7 @@ function applyTheme(theme: Theme) {
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    return stored || 'dark';
+    return stored || 'light';
   });
 
   const setTheme = useCallback((t: Theme) => {

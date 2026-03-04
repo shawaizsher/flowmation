@@ -1,22 +1,23 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16-alpine
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-flowa}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowa_secret_2026}
-      POSTGRES_DB: ${POSTGRES_DB:-flowa}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Flowa_Secret_2026!}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
     ports:
-      - "5432:5432"
+      - "1433:1433"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sqldata:/var/opt/mssql
       - ./backend/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flowa"]
-      interval: 5s
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Flowa_Secret_2026! -Q 'SELECT 1' || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -39,7 +40,11 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 4000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://flowa:flowa_secret_2026@postgres:5432/flowa}
+      DB_SERVER: ${DB_SERVER:-sqlserver}
+      DB_PORT: ${DB_PORT:-1433}
+      DB_DATABASE: ${DB_DATABASE:-flowa}
+      DB_USER: ${DB_USER:-sa}
+      DB_PASSWORD: ${DB_PASSWORD:-Flowa_Secret_2026!}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
@@ -47,7 +52,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
-      postgres:
+      sqlserver:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -62,14 +67,18 @@ services:
     command: node src/worker.js
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://flowa:flowa_secret_2026@postgres:5432/flowa}
+      DB_SERVER: ${DB_SERVER:-sqlserver}
+      DB_PORT: ${DB_PORT:-1433}
+      DB_DATABASE: ${DB_DATABASE:-flowa}
+      DB_USER: ${DB_USER:-sa}
+      DB_PASSWORD: ${DB_PASSWORD:-Flowa_Secret_2026!}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
-      postgres:
+      sqlserver:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -93,5 +102,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  pgdata:
+  sqldata:
   redisdata:

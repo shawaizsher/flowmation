@@ -142,7 +142,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
 
     // Update execution as running
     await query(
-      "UPDATE executions SET status = 'running', started_at = NOW() WHERE id = $1",
+      "UPDATE executions SET status = 'running', started_at = GETDATE() WHERE id = $1",
       [executionId]
     );
 
@@ -181,7 +181,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
       // Log trigger execution
       await query(
         `INSERT INTO node_logs (execution_id, node_id, node_type, node_label, status, input, output, started_at, finished_at, duration_ms)
-         VALUES ($1, $2, $3, $4, 'success', $5, $6, NOW(), NOW(), 0)`,
+         VALUES ($1, $2, $3, $4, 'success', $5, $6, GETDATE(), GETDATE(), 0)`,
         [executionId, trigger.id, trigger.data?.type || trigger.type,
          trigger.data?.label || 'Trigger', JSON.stringify(triggerPayload),
          JSON.stringify(triggerPayload)]
@@ -241,7 +241,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           skipped.add(node.id);
           await query(
             `INSERT INTO node_logs (execution_id, node_id, node_type, node_label, status, started_at, finished_at)
-             VALUES ($1, $2, $3, $4, 'skipped', NOW(), NOW())`,
+             VALUES ($1, $2, $3, $4, 'skipped', GETDATE(), GETDATE())`,
             [executionId, node.id, nodeType, nodeLabel]
           );
           return;
@@ -250,7 +250,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         // Create node log record
         const logResult = await query(
           `INSERT INTO node_logs (execution_id, node_id, node_type, node_label, status, started_at)
-           VALUES ($1, $2, $3, $4, 'running', NOW()) RETURNING id`,
+           OUTPUT INSERTED.id
+           VALUES ($1, $2, $3, $4, 'running', GETDATE())`,
           [executionId, node.id, nodeType, nodeLabel]
         );
         const logId = logResult.rows[0].id;
@@ -298,7 +299,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
 
           // Update log
           await query(
-            `UPDATE node_logs SET status = 'success', output = $1, finished_at = NOW(), duration_ms = $2, input = $3
+            `UPDATE node_logs SET status = 'success', output = $1, finished_at = GETDATE(), duration_ms = $2, input = $3
              WHERE id = $4`,
             [JSON.stringify(output), duration, JSON.stringify(input), logId]
           );
@@ -322,7 +323,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
 
           // Update log with failure
           await query(
-            `UPDATE node_logs SET status = 'failed', error = $1, finished_at = NOW(), duration_ms = $2
+            `UPDATE node_logs SET status = 'failed', error = $1, finished_at = GETDATE(), duration_ms = $2
              WHERE id = $3`,
             [err.message, duration, logId]
           );
@@ -350,7 +351,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
   // Finalize execution
   const totalDuration = Date.now() - startTime;
   await query(
-    `UPDATE executions SET status = $1, error = $2, finished_at = NOW(), duration_ms = $3
+    `UPDATE executions SET status = $1, error = $2, finished_at = GETDATE(), duration_ms = $3
      WHERE id = $4`,
     [executionStatus, executionError, totalDuration, executionId]
   );
