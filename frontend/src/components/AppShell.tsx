@@ -1,12 +1,12 @@
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import {
-  Zap,
   LayoutDashboard,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import FlowaLogo from './FlowaLogo';
 import { useState } from 'react';
 import { useStore } from '../store';
 import toast from 'react-hot-toast';
@@ -37,9 +37,7 @@ export default function AppShell() {
       >
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 py-5 border-b border-surface-border">
-          <div className="w-8 h-8 min-w-[32px] rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/25">
-            <Zap size={16} className="text-white" />
-          </div>
+          <FlowaLogo size={32} className="min-w-[32px]" />
           {!collapsed && (
             <span className="font-display text-lg font-bold tracking-tight text-foreground truncate">
               Flowa

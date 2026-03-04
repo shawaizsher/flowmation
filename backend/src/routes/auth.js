@@ -30,11 +30,15 @@ router.post('/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Auto-verify if no SMTP is configured (dev mode)
+    const smtpConfigured = !!process.env.SMTP_HOST;
+    const autoVerify = !smtpConfigured;
+
     const result = await transaction(async (client) => {
-      // Create user (email_verified = 0 by default)
+      // Create user — auto-verify if no SMTP
       const userResult = await client.query(
-        'INSERT INTO users (email, password_hash, name, email_verified) OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role VALUES ($1, $2, $3, 0)',
-        [email.toLowerCase(), passwordHash, name]
+        'INSERT INTO users (email, password_hash, name, email_verified) OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role VALUES ($1, $2, $3, $4)',
+        [email.toLowerCase(), passwordHash, name, autoVerify ? 1 : 0]
       );
       const user = userResult.rows[0];
 
@@ -52,16 +56,43 @@ router.post('/register', async (req, res) => {
         [workspace.id, user.id, 'owner']
       );
 
-      // Generate email verification token (valid 24h)
-      const token = generateToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      await client.query(
-        'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-        [user.id, token, expiresAt]
+      let verificationToken = null;
+      if (!autoVerify) {
+        // Generate email verification token (valid 24h)
+        verificationToken = generateToken();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        await client.query(
+          'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+          [user.id, verificationToken, expiresAt]
+        );
+      }
+
+      return { user, workspace, verificationToken };
+    });
+
+    if (autoVerify) {
+      // No SMTP — auto-verified, issue JWT immediately so user can log in
+      const jwtToken = jwt.sign({ userId: result.user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+      const workspaces = await query(
+        `SELECT w.id, w.name, w.slug, wm.role
+         FROM workspaces w
+         JOIN workspace_members wm ON w.id = wm.workspace_id
+         WHERE wm.user_id = $1
+         ORDER BY w.created_at ASC`,
+        [result.user.id]
       );
 
-      return { user, workspace, verificationToken: token };
-    });
+      logger.info(`User registered (auto-verified, no SMTP): ${result.user.email}`);
+
+      return res.status(201).json({
+        message: 'Account created and verified!',
+        token: jwtToken,
+        user: { id: result.user.id, email: result.user.email, name: result.user.name },
+        workspace: workspaces.rows[0] || null,
+        emailVerificationRequired: false,
+      });
+    }
 
     // Send verification email (non-blocking — don't fail registration if email fails)
     sendVerificationEmail(email.toLowerCase(), name, result.verificationToken).catch((err) => {

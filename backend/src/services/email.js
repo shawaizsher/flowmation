@@ -64,21 +64,21 @@ async function sendVerificationEmail(toEmail, userName, token) {
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px;">
         <div style="text-align: center; margin-bottom: 32px;">
-          <div style="display: inline-block; background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">⚡</div>
+          <div style="display: inline-block; background: linear-gradient(135deg, #F63049, #E11D48); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">⚡</div>
           <h1 style="margin: 12px 0 0; font-size: 24px; color: #111;">Flowa</h1>
         </div>
         <h2 style="font-size: 20px; color: #111; margin-bottom: 8px;">Verify your email</h2>
         <p style="color: #555; font-size: 15px; line-height: 1.6;">Hi ${userName},</p>
         <p style="color: #555; font-size: 15px; line-height: 1.6;">Thanks for signing up! Please confirm your email address by clicking the button below.</p>
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${verifyUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white; text-decoration: none; padding: 14px 36px; border-radius: 10px; font-weight: 600; font-size: 15px;">
+          <a href="${verifyUrl}" style="display: inline-block; background: linear-gradient(135deg, #F63049, #E11D48); color: white; text-decoration: none; padding: 14px 36px; border-radius: 10px; font-weight: 600; font-size: 15px;">
             Verify Email Address
           </a>
         </div>
         <p style="color: #888; font-size: 13px; line-height: 1.5;">This link expires in 24 hours. If you didn't create a Flowa account, you can safely ignore this email.</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
         <p style="color: #aaa; font-size: 12px;">Or copy and paste this URL into your browser:</p>
-        <p style="color: #8B5CF6; font-size: 12px; word-break: break-all;">${verifyUrl}</p>
+        <p style="color: #F63049; font-size: 12px; word-break: break-all;">${verifyUrl}</p>
       </div>
     `,
     text: `Hi ${userName},\n\nVerify your Flowa account by visiting:\n${verifyUrl}\n\nThis link expires in 24 hours.`,

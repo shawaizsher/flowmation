@@ -166,8 +166,8 @@ const iconMap: Record<string, IconDef> = {
   openai_image:          { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
   anthropic_chat:        { icon: <Zap size={ICON_SIZE} />,             bg: 'bg-orange-500/20',  fg: 'text-orange-400' },
   huggingface_inference: { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
-  ai_text_classifier:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
-  ai_summarizer:         { icon: <BookOpen size={ICON_SIZE} />,        bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  ai_text_classifier:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
+  ai_summarizer:         { icon: <BookOpen size={ICON_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   whisper_transcribe:    { icon: <Megaphone size={ICON_SIZE} />,       bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
 
   // Social Media
@@ -178,7 +178,7 @@ const iconMap: Record<string, IconDef> = {
   reddit_post:           { icon: <SiReddit size={SI_SIZE} />,          bg: 'bg-orange-600/20',  fg: 'text-orange-400' },
 
   // Messaging
-  slack_message:         { icon: <SiSlack size={SI_SIZE} />,           bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  slack_message:         { icon: <SiSlack size={SI_SIZE} />,           bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   discord_message:       { icon: <SiDiscord size={SI_SIZE} />,         bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
   telegram_send:         { icon: <SiTelegram size={SI_SIZE} />,        bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   whatsapp_send:         { icon: <SiWhatsapp size={SI_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
@@ -240,13 +240,13 @@ const iconMap: Record<string, IconDef> = {
   notion_query:          { icon: <SiNotion size={SI_SIZE} />,          bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
 
   // Payments
-  stripe_charge:         { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
-  stripe_customer:       { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  stripe_charge:         { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
+  stripe_customer:       { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   paypal_payment:        { icon: <SiPaypal size={SI_SIZE} />,          bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
 
   // Analytics
   google_analytics:      { icon: <SiGoogle size={SI_SIZE} />,          bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
-  mixpanel_track:        { icon: <SiMixpanel size={SI_SIZE} />,        bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  mixpanel_track:        { icon: <SiMixpanel size={SI_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   segment_track:         { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
 
   // Utilities
@@ -273,14 +273,14 @@ const iconMap: Record<string, IconDef> = {
   openai_embeddings:     { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
   openai_tts:            { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
   langchain_chain:       { icon: <SiLangchain size={SI_SIZE} />,       bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  stability_generate:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  stability_generate:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   cohere_generate:       { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
   cohere_embed:          { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
 
   // Vector Databases
   pinecone_upsert:       { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
   pinecone_query:        { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  qdrant_search:         { icon: <Database size={ICON_SIZE} />,        bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  qdrant_search:         { icon: <Database size={ICON_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   weaviate_query:        { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
   chroma_query:          { icon: <Database size={ICON_SIZE} />,        bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
 
@@ -293,28 +293,28 @@ const iconMap: Record<string, IconDef> = {
   facebook_post:         { icon: <SiFacebook size={SI_SIZE} />,        bg: 'bg-blue-600/20',    fg: 'text-blue-500' },
   pinterest_pin:         { icon: <SiPinterest size={SI_SIZE} />,       bg: 'bg-red-500/20',     fg: 'text-red-400' },
   youtube_upload:        { icon: <SiYoutube size={SI_SIZE} />,         bg: 'bg-red-600/20',     fg: 'text-red-500' },
-  twitch_send:           { icon: <SiTwitch size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  twitch_send:           { icon: <SiTwitch size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   spotify_search:        { icon: <SiSpotify size={SI_SIZE} />,         bg: 'bg-green-500/20',   fg: 'text-green-400' },
 
   // Messaging (expanded)
-  teams_message:         { icon: <MessageSquare size={ICON_SIZE} />,   bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  teams_message:         { icon: <MessageSquare size={ICON_SIZE} />,   bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   sendgrid_email:        { icon: <SiSendgrid size={SI_SIZE} />,        bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   mailgun_send:          { icon: <SiMailgun size={SI_SIZE} />,         bg: 'bg-red-500/20',     fg: 'text-red-400' },
 
   // Project Management
   jira_create_issue:     { icon: <SiJira size={SI_SIZE} />,            bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   jira_update_issue:     { icon: <SiJira size={SI_SIZE} />,            bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
-  linear_create_issue:   { icon: <SiLinear size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  linear_create_issue:   { icon: <SiLinear size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   trello_create_card:    { icon: <SiTrello size={SI_SIZE} />,          bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   asana_create_task:     { icon: <SiAsana size={SI_SIZE} />,           bg: 'bg-pink-500/20',    fg: 'text-pink-400' },
-  clickup_create_task:   { icon: <SiClickup size={SI_SIZE} />,         bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  clickup_create_task:   { icon: <SiClickup size={SI_SIZE} />,         bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   todoist_add_task:      { icon: <SiTodoist size={SI_SIZE} />,         bg: 'bg-red-500/20',     fg: 'text-red-400' },
   monday_create_item:    { icon: <BarChart3 size={ICON_SIZE} />,       bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
 
   // E-Commerce
   shopify_get_orders:    { icon: <SiShopify size={SI_SIZE} />,         bg: 'bg-green-500/20',   fg: 'text-green-400' },
   shopify_create_product:{ icon: <SiShopify size={SI_SIZE} />,         bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  woocommerce_get_orders:{ icon: <SiWoocommerce size={SI_SIZE} />,     bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  woocommerce_get_orders:{ icon: <SiWoocommerce size={SI_SIZE} />,     bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   gumroad_get_sales:     { icon: <SiGumroad size={SI_SIZE} />,         bg: 'bg-pink-500/20',    fg: 'text-pink-400' },
   lemonsqueezy_get_orders:{ icon: <SiLemonsqueezy size={SI_SIZE} />,   bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
 
@@ -334,7 +334,7 @@ const iconMap: Record<string, IconDef> = {
   // Scheduling & Video
   calendly_get_events:   { icon: <SiCalendly size={SI_SIZE} />,        bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   zoom_create_meeting:   { icon: <SiZoom size={SI_SIZE} />,            bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
-  loom_get_videos:       { icon: <SiLoom size={SI_SIZE} />,            bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  loom_get_videos:       { icon: <SiLoom size={SI_SIZE} />,            bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   vimeo_upload:          { icon: <SiVimeo size={SI_SIZE} />,           bg: 'bg-cyan-500/20',    fg: 'text-cyan-400' },
 
   // Cloud & DevOps (expanded)
@@ -345,7 +345,7 @@ const iconMap: Record<string, IconDef> = {
   cloudflare_worker:     { icon: <SiCloudflare size={SI_SIZE} />,      bg: 'bg-orange-500/20',  fg: 'text-orange-400' },
   digitalocean_droplet:  { icon: <SiDigitalocean size={SI_SIZE} />,    bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   netlify_deploy:        { icon: <SiNetlify size={SI_SIZE} />,         bg: 'bg-teal-500/20',    fg: 'text-teal-400' },
-  railway_deploy:        { icon: <SiRailway size={SI_SIZE} />,         bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  railway_deploy:        { icon: <SiRailway size={SI_SIZE} />,         bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
 
   // Files & Storage (expanded)
   dropbox_upload:        { icon: <SiDropbox size={SI_SIZE} />,         bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
@@ -361,8 +361,8 @@ const iconMap: Record<string, IconDef> = {
   activecampaign_contact:{ icon: <Send size={ICON_SIZE} />,            bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
 
   // Design
-  figma_get_file:        { icon: <SiFigma size={SI_SIZE} />,           bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
-  figma_export:          { icon: <SiFigma size={SI_SIZE} />,           bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  figma_get_file:        { icon: <SiFigma size={SI_SIZE} />,           bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
+  figma_export:          { icon: <SiFigma size={SI_SIZE} />,           bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   canva_create_design:   { icon: <SiCanva size={SI_SIZE} />,           bg: 'bg-cyan-500/20',    fg: 'text-cyan-400' },
 
   // CRM (expanded)
@@ -375,11 +375,11 @@ const iconMap: Record<string, IconDef> = {
   webhook_response:      { icon: <Webhook size={ICON_SIZE} />,         bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
   websocket_send:        { icon: <Globe size={ICON_SIZE} />,           bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
   typeform_responses:    { icon: <SiTypeform size={SI_SIZE} />,        bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
-  google_forms_responses:{ icon: <SiGoogleforms size={SI_SIZE} />,     bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  google_forms_responses:{ icon: <SiGoogleforms size={SI_SIZE} />,     bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
 
   // Payments (expanded)
-  stripe_subscription:   { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
-  stripe_webhook:        { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-purple-500/20',  fg: 'text-purple-400' },
+  stripe_subscription:   { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
+  stripe_webhook:        { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
 };
 
 // ── Default fallback icon ──

@@ -27,11 +27,11 @@ export interface ConfigField {
 export const categoryMeta: Record<string, { label: string; icon: string; color: string }> = {
   triggers:    { label: 'Triggers',            icon: '⚡', color: 'text-yellow-400' },
   google:      { label: 'Google',              icon: '🔍', color: 'text-blue-400' },
-  ai:          { label: 'AI & ML',             icon: '🧠', color: 'text-purple-400' },
+  ai:          { label: 'AI & ML',             icon: '🧠', color: 'text-rose-400' },
   social:      { label: 'Social Media',        icon: '📱', color: 'text-pink-400' },
   messaging:   { label: 'Messaging',           icon: '💬', color: 'text-green-400' },
   databases:   { label: 'Databases',           icon: '🗄️', color: 'text-orange-400' },
-  vectordb:    { label: 'Vector Databases',    icon: '🔮', color: 'text-violet-400' },
+  vectordb:    { label: 'Vector Databases',    icon: '🔮', color: 'text-rose-400' },
   cloud:       { label: 'Cloud & DevOps',      icon: '☁️', color: 'text-cyan-400' },
   http:        { label: 'HTTP & APIs',         icon: '🌐', color: 'text-indigo-400' },
   files:       { label: 'Files & Storage',     icon: '📁', color: 'text-amber-400' },
@@ -40,7 +40,7 @@ export const categoryMeta: Record<string, { label: string; icon: string; color: 
   crm:         { label: 'CRM & Sales',         icon: '💼', color: 'text-emerald-400' },
   productivity:{ label: 'Project Management',  icon: '📋', color: 'text-sky-400' },
   ecommerce:   { label: 'E-Commerce',          icon: '🛒', color: 'text-fuchsia-400' },
-  cms:         { label: 'CMS & Website',       icon: '🌍', color: 'text-violet-400' },
+  cms:         { label: 'CMS & Website',       icon: '🌍', color: 'text-rose-400' },
   support:     { label: 'Support & Helpdesk',  icon: '🎧', color: 'text-pink-400' },
   scheduling:  { label: 'Scheduling & Video',  icon: '📅', color: 'text-sky-400' },
   marketing:   { label: 'Marketing',           icon: '📣', color: 'text-rose-400' },
@@ -303,7 +303,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Classify text into categories using AI',
     category: 'ai',
     icon: '🏷️',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       text: { type: 'string', label: 'Text Input', default: '' },
       categories: { type: 'string', label: 'Categories (comma-sep)', default: 'positive,negative,neutral' },
@@ -315,7 +315,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Summarize long text with AI',
     category: 'ai',
     icon: '📋',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       text: { type: 'code', label: 'Text to Summarize', default: '' },
       maxLength: { type: 'number', label: 'Max Length (words)', default: 100 },
@@ -403,7 +403,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Send a message to a Slack channel',
     category: 'messaging',
     icon: '💬',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       channel: { type: 'string', label: 'Channel', default: '#general' },
       text: { type: 'code', label: 'Message', default: '' },
@@ -982,7 +982,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Create a payment charge via Stripe',
     category: 'payments',
     icon: '💳',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       amount: { type: 'number', label: 'Amount (cents)', default: 0 },
       currency: { type: 'string', label: 'Currency', default: 'usd' },
@@ -995,7 +995,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Retrieve a Stripe customer',
     category: 'payments',
     icon: '👤',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       customerId: { type: 'string', label: 'Customer ID', default: '' },
     },
@@ -1035,7 +1035,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Send tracking event to Mixpanel',
     category: 'analytics',
     icon: '📊',
-    color: 'text-purple-500',
+    color: 'text-rose-500',
     configSchema: {
       event: { type: 'string', label: 'Event Name', default: '' },
       properties: { type: 'json', label: 'Properties', default: '{}' },
@@ -1317,7 +1317,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Generate images with Stable Diffusion via Stability AI',
     category: 'ai',
     icon: '🎨',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       prompt: { type: 'code', label: 'Prompt', default: '' },
       negativePrompt: { type: 'code', label: 'Negative Prompt', default: '' },
@@ -1388,7 +1388,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Search vectors in Qdrant',
     category: 'vectordb',
     icon: '🔷',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       url: { type: 'string', label: 'Qdrant URL', default: 'http://localhost:6333' },
       collection: { type: 'string', label: 'Collection', default: '' },
@@ -1516,7 +1516,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Send a message to a Twitch channel chat',
     category: 'social',
     icon: '🟣',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       channel: { type: 'string', label: 'Channel', default: '' },
       message: { type: 'string', label: 'Message', default: '' },
@@ -1543,7 +1543,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Send a message to a Microsoft Teams channel',
     category: 'messaging',
     icon: '💜',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       webhookUrl: { type: 'string', label: 'Webhook URL', default: '', required: true },
       text: { type: 'code', label: 'Message', default: '' },
@@ -1617,7 +1617,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Create an issue in Linear',
     category: 'productivity',
     icon: '📐',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       teamId: { type: 'string', label: 'Team ID', default: '' },
       title: { type: 'string', label: 'Title', default: '' },
@@ -1661,7 +1661,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Create a task in ClickUp',
     category: 'productivity',
     icon: '✅',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       listId: { type: 'string', label: 'List ID', default: '' },
       name: { type: 'string', label: 'Task Name', default: '' },
@@ -1734,7 +1734,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Retrieve orders from WooCommerce',
     category: 'ecommerce',
     icon: '🛒',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       status: { type: 'select', label: 'Status', default: 'any', options: ['any', 'pending', 'processing', 'completed', 'cancelled', 'refunded'] },
       perPage: { type: 'number', label: 'Per Page', default: 25 },
@@ -1928,7 +1928,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Retrieve videos from Loom workspace',
     category: 'scheduling',
     icon: '🎥',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       limit: { type: 'number', label: 'Limit', default: 25 },
     },
@@ -2045,7 +2045,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Deploy a service on Railway',
     category: 'cloud',
     icon: '🚂',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       serviceId: { type: 'string', label: 'Service ID', default: '' },
       environmentId: { type: 'string', label: 'Environment ID', default: '' },
@@ -2178,7 +2178,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Retrieve a Figma file or component data',
     category: 'design',
     icon: '🎨',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       fileKey: { type: 'string', label: 'File Key', default: '' },
       nodeIds: { type: 'string', label: 'Node IDs (comma-sep)', default: '' },
@@ -2190,7 +2190,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Export images from a Figma file',
     category: 'design',
     icon: '🖼️',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       fileKey: { type: 'string', label: 'File Key', default: '' },
       nodeIds: { type: 'string', label: 'Node IDs', default: '' },
@@ -2311,7 +2311,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Retrieve responses from Google Forms',
     category: 'google',
     icon: '📋',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       formId: { type: 'string', label: 'Form ID', default: '' },
     },
@@ -2324,7 +2324,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Create a subscription in Stripe',
     category: 'payments',
     icon: '🔄',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       customerId: { type: 'string', label: 'Customer ID', default: '' },
       priceId: { type: 'string', label: 'Price ID', default: '' },
@@ -2336,7 +2336,7 @@ export const nodeCatalog: NodeDefinition[] = [
     description: 'Process Stripe webhook events',
     category: 'payments',
     icon: '🔔',
-    color: 'text-purple-400',
+    color: 'text-rose-400',
     configSchema: {
       events: { type: 'string', label: 'Event Types (comma-sep)', default: 'checkout.session.completed,invoice.paid' },
     },

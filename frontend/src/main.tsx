@@ -20,7 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             fontFamily: 'Plus Jakarta Sans, sans-serif',
           },
           success: {
-            iconTheme: { primary: '#8B5CF6', secondary: '#fff' },
+            iconTheme: { primary: '#F63049', secondary: '#fff' },
           },
           error: {
             iconTheme: { primary: '#ef4444', secondary: '#fff' },

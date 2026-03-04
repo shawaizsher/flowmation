@@ -22,7 +22,7 @@
 
   /* Glass */
   --glass-bg:     rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(139, 92, 246, 0.15);
+  --glass-border: rgba(246, 48, 73, 0.15);
 
   /* Card gradient border bg */
   --card-gradient-bg: #FFFFFF;
@@ -76,7 +76,7 @@
 }
 
 ::selection {
-  background: rgba(139, 92, 246, 0.35);
+  background: rgba(246, 48, 73, 0.35);
   color: white;
 }
 
@@ -114,7 +114,7 @@ body {
 
 .react-flow__controls-button:hover {
   background: var(--surface-hover) !important;
-  color: #8B5CF6 !important;
+  color: #F63049 !important;
 }
 
 .react-flow__edge-path {
@@ -123,11 +123,11 @@ body {
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #8B5CF6 !important;
+  stroke: #F63049 !important;
 }
 
 .react-flow__connection-line {
-  stroke: #8B5CF6 !important;
+  stroke: #F63049 !important;
   stroke-width: 2 !important;
 }
 
@@ -139,8 +139,8 @@ body {
 }
 
 .react-flow__handle:hover {
-  border-color: #8B5CF6 !important;
-  background: #8B5CF6 !important;
+  border-color: #F63049 !important;
+  background: #F63049 !important;
 }
 
 /* ── Component classes ── */
@@ -210,8 +210,8 @@ body {
 }
 
 @keyframes pulse-brand {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(246, 48, 73, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(246, 48, 73, 0); }
 }
 
 @keyframes node-success-flash {
@@ -275,8 +275,8 @@ body {
 }
 
 @keyframes borderGlow {
-  0%, 100% { border-color: rgba(139, 92, 246, 0.2); }
-  50% { border-color: rgba(139, 92, 246, 0.5); }
+  0%, 100% { border-color: rgba(246, 48, 73, 0.2); }
+  50% { border-color: rgba(246, 48, 73, 0.5); }
 }
 
 /* ── NEW: Aurora / Northern-lights gradient ── */
@@ -501,7 +501,7 @@ body {
 }
 
 .animate-border-rotate {
-  background: linear-gradient(90deg, #8B5CF6, #06B6D4, #EC4899, #8B5CF6);
+  background: linear-gradient(90deg, #F63049, #06B6D4, #EC4899, #F63049);
   background-size: 200% auto;
   animation: borderRotate 3s linear infinite;
 }
@@ -553,7 +553,7 @@ body {
 
 /* ── Gradient text with modern feel ── */
 .gradient-text-vivid {
-  background: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 50%, #EC4899 100%);
+  background: linear-gradient(135deg, #F63049 0%, #06B6D4 50%, #EC4899 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -564,14 +564,14 @@ body {
 /* ── Glowing card on hover ── */
 .card-glow:hover {
   box-shadow:
-    0 0 20px rgba(139, 92, 246, 0.15),
-    0 0 60px rgba(139, 92, 246, 0.05),
+    0 0 20px rgba(246, 48, 73, 0.15),
+    0 0 60px rgba(246, 48, 73, 0.05),
     0 8px 32px rgba(0, 0, 0, 0.12);
 }
 .dark .card-glow:hover {
   box-shadow:
-    0 0 30px rgba(139, 92, 246, 0.15),
-    0 0 60px rgba(139, 92, 246, 0.05),
+    0 0 30px rgba(246, 48, 73, 0.15),
+    0 0 60px rgba(246, 48, 73, 0.05),
     0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -585,7 +585,7 @@ body {
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(246, 48, 73, 0.08) 0%, transparent 70%);
   left: var(--mouse-x, 50%);
   top: var(--mouse-y, 50%);
   transform: translate(-50%, -50%);
@@ -602,7 +602,7 @@ body {
   position: absolute;
   width: 3px;
   height: 3px;
-  background: rgba(139, 92, 246, 0.25);
+  background: rgba(246, 48, 73, 0.25);
   border-radius: 50%;
   animation: particleDrift var(--duration, 8s) linear infinite;
   animation-delay: var(--delay, 0s);
@@ -644,7 +644,7 @@ body {
   left: 0;
   width: 0%;
   height: 2px;
-  background: linear-gradient(90deg, #8B5CF6, #06B6D4);
+  background: linear-gradient(90deg, #F63049, #06B6D4);
   transition: width 0.3s ease;
 }
 .hover-underline:hover::after {
@@ -689,7 +689,7 @@ body {
 }
 
 .card-gradient-border:hover::before {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.15));
+  background: linear-gradient(135deg, rgba(246, 48, 73, 0.4), rgba(6, 182, 212, 0.3), rgba(246, 48, 73, 0.15));
 }
 
 /* CTA shimmer button */
@@ -715,4 +715,178 @@ body {
   border-radius: 50%;
   filter: blur(80px);
   pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   DIFY-STYLE EFFECTS
+   ══════════════════════════════════════════════════════ */
+
+/* ── Global pointer glow (follows cursor across entire page) ── */
+.pointer-glow-container {
+  position: relative;
+}
+.pointer-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    600px circle at var(--px, -999px) var(--py, -999px),
+    rgba(246, 48, 73, 0.06),
+    rgba(6, 182, 212, 0.02) 40%,
+    transparent 70%
+  );
+  transition: opacity 0.3s ease;
+}
+.dark .pointer-glow {
+  background: radial-gradient(
+    600px circle at var(--px, -999px) var(--py, -999px),
+    rgba(246, 48, 73, 0.08),
+    rgba(6, 182, 212, 0.03) 40%,
+    transparent 70%
+  );
+}
+
+/* ── Typewriter cursor ── */
+.typewriter-cursor {
+  display: inline-block;
+  color: #F63049;
+  font-weight: 300;
+  animation: blink 0.8s step-end infinite;
+  margin-left: 2px;
+}
+
+/* ── Hero text reveal (slide up + fade) ── */
+@keyframes heroTextReveal {
+  0%   { opacity: 0; transform: translateY(30px) scale(0.97); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.hero-text-reveal {
+  opacity: 0;
+  animation: heroTextReveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Hero gradient text (typing target) ── */
+.hero-gradient-text {
+  background: linear-gradient(135deg, #F63049 0%, #FB7185 30%, #06B6D4 60%, #22D3EE 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 5s ease infinite;
+}
+
+/* ── Feature card with local hover spotlight ── */
+.feature-card {
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+}
+.feature-card-glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(246, 48, 73, 0.06),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+.feature-card:hover .feature-card-glow {
+  opacity: 1;
+}
+.feature-card:hover {
+  border-color: rgba(246, 48, 73, 0.25);
+  box-shadow:
+    0 0 20px rgba(246, 48, 73, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+}
+.dark .feature-card:hover {
+  border-color: rgba(246, 48, 73, 0.2);
+  box-shadow:
+    0 0 30px rgba(246, 48, 73, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Proper dual-track marquee (infinite seamless loop) ── */
+.marquee-track {
+  display: flex;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+.marquee-content {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3rem;
+  padding: 0 1.5rem;
+  animation: marquee 35s linear infinite;
+}
+.marquee-item {
+  white-space: nowrap;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--foreground-muted);
+  opacity: 0.5;
+  transition: opacity 0.3s, color 0.3s;
+  cursor: default;
+  user-select: none;
+}
+.marquee-item:hover {
+  opacity: 1;
+  color: var(--foreground-secondary);
+}
+
+/* ── Animated "connecting line" between steps ── */
+.animated-line {
+  position: relative;
+  overflow: hidden;
+}
+.animated-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(246, 48, 73, 0.5), transparent);
+  animation: lineShimmer 3s ease-in-out infinite;
+}
+@keyframes lineShimmer {
+  0%   { left: -30%; }
+  100% { left: 130%; }
+}
+
+/* ── CTA primary button hover shine ── */
+.cta-primary {
+  position: relative;
+  overflow: hidden;
+}
+.cta-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transition: left 0.5s ease;
+}
+.cta-primary:hover::before {
+  left: 130%;
+}
+
+/* ── Shimmer on nav CTA ── */
+.btn-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
 }

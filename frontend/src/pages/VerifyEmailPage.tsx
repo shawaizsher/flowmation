@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Zap, CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import FlowaLogo from '../components/FlowaLogo';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -57,9 +58,7 @@ export default function VerifyEmailPage() {
       <div className="w-full max-w-md text-center">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-brand-500 flex items-center justify-center">
-            <Zap size={20} className="text-white" />
-          </div>
+          <FlowaLogo size={36} />
           <span className="font-display text-2xl font-bold text-foreground tracking-tight">Flowa</span>
         </div>
 

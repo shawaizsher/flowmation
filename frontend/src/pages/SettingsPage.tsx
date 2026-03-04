@@ -295,7 +295,7 @@ export default function SettingsPage() {
                   </label>
                   <div className="flex gap-2">
                     {[
-                      { name: 'Violet', color: 'bg-violet-500' },
+                      { name: 'Rose', color: 'bg-rose-500' },
                       { name: 'Cyan', color: 'bg-cyan-500' },
                       { name: 'Rose', color: 'bg-rose-500' },
                       { name: 'Amber', color: 'bg-amber-500' },
@@ -305,7 +305,7 @@ export default function SettingsPage() {
                         key={c.name}
                         title={c.name}
                         className={`w-8 h-8 rounded-full ${c.color} transition-all duration-200 hover:scale-110 ${
-                          c.name === 'Violet'
+                          c.name === 'Rose'
                             ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-card'
                             : 'opacity-50 hover:opacity-80'
                         }`}

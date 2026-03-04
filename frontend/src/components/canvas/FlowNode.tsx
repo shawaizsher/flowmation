@@ -21,7 +21,7 @@ const statusBadge: Record<string, { bg: string; text: string; label: string }> =
 const categoryAccent: Record<string, string> = {
   triggers:  'from-yellow-400 to-amber-500',
   google:    'from-blue-400 to-blue-600',
-  ai:        'from-purple-400 to-violet-600',
+  ai:        'from-rose-400 to-red-600',
   social:    'from-pink-400 to-rose-500',
   messaging: 'from-green-400 to-emerald-500',
   databases: 'from-orange-400 to-orange-600',

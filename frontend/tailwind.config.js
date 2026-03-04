@@ -9,16 +9,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          50:  '#F5F3FF',
-          100: '#EDE9FE',
-          200: '#DDD6FE',
-          300: '#C4B5FD',
-          400: '#A78BFA',
-          500: '#8B5CF6',  // Primary – Vivid Violet
-          600: '#7C3AED',  // Hover
-          700: '#6D28D9',
-          800: '#5B21B6',
-          900: '#4C1D95',
+          50:  '#FFF1F2',
+          100: '#FFE4E6',
+          200: '#FECDD3',
+          300: '#FDA4AF',
+          400: '#FB7185',
+          500: '#F63049',  // Primary – Flowa Red (matches logo)
+          600: '#E11D48',  // Hover
+          700: '#BE123C',
+          800: '#9F1239',
+          900: '#881337',
         },
         accent: {
           400: '#22D3EE',

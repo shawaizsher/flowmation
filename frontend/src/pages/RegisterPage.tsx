@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap, Eye, EyeOff, ArrowLeft, Mail, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Mail, RefreshCw } from 'lucide-react';
+import FlowaLogo from '../components/FlowaLogo';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -79,9 +80,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-brand-500 flex items-center justify-center">
-            <Zap size={20} className="text-white" />
-          </div>
+          <FlowaLogo size={36} />
           <span className="font-display text-2xl font-bold text-foreground tracking-tight">Flowa</span>
         </div>
 
