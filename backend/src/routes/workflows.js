@@ -109,46 +109,30 @@ router.put('/:id', async (req, res) => {
 
     const workflow = existing.rows[0];
 
-    const result = await transaction(async (client) => {
-      // Snapshot current version before update
-      if (graph && JSON.stringify(graph) !== JSON.stringify(workflow.graph)) {
-        await client.query(
-          `IF NOT EXISTS (SELECT 1 FROM workflow_versions WHERE workflow_id = $1 AND version = $2)
-           BEGIN
-             INSERT INTO workflow_versions (workflow_id, version, graph, created_by)
-             VALUES ($1, $2, $3, $4)
-           END`,
-          [workflow.id, workflow.version, JSON.stringify(workflow.graph), req.user.id]
-        );
-      }
+    // Save is now a draft-only operation — no version bump, no snapshot.
+    // Use POST /:id/publish to create a versioned release.
+    const result = await query(
+      `UPDATE workflows
+       SET name = COALESCE($1, name),
+           description = COALESCE($2, description),
+           graph = COALESCE($3, graph),
+           status = COALESCE($4, status),
+           tags = COALESCE($5, tags),
+           updated_at = GETDATE()
+       OUTPUT INSERTED.*
+       WHERE id = $6 AND workspace_id = $7`,
+      [
+        name || null,
+        description !== undefined ? description : null,
+        graph ? JSON.stringify(graph) : null,
+        status || null,
+        tags || null,
+        req.params.id,
+        req.workspaceId
+      ]
+    );
 
-      const newVersion = graph ? workflow.version + 1 : workflow.version;
-
-      const updated = await client.query(
-        `UPDATE workflows
-         SET name = COALESCE($1, name),
-             description = COALESCE($2, description),
-             graph = COALESCE($3, graph),
-             status = COALESCE($4, status),
-             tags = COALESCE($5, tags),
-             version = $6,
-             updated_at = GETDATE()
-         OUTPUT INSERTED.*
-         WHERE id = $7 AND workspace_id = $8`,
-        [
-          name || null,
-          description !== undefined ? description : null,
-          graph ? JSON.stringify(graph) : null,
-          status || null,
-          tags || null,
-          newVersion,
-          req.params.id,
-          req.workspaceId
-        ]
-      );
-
-      return updated.rows[0];
-    });
+    const updatedWorkflow = result.rows[0];
 
     // Broadcast save event via WebSocket
     try {
@@ -157,16 +141,83 @@ router.put('/:id', async (req, res) => {
         type: 'workflow_saved',
         workflowId: req.params.id,
         savedBy: req.user.name,
-        version: result.version
+        version: updatedWorkflow.version
       });
     } catch (e) {
       // WebSocket broadcast is non-critical
     }
 
-    res.json({ workflow: result });
+    res.json({ workflow: updatedWorkflow });
   } catch (err) {
     logger.error('Update workflow error:', err);
     res.status(500).json({ error: 'Failed to update workflow' });
+  }
+});
+
+// ── POST /api/workspaces/:wid/workflows/:id/publish ──
+// Publishes the current draft as a new named version
+router.post('/:id/publish', async (req, res) => {
+  try {
+    const { label, message } = req.body;
+
+    const existing = await query(
+      'SELECT * FROM workflows WHERE id = $1 AND workspace_id = $2',
+      [req.params.id, req.workspaceId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    const workflow = existing.rows[0];
+    const newVersion = workflow.version + 1;
+
+    const result = await transaction(async (client) => {
+      // Snapshot current graph as the new published version
+      await client.query(
+        `INSERT INTO workflow_versions (workflow_id, version, graph, label, message, is_named, created_by)
+         VALUES ($1, $2, $3, $4, $5, 1, $6)`,
+        [
+          workflow.id,
+          newVersion,
+          JSON.stringify(workflow.graph),
+          label || `v${newVersion}`,
+          message || '',
+          req.user.id
+        ]
+      );
+
+      // Bump the workflow version number
+      const updated = await client.query(
+        `UPDATE workflows SET version = $1, updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE id = $2`,
+        [newVersion, workflow.id]
+      );
+
+      return updated.rows[0];
+    });
+
+    // Broadcast publish event
+    try {
+      const { broadcast } = require('../services/websocket');
+      broadcast(req.params.id, {
+        type: 'workflow_published',
+        workflowId: req.params.id,
+        publishedBy: req.user.name,
+        version: newVersion,
+        label: label || `v${newVersion}`
+      });
+    } catch (e) { /* non-critical */ }
+
+    logger.info(`Workflow ${req.params.id} published as v${newVersion} by ${req.user.email}`);
+    res.json({ workflow: result, version: newVersion });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Version already exists — save and try again' });
+    }
+    logger.error('Publish workflow error:', err);
+    res.status(500).json({ error: 'Failed to publish workflow' });
   }
 });
 

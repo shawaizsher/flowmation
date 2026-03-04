@@ -38,6 +38,7 @@ import {
   ArrowUpFromLine,
   Link2,
   Unlink,
+  Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
@@ -66,6 +67,11 @@ function EditorCanvas() {
   const [workflowVersion, setWorkflowVersion] = useState(1);
   const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
+
+  // Publishing
+  const [publishing, setPublishing] = useState(false);
+  const [showPublishPopover, setShowPublishPopover] = useState(false);
+  const [publishLabel, setPublishLabel] = useState('');
 
   // Panels — both open by default for easier understanding
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
@@ -191,9 +197,14 @@ function EditorCanvas() {
         break;
       case 'workflow_saved':
         if (msg.savedBy !== user?.name) {
-          toast(`${msg.savedBy} saved — v${msg.version}`, { icon: '💾', duration: 3000 });
-          setWorkflowVersion(msg.version);
+          toast(`${msg.savedBy} saved a draft`, { icon: '💾', duration: 3000 });
         }
+        break;
+      case 'workflow_published':
+        if (msg.publishedBy !== user?.name) {
+          toast(`${msg.publishedBy} published v${msg.version} — "${msg.label}"`, { icon: '🚀', duration: 4000 });
+        }
+        setWorkflowVersion(msg.version);
         break;
       case 'execution_started':
         setExecutionId(msg.executionId);
@@ -277,13 +288,43 @@ function EditorCanvas() {
       }));
       const graph = { nodes: graphNodes, edges };
 
-      const res = await workflowApi.update(workspaceId, id, { name: workflowName, graph });
-      setWorkflowVersion(res.data.workflow.version);
-      toast.success('Saved');
+      await workflowApi.update(workspaceId, id, { name: workflowName, graph });
+      toast.success('Draft saved');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setPublishing(true);
+      // Save the current draft first
+      const graphNodes = nodes.map((n) => ({
+        id: n.id,
+        type: n.data.type,
+        position: n.position,
+        data: n.data,
+      }));
+      const graph = { nodes: graphNodes, edges };
+      await workflowApi.update(workspaceId, id, { name: workflowName, graph });
+
+      // Then publish as a new version
+      const res = await workflowApi.publish(workspaceId, id, {
+        label: publishLabel.trim() || undefined,
+      });
+      setWorkflowVersion(res.data.version);
+      toast.success(`Published as v${res.data.version}`);
+      setPublishLabel('');
+      setShowPublishPopover(false);
+      // Refresh version list if the panel is open
+      if (rightPanel === 'versions') loadVersions();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to publish');
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -509,6 +550,9 @@ function EditorCanvas() {
           <span className="rounded bg-surface-border px-2 py-0.5 text-sm text-foreground-muted">
             v{workflowVersion}
           </span>
+          <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-400">
+            DRAFT
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -574,6 +618,47 @@ function EditorCanvas() {
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
             Save
           </button>
+
+          {/* Publish button with popover */}
+          <div className="relative">
+            <button
+              onClick={() => setShowPublishPopover(!showPublishPopover)}
+              disabled={publishing}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-500/15 px-3 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand-500/25 border border-brand-500/30"
+            >
+              {publishing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              Publish
+            </button>
+            {showPublishPopover && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl border border-surface-border bg-surface-card p-4 shadow-2xl">
+                <h4 className="mb-2 text-sm font-semibold text-foreground">Publish New Version</h4>
+                <p className="mb-3 text-xs text-foreground-muted">This will snapshot your current draft as v{workflowVersion + 1}.</p>
+                <input
+                  type="text"
+                  placeholder={`Version label (e.g. "Add Gemini node")`}
+                  value={publishLabel}
+                  onChange={(e) => setPublishLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePublish()}
+                  className="mb-3 w-full rounded-lg border border-surface-border bg-base px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50"
+                  autoFocus
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => setShowPublishPopover(false)} className="text-xs text-foreground-muted hover:text-foreground">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePublish}
+                    disabled={publishing}
+                    className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1"
+                  >
+                    {publishing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                    Publish v{workflowVersion + 1}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleExecute}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
