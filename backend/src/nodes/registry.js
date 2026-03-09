@@ -176,6 +176,77 @@ registry.register('codeBlock', {
   }
 });
 
+registry.register('code_javascript', {
+  label: 'JavaScript Code',
+  description: 'Run custom JavaScript code',
+  category: 'transform',
+  icon: '🟨',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    code: { type: 'code', label: 'Code', language: 'javascript',
+      default: '// Access input via `data`\nreturn data;' }
+  },
+  execute: async ({ config, input }) => {
+    const fn = new Function('data', config.code || 'return data;');
+    const result = fn(input);
+    return { result };
+  }
+});
+
+registry.register('code_python', {
+  label: 'Python Code',
+  description: 'Run custom Python code',
+  category: 'transform',
+  icon: '🐍',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    code: { type: 'code', label: 'Code', language: 'python',
+      default: '# Access input via `data`\nresult = data' }
+  },
+  execute: async ({ config, input }) => {
+    const { execSync } = require('child_process');
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const code = config.code || 'result = None';
+    // Write wrapper to a temp file to avoid shell escaping issues
+    const wrapper = [
+      'import json, sys',
+      'data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}',
+      code,
+      'try:',
+      '    print(json.dumps({"result": result}))',
+      'except NameError:',
+      '    print(json.dumps({"result": None}))'
+    ].join('\n');
+    const tmpFile = path.join(os.tmpdir(), `flowa_py_${Date.now()}.py`);
+    try {
+      fs.writeFileSync(tmpFile, wrapper, 'utf-8');
+      const inputJson = JSON.stringify(input || {});
+      const output = execSync(`python "${tmpFile}" ${JSON.stringify(inputJson)}`, {
+        timeout: 30000,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      // Parse the last line as JSON (in case there's print() output before)
+      const lines = output.trim().split('\n');
+      const lastLine = lines[lines.length - 1];
+      try {
+        return JSON.parse(lastLine);
+      } catch {
+        return { result: output.trim() };
+      }
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString() : err.message;
+      throw new Error(`Python execution failed: ${stderr}`);
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch {}
+    }
+  }
+});
+
 registry.register('setVariable', {
   label: 'Set Variable',
   description: 'Set or transform data fields',

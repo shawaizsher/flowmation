@@ -84,10 +84,17 @@ function buildGraph(nodes, edges) {
 /**
  * Find trigger/starting nodes
  */
+function isTriggerType(type) {
+  return type.endsWith('Trigger') || type.startsWith('trigger_');
+}
+
 function findTriggerNodes(nodes, inDegree) {
-  return nodes.filter(n =>
-    (n.data?.type || n.type || '').endsWith('Trigger') || inDegree[n.id] === 0
-  );
+  const type = n => n.data?.type || n.type || '';
+  // Find actual trigger nodes first
+  const triggers = nodes.filter(n => isTriggerType(type(n)));
+  // If no explicit triggers, use root nodes (inDegree 0) as entry points
+  if (triggers.length > 0) return triggers;
+  return nodes.filter(n => inDegree[n.id] === 0);
 }
 
 /**
@@ -134,7 +141,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
     if (wfResult.rows.length === 0) throw new Error('Workflow not found');
 
     const workflow = wfResult.rows[0];
-    const graph = workflow.graph;
+    const graph = typeof workflow.graph === 'string' ? JSON.parse(workflow.graph) : workflow.graph;
     const nodes = graph.nodes || [];
     const edges = graph.edges || [];
 
@@ -173,9 +180,12 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
     const failed = new Set();
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-    // Find trigger nodes and seed them
-    const triggers = findTriggerNodes(nodes, inDegree);
-    for (const trigger of triggers) {
+    // Find trigger nodes and seed them; queue non-trigger root nodes to run in BFS
+    const triggerNodes = nodes.filter(n => isTriggerType(n.data?.type || n.type || ''));
+    const rootNodes = nodes.filter(n => inDegree[n.id] === 0 && !isTriggerType(n.data?.type || n.type || ''));
+
+    // Seed triggers with payload
+    for (const trigger of triggerNodes) {
       context.nodeOutputs[trigger.id] = triggerPayload;
       completed.add(trigger.id);
 
@@ -207,13 +217,16 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
     while (iteration < MAX_ITERATIONS) {
       iteration++;
 
-      // Find ready nodes: all incoming edges are from completed/skipped nodes
+      // Find ready nodes: all incoming edges are from completed/skipped nodes,
+      // or root nodes with no incoming edges (non-trigger entry points)
       const readyNodes = nodes.filter(n => {
         if (completed.has(n.id) || skipped.has(n.id) || failed.has(n.id)) return false;
 
         // Check all nodes that point to this node
         const incomingEdges = edges.filter(e => e.target === n.id);
-        if (incomingEdges.length === 0) return false;
+
+        // Root nodes with no incoming edges are ready immediately
+        if (incomingEdges.length === 0) return true;
 
         return incomingEdges.every(e =>
           completed.has(e.source) || skipped.has(e.source) || failed.has(e.source)

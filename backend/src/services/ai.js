@@ -274,7 +274,7 @@ async function documentWorkflow(workflow) {
   return {
     title: workflow.name || 'Untitled Workflow',
     description: workflow.description || 'No description available',
-    steps: (workflow.graph?.nodes || []).map(n => ({
+    steps: ((typeof workflow.graph === 'string' ? JSON.parse(workflow.graph) : workflow.graph)?.nodes || []).map(n => ({
       node: n.data?.label || n.id,
       description: `${n.data?.type || n.type} node`
     })),

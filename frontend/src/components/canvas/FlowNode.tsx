@@ -1,5 +1,6 @@
-import { memo, useMemo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { memo, useMemo, useCallback } from 'react';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { X } from 'lucide-react';
 import { useStore } from '../../store';
 import NodeIcon from './NodeIcon';
 import { nodeCatalog } from '../../data/nodeCatalog';
@@ -68,6 +69,12 @@ function FlowNode({ data, selected, id }: NodeProps) {
   const category = getCategoryFromType(data.type || '');
   const accent = categoryAccent[category] || 'from-brand-400 to-brand-600';
   const summary = summaryMap[data.type || ''] || '';
+  const { deleteElements } = useReactFlow();
+
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteElements({ nodes: [{ id }] });
+  }, [id, deleteElements]);
 
   return (
     <div
@@ -79,6 +86,15 @@ function FlowNode({ data, selected, id }: NodeProps) {
           : 'border-[#1e2d42] hover:border-[#2a3f5e]'
       }`}
     >
+      {/* Delete button — visible on hover */}
+      <button
+        onClick={handleDelete}
+        className="absolute right-1.5 top-1.5 z-10 hidden rounded-md p-0.5 text-foreground-muted/60 hover:bg-red-500/20 hover:text-red-400 transition group-hover:flex items-center justify-center"
+        title="Delete node"
+      >
+        <X size={14} />
+      </button>
+
       {/* Category accent bar */}
       <div className={`h-[3px] w-full bg-gradient-to-r ${accent}`} />
 

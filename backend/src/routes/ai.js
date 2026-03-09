@@ -147,7 +147,7 @@ router.post('/apply-fix', async (req, res) => {
     }
 
     const workflow = wfResult.rows[0];
-    const graph = workflow.graph;
+    const graph = typeof workflow.graph === 'string' ? JSON.parse(workflow.graph) : workflow.graph;
 
     // Find the node and patch its config
     const nodeIndex = graph.nodes.findIndex(n => n.id === nodeId);

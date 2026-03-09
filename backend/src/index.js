@@ -134,7 +134,8 @@ async function start() {
     await initDb();
     await initRedis();
     await initEmail();
-    initWebSocket(server);
+    const wsManager = initWebSocket(server);
+    wsManager.initRedisSubscriber();
 
     server.listen(PORT, () => {
       logger.info(`🚀 Flowa backend running on port ${PORT}`);

@@ -1,7 +1,10 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
+const { getRedis, getRedisSub } = require('../db/redis');
 const logger = require('../utils/logger');
+
+const WS_EVENTS_CHANNEL = 'ws:execution-events';
 
 // Color palette for collaborators
 const COLORS = ['#F63049', '#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
@@ -299,6 +302,17 @@ class WebSocketManager {
   }
 
   broadcastToWorkspace(workspaceId, message) {
+    // If running in worker process (no WebSocket server), relay via Redis pub/sub
+    if (!this.wss) {
+      try {
+        const redis = getRedis();
+        redis.publish(WS_EVENTS_CHANNEL, JSON.stringify({ workspaceId, message }));
+      } catch (err) {
+        logger.error('Failed to publish execution event to Redis:', err.message);
+      }
+      return;
+    }
+
     const socketIds = this.workspaceClients.get(workspaceId);
     if (!socketIds) return;
 
@@ -308,6 +322,37 @@ class WebSocketManager {
         this.send(client.ws, message);
       }
     }
+  }
+
+  /** Subscribe to Redis channel and relay execution events to WebSocket clients (main server only) */
+  initRedisSubscriber() {
+    const sub = getRedisSub();
+    sub.subscribe(WS_EVENTS_CHANNEL, (err) => {
+      if (err) {
+        logger.error('Failed to subscribe to execution events channel:', err.message);
+        return;
+      }
+      logger.info('Subscribed to Redis execution events channel');
+    });
+
+    sub.on('message', (channel, data) => {
+      if (channel !== WS_EVENTS_CHANNEL) return;
+      try {
+        const { workspaceId, message } = JSON.parse(data);
+        // Broadcast directly to WebSocket clients (this.wss exists in main server)
+        const socketIds = this.workspaceClients.get(workspaceId);
+        if (!socketIds) return;
+
+        for (const socketId of socketIds) {
+          const client = this.clients.get(socketId);
+          if (client) {
+            this.send(client.ws, message);
+          }
+        }
+      } catch (err) {
+        logger.error('Failed to process Redis execution event:', err.message);
+      }
+    });
   }
 }
 

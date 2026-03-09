@@ -209,7 +209,7 @@ function EditorCanvas() {
       case 'execution_started':
         setExecutionId(msg.executionId);
         setNodeStatuses({});
-        setIoEntries([]); // Clear previous I/O
+        // Don't clear ioEntries — they were pre-populated by handleExecute
         setIoVisible(true);
         break;
       case 'node_started':
@@ -273,6 +273,10 @@ function EditorCanvas() {
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
+  }, []);
+
+  const onNodesDelete = useCallback((deleted: Node[]) => {
+    setSelectedNode((prev) => prev && deleted.some((n) => n.id === prev.id) ? null : prev);
   }, []);
 
   const handleSave = async () => {
@@ -358,7 +362,7 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
-      // Safety timeout — reset after 15s if backend never responds
+      // Safety timeout — reset after 60s if backend never responds
       executeTimeoutRef.current = setTimeout(() => {
         setExecuting(false);
         // Mark all pending I/O entries as success with simulated output
@@ -370,7 +374,7 @@ function EditorCanvas() {
           )
         );
         toast('Execution timed out — backend may be offline', { icon: '⏱️', duration: 4000 });
-      }, 15000);
+      }, 60000);
 
       // ── Collect per-user credentials for all nodes that have a credentialId ──
       const credentialsMap: Record<string, { serviceId: string; values: Record<string, string> }> = {};
@@ -758,9 +762,11 @@ function EditorCanvas() {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
+            onNodesDelete={onNodesDelete}
             nodeTypes={nodeTypes}
             fitView
             className="bg-base"
+            deleteKeyCode={['Backspace', 'Delete']}
             defaultEdgeOptions={{
               animated: true,
               style: { stroke: '#1e2d42', strokeWidth: 2 },
