@@ -92,6 +92,14 @@ import {
   SiBrevo,
   SiMailtrap,
   SiReplit,
+  // Latest specific service icons
+  SiGooglesheets,
+  SiGoogleanalytics,
+  SiGooglepubsub,
+  SiGooglelens,
+  SiGooglechat,
+  SiGooglemeet,
+  SiGoogledocs,
 } from 'react-icons/si';
 import { FaXTwitter, FaMicrosoft, FaLinkedinIn, FaAws } from 'react-icons/fa6';
 
@@ -156,26 +164,26 @@ const iconMap: Record<string, IconDef> = {
   trigger_manual:   { icon: <MousePointerClick size={ICON_SIZE} />, bg: 'bg-yellow-500/20', fg: 'text-yellow-400' },
 
   // Google
-  google_sheets_read:    { icon: <SiGoogle size={SI_SIZE} />,          bg: 'bg-[#34A853]/20',  fg: 'text-[#34A853]' },
-  google_sheets_write:   { icon: <SiGoogle size={SI_SIZE} />,          bg: 'bg-[#34A853]/20',  fg: 'text-[#34A853]' },
+  google_sheets_read:    { icon: <SiGooglesheets size={SI_SIZE} />,    bg: 'bg-[#0F9D58]/20',  fg: 'text-[#0F9D58]' },
+  google_sheets_write:   { icon: <SiGooglesheets size={SI_SIZE} />,    bg: 'bg-[#0F9D58]/20',  fg: 'text-[#0F9D58]' },
   google_gmail_send:     { icon: <SiGmail size={SI_SIZE} />,           bg: 'bg-[#EA4335]/20',  fg: 'text-[#EA4335]' },
   google_gmail_read:     { icon: <SiGmail size={SI_SIZE} />,           bg: 'bg-[#EA4335]/20',  fg: 'text-[#EA4335]' },
   google_drive_upload:   { icon: <SiGoogledrive size={SI_SIZE} />,     bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
   google_drive_list:     { icon: <SiGoogledrive size={SI_SIZE} />,     bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
   google_calendar_create:{ icon: <SiGooglecalendar size={SI_SIZE} />,  bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
   google_translate:      { icon: <SiGoogletranslate size={SI_SIZE} />, bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
-  google_vision:         { icon: <Eye size={ICON_SIZE} />,             bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
+  google_vision:         { icon: <SiGooglelens size={SI_SIZE} />,      bg: 'bg-[#4285F4]/20',  fg: 'text-[#4285F4]' },
   google_maps_geocode:   { icon: <SiGooglemaps size={SI_SIZE} />,      bg: 'bg-[#34A853]/20',  fg: 'text-[#34A853]' },
   youtube_search:        { icon: <SiYoutube size={SI_SIZE} />,         bg: 'bg-[#FF0000]/20',  fg: 'text-[#FF0000]' },
 
   // AI & ML
-  openai_chat:           { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#412991]/20',   fg: 'text-[#412991] dark:text-[#a89ed4]' },
-  openai_image:          { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#412991]/20',   fg: 'text-[#412991] dark:text-[#a89ed4]' },
-  anthropic_chat:        { icon: <SiAnthropic size={SI_SIZE} />,       bg: 'bg-amber-600/20',   fg: 'text-amber-500' },
+  openai_chat:           { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
+  openai_image:          { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
+  anthropic_chat:        { icon: <SiAnthropic size={SI_SIZE} />,       bg: 'bg-[#D4A27F]/20',   fg: 'text-[#D4A27F]' },
   huggingface_inference: { icon: <SiHuggingface size={SI_SIZE} />,     bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
   ai_text_classifier:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   ai_summarizer:         { icon: <BookOpen size={ICON_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
-  whisper_transcribe:    { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
+  whisper_transcribe:    { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
 
   // Social Media
   twitter_post:          { icon: <FaXTwitter size={SI_SIZE} />,        bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
@@ -185,7 +193,7 @@ const iconMap: Record<string, IconDef> = {
   reddit_post:           { icon: <SiReddit size={SI_SIZE} />,          bg: 'bg-[#FF4500]/20',   fg: 'text-[#FF4500]' },
 
   // Messaging
-  slack_message:         { icon: <SiSlack size={SI_SIZE} />,           bg: 'bg-[#4A154B]/20',   fg: 'text-[#E01E5A]' },
+  slack_message:         { icon: <SiSlack size={SI_SIZE} />,           bg: 'bg-[#4A154B]/20',   fg: 'text-[#611f69]' },
   discord_message:       { icon: <SiDiscord size={SI_SIZE} />,         bg: 'bg-[#5865F2]/20',   fg: 'text-[#5865F2]' },
   telegram_send:         { icon: <SiTelegram size={SI_SIZE} />,        bg: 'bg-[#26A5E4]/20',   fg: 'text-[#26A5E4]' },
   whatsapp_send:         { icon: <SiWhatsapp size={SI_SIZE} />,        bg: 'bg-[#25D366]/20',   fg: 'text-[#25D366]' },
@@ -249,10 +257,10 @@ const iconMap: Record<string, IconDef> = {
   // Payments
   stripe_charge:         { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-[#635BFF]/20',   fg: 'text-[#635BFF]' },
   stripe_customer:       { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-[#635BFF]/20',   fg: 'text-[#635BFF]' },
-  paypal_payment:        { icon: <SiPaypal size={SI_SIZE} />,          bg: 'bg-[#003087]/20',   fg: 'text-[#003087] dark:text-[#00A1E0]' },
+  paypal_payment:        { icon: <SiPaypal size={SI_SIZE} />,          bg: 'bg-[#003087]/20',   fg: 'text-[#0070BA]' },
 
   // Analytics
-  google_analytics:      { icon: <SiGoogle size={SI_SIZE} />,          bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
+  google_analytics:      { icon: <SiGoogleanalytics size={SI_SIZE} />, bg: 'bg-[#E37400]/20',   fg: 'text-[#E37400]' },
   mixpanel_track:        { icon: <SiMixpanel size={SI_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
   segment_track:         { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
 
@@ -277,8 +285,8 @@ const iconMap: Record<string, IconDef> = {
   ollama_chat:           { icon: <SiOllama size={SI_SIZE} />,          bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
   elevenlabs_tts:        { icon: <SiElevenlabs size={SI_SIZE} />,      bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
   replicate_run:         { icon: <SiReplicate size={SI_SIZE} />,       bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
-  openai_embeddings:     { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#412991]/20',   fg: 'text-[#412991] dark:text-[#a89ed4]' },
-  openai_tts:            { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#412991]/20',   fg: 'text-[#412991] dark:text-[#a89ed4]' },
+  openai_embeddings:     { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
+  openai_tts:            { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
   langchain_chain:       { icon: <SiLangchain size={SI_SIZE} />,       bg: 'bg-green-500/20',   fg: 'text-green-400' },
   stability_generate:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-[#9B59B6]/20',   fg: 'text-[#9B59B6]' },
   cohere_generate:       { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-[#39594D]/20',   fg: 'text-[#39594D] dark:text-emerald-400' },
@@ -304,7 +312,7 @@ const iconMap: Record<string, IconDef> = {
   spotify_search:        { icon: <SiSpotify size={SI_SIZE} />,         bg: 'bg-[#1DB954]/20',   fg: 'text-[#1DB954]' },
 
   // Messaging (expanded)
-  teams_message:         { icon: <FaMicrosoft size={SI_SIZE} />,       bg: 'bg-[#6264A7]/20',   fg: 'text-[#6264A7]' },
+  teams_message:         { icon: <FaMicrosoft size={SI_SIZE} />,       bg: 'bg-[#6264A7]/20',   fg: 'text-[#5B5FC7]' },
   sendgrid_email:        { icon: <SiSendgrid size={SI_SIZE} />,        bg: 'bg-[#1A82E2]/20',   fg: 'text-[#1A82E2]' },
   mailgun_send:          { icon: <SiMailgun size={SI_SIZE} />,         bg: 'bg-[#F06B66]/20',   fg: 'text-[#F06B66]' },
 
@@ -345,8 +353,8 @@ const iconMap: Record<string, IconDef> = {
   vimeo_upload:          { icon: <SiVimeo size={SI_SIZE} />,           bg: 'bg-cyan-500/20',    fg: 'text-cyan-400' },
 
   // Cloud & DevOps (expanded)
-  gcp_pubsub:            { icon: <SiGooglecloud size={SI_SIZE} />,     bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
-  gcp_function:          { icon: <SiGooglecloud size={SI_SIZE} />,     bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
+  gcp_pubsub:            { icon: <SiGooglepubsub size={SI_SIZE} />,    bg: 'bg-[#4285F4]/20',   fg: 'text-[#4285F4]' },
+  gcp_function:          { icon: <SiGooglecloud size={SI_SIZE} />,     bg: 'bg-[#4285F4]/20',   fg: 'text-[#4285F4]' },
   azure_function:        { icon: <FaMicrosoft size={SI_SIZE} />,       bg: 'bg-[#0078D4]/20',   fg: 'text-[#0078D4]' },
   azure_blob:            { icon: <FaMicrosoft size={SI_SIZE} />,       bg: 'bg-[#0078D4]/20',   fg: 'text-[#0078D4]' },
   cloudflare_worker:     { icon: <SiCloudflare size={SI_SIZE} />,      bg: 'bg-orange-500/20',  fg: 'text-orange-400' },
@@ -382,7 +390,7 @@ const iconMap: Record<string, IconDef> = {
   webhook_response:      { icon: <Webhook size={ICON_SIZE} />,         bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
   websocket_send:        { icon: <Globe size={ICON_SIZE} />,           bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
   typeform_responses:    { icon: <SiTypeform size={SI_SIZE} />,        bg: 'bg-indigo-500/20',  fg: 'text-indigo-400' },
-  google_forms_responses:{ icon: <SiGoogleforms size={SI_SIZE} />,     bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
+  google_forms_responses:{ icon: <SiGoogleforms size={SI_SIZE} />,     bg: 'bg-[#7248B9]/20',   fg: 'text-[#7248B9]' },
 
   // Payments (expanded)
   stripe_subscription:   { icon: <SiStripe size={SI_SIZE} />,          bg: 'bg-[#635BFF]/20',   fg: 'text-[#635BFF]' },
