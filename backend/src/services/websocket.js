@@ -109,6 +109,11 @@ class WebSocketManager {
 
   handleSubscribe(socketId, client, message) {
     const { workspaceId } = message;
+    if (!workspaceId) {
+      this.send(client.ws, { type: 'error', code: 'workspace_required', message: 'Workspace ID is required to subscribe.' });
+      return;
+    }
+
     client.workspaceId = workspaceId;
 
     if (!this.workspaceClients.has(workspaceId)) {
@@ -119,8 +124,66 @@ class WebSocketManager {
     this.send(client.ws, { type: 'subscribed', workspaceId });
   }
 
+  async canAccessWorkflow(client, workflowId) {
+    if (!client?.workspaceId || !workflowId) return false;
+
+    try {
+      const result = await query(
+        `SELECT 1
+         FROM workflows w
+         JOIN workspace_members wm ON wm.workspace_id = w.workspace_id
+         WHERE w.id = $1
+           AND w.workspace_id = $2
+           AND wm.user_id = $3`,
+        [workflowId, client.workspaceId, client.userId]
+      );
+
+      return result.rows.length > 0;
+    } catch (err) {
+      logger.error('Workflow access check failed:', err.message);
+      return false;
+    }
+  }
+
+  normalizeGraphChange(change) {
+    if (!change || typeof change !== 'object') return null;
+
+    const normalized = {
+      changedAt: Number.isFinite(change.changedAt) ? Number(change.changedAt) : Date.now()
+    };
+
+    if (typeof change.workflowName === 'string') {
+      normalized.workflowName = change.workflowName.slice(0, 255);
+    }
+
+    if (change.graph && typeof change.graph === 'object') {
+      normalized.graph = {
+        nodes: Array.isArray(change.graph.nodes) ? change.graph.nodes : [],
+        edges: Array.isArray(change.graph.edges) ? change.graph.edges : []
+      };
+    }
+
+    if (!normalized.graph && typeof normalized.workflowName !== 'string') {
+      return null;
+    }
+
+    return normalized;
+  }
+
   async handleJoinWorkflow(socketId, client, message) {
     const { workflowId } = message;
+    if (!workflowId) return;
+
+    const canAccess = await this.canAccessWorkflow(client, workflowId);
+    if (!canAccess) {
+      this.send(client.ws, {
+        type: 'error',
+        code: 'workflow_access_denied',
+        workflowId,
+        message: 'You do not have access to this workflow.'
+      });
+      return;
+    }
 
     if (!this.workflowPresence.has(workflowId)) {
       this.workflowPresence.set(workflowId, new Map());
@@ -219,15 +282,42 @@ class WebSocketManager {
     }, client.userId);
   }
 
-  handleGraphChange(socketId, client, message) {
+  async handleGraphChange(socketId, client, message) {
     const { workflowId, change } = message;
+    if (!workflowId) return;
+
+    const canAccess = await this.canAccessWorkflow(client, workflowId);
+    if (!canAccess) return;
+
+    const normalizedChange = this.normalizeGraphChange(change);
+    if (!normalizedChange) return;
+
+    // Persist collaborative draft updates so late joiners and refreshes see latest state.
+    if (normalizedChange.graph || typeof normalizedChange.workflowName === 'string') {
+      try {
+        await query(
+          `UPDATE workflows
+           SET graph = COALESCE($1, graph),
+               name = COALESCE($2, name),
+               updated_at = GETDATE()
+           WHERE id = $3`,
+          [
+            normalizedChange.graph ? JSON.stringify(normalizedChange.graph) : null,
+            typeof normalizedChange.workflowName === 'string' ? normalizedChange.workflowName : null,
+            workflowId
+          ]
+        );
+      } catch (err) {
+        logger.error('Failed to persist collaborative graph change:', err.message);
+      }
+    }
 
     this.broadcastToWorkflow(workflowId, {
       type: 'graph_change',
       workflowId,
       userId: client.userId,
       userName: client.userName,
-      change
+      change: normalizedChange
     }, client.userId);
   }
 

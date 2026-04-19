@@ -107,12 +107,46 @@ function EditorCanvas() {
   // WebSocket
   const wsRef = useRef<WebSocket | null>(null);
   const [collaborators, setCollaborators] = useState<any[]>([]);
+  const suppressGraphSyncRef = useRef(false);
+  const graphSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialGraphLoadedRef = useRef(false);
+  const lastRemoteChangeTsRef = useRef(0);
 
   const workspaceId = workspace?.id;
+
+  const normalizeGraph = useCallback((rawGraph: any) => {
+    if (!rawGraph) return { nodes: [], edges: [] };
+
+    let parsed = rawGraph;
+    if (typeof rawGraph === 'string') {
+      try {
+        parsed = JSON.parse(rawGraph);
+      } catch {
+        return { nodes: [], edges: [] };
+      }
+    }
+
+    return {
+      nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
+      edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
+    };
+  }, []);
+
+  const toPersistedGraph = useCallback((nextNodes: Node[] = nodes, nextEdges: Edge[] = edges) => {
+    const graphNodes = nextNodes.map((n) => ({
+      id: n.id,
+      type: n.data.type,
+      position: n.position,
+      data: n.data,
+    }));
+
+    return { nodes: graphNodes, edges: nextEdges };
+  }, [nodes, edges]);
 
   // ── Load workflow ──
   useEffect(() => {
     if (!workspaceId || !id) return;
+    initialGraphLoadedRef.current = false;
 
     const loadWorkflow = async () => {
       try {
@@ -121,15 +155,20 @@ function EditorCanvas() {
         setWorkflowName(wf.name);
         setWorkflowVersion(wf.version);
 
-        const graph = wf.graph || { nodes: [], edges: [] };
+        const graph = normalizeGraph(wf.graph);
         // Map nodes to ReactFlow format with flowNode type
         const flowNodes = (graph.nodes || []).map((n: any) => ({
           ...n,
           type: 'flowNode',
           data: { ...n.data, type: n.data?.type || n.type },
         }));
+        suppressGraphSyncRef.current = true;
         setNodes(flowNodes);
         setEdges(graph.edges || []);
+        setTimeout(() => {
+          suppressGraphSyncRef.current = false;
+          initialGraphLoadedRef.current = true;
+        }, 0);
       } catch (err: any) {
         toast.error('Failed to load workflow');
         navigate('/dashboard');
@@ -137,7 +176,7 @@ function EditorCanvas() {
     };
 
     loadWorkflow();
-  }, [workspaceId, id]);
+  }, [workspaceId, id, navigate, normalizeGraph, setEdges, setNodes]);
 
   // Toggle category collapse
   const toggleCategory = (cat: string) => {
@@ -174,12 +213,51 @@ function EditorCanvas() {
     };
 
     return () => {
+      if (graphSyncTimerRef.current) {
+        clearTimeout(graphSyncTimerRef.current);
+        graphSyncTimerRef.current = null;
+      }
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'leave_workflow', workflowId: id }));
       }
       ws.close();
     };
   }, [workspaceId, id]);
+
+  // Broadcast local draft edits to collaborators.
+  useEffect(() => {
+    if (!id || !initialGraphLoadedRef.current || suppressGraphSyncRef.current) return;
+
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    if (graphSyncTimerRef.current) {
+      clearTimeout(graphSyncTimerRef.current);
+    }
+
+    graphSyncTimerRef.current = setTimeout(() => {
+      if (suppressGraphSyncRef.current) return;
+      const socket = wsRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+      socket.send(JSON.stringify({
+        type: 'graph_change',
+        workflowId: id,
+        change: {
+          workflowName,
+          graph: toPersistedGraph(),
+          changedAt: Date.now(),
+        },
+      }));
+    }, 250);
+
+    return () => {
+      if (graphSyncTimerRef.current) {
+        clearTimeout(graphSyncTimerRef.current);
+        graphSyncTimerRef.current = null;
+      }
+    };
+  }, [id, nodes, edges, workflowName, toPersistedGraph]);
 
   const handleWsMessage = useCallback((msg: any) => {
     switch (msg.type) {
@@ -206,6 +284,40 @@ function EditorCanvas() {
         }
         setWorkflowVersion(msg.version);
         break;
+      case 'graph_change': {
+        const incoming = msg.change || {};
+        const changedAt = Number(incoming.changedAt || 0);
+        if (changedAt && changedAt <= lastRemoteChangeTsRef.current) break;
+        if (changedAt) {
+          lastRemoteChangeTsRef.current = changedAt;
+        }
+
+        const graph = normalizeGraph(incoming.graph);
+        const flowNodes = (graph.nodes || []).map((n: any) => ({
+          ...n,
+          type: 'flowNode',
+          data: { ...n.data, type: n.data?.type || n.type },
+        }));
+
+        suppressGraphSyncRef.current = true;
+        setNodes(flowNodes);
+        setEdges(graph.edges || []);
+
+        if (typeof incoming.workflowName === 'string' && incoming.workflowName.trim().length > 0) {
+          setWorkflowName(incoming.workflowName);
+        }
+
+        setSelectedNode((prev) => {
+          if (!prev) return null;
+          const updated = flowNodes.find((n: Node) => n.id === prev.id);
+          return updated || null;
+        });
+
+        setTimeout(() => {
+          suppressGraphSyncRef.current = false;
+        }, 0);
+        break;
+      }
       case 'execution_started':
         setExecutionId(msg.executionId);
         setNodeStatuses({});
@@ -253,8 +365,14 @@ function EditorCanvas() {
         }
         setExecuting(false);
         break;
+      case 'error':
+        if (msg.code === 'workflow_access_denied') {
+          toast.error('You no longer have access to this workflow');
+          navigate('/dashboard');
+        }
+        break;
     }
-  }, [user?.name, setNodeStatuses]);
+  }, [user?.name, setNodeStatuses, normalizeGraph, navigate, setNodes, setEdges]);
 
   // ── Handlers ──
   const onConnect = useCallback((connection: Connection) => {
@@ -283,14 +401,7 @@ function EditorCanvas() {
     if (!workspaceId || !id) return;
     try {
       setSaving(true);
-      // Convert nodes back to storage format
-      const graphNodes = nodes.map((n) => ({
-        id: n.id,
-        type: n.data.type,
-        position: n.position,
-        data: n.data,
-      }));
-      const graph = { nodes: graphNodes, edges };
+      const graph = toPersistedGraph();
 
       await workflowApi.update(workspaceId, id, { name: workflowName, graph });
       toast.success('Draft saved');
@@ -306,13 +417,7 @@ function EditorCanvas() {
     try {
       setPublishing(true);
       // Save the current draft first
-      const graphNodes = nodes.map((n) => ({
-        id: n.id,
-        type: n.data.type,
-        position: n.position,
-        data: n.data,
-      }));
-      const graph = { nodes: graphNodes, edges };
+      const graph = toPersistedGraph();
       await workflowApi.update(workspaceId, id, { name: workflowName, graph });
 
       // Then publish as a new version
@@ -468,7 +573,7 @@ function EditorCanvas() {
     try {
       const res = await versionApi.restore(workspaceId, id, version);
       const wf = res.data.workflow;
-      const graph = wf.graph || { nodes: [], edges: [] };
+      const graph = normalizeGraph(wf.graph);
       const flowNodes = (graph.nodes || []).map((n: any) => ({
         ...n,
         type: 'flowNode',
@@ -515,7 +620,7 @@ function EditorCanvas() {
       // Reload workflow
       const res = await workflowApi.get(workspaceId, id);
       const wf = res.data.workflow;
-      const graph = wf.graph || { nodes: [], edges: [] };
+      const graph = normalizeGraph(wf.graph);
       const flowNodes = (graph.nodes || []).map((n: any) => ({
         ...n,
         type: 'flowNode',
