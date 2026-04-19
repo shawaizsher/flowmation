@@ -95,21 +95,21 @@ const steps = [
 
 /* ── Marquee logos ── */
 const marqueeItems = [
-  { name: 'OpenAI', icon: SiOpenai },
-  { name: 'Slack', icon: SiSlack },
-  { name: 'GitHub', icon: SiGithub },
-  { name: 'Stripe', icon: SiStripe },
-  { name: 'Notion', icon: SiNotion },
-  { name: 'Discord', icon: SiDiscord },
-  { name: 'Zapier', icon: SiZapier },
-  { name: 'Jira', icon: SiJira },
-  { name: 'Twilio', icon: SiTwilio },
-  { name: 'Airtable', icon: SiAirtable },
-  { name: 'HubSpot', icon: SiHubspot },
-  { name: 'Shopify', icon: SiShopify },
-  { name: 'PostgreSQL', icon: SiPostgresql },
-  { name: 'Redis', icon: SiRedis },
-  { name: 'Docker', icon: SiDocker },
+  { name: 'OpenAI', icon: SiOpenai, color: '#10A37F' },
+  { name: 'Slack', icon: SiSlack, color: '#4A154B' },
+  { name: 'GitHub', icon: SiGithub, color: '#181717' },
+  { name: 'Stripe', icon: SiStripe, color: '#635BFF' },
+  { name: 'Notion', icon: SiNotion, color: '#000000' },
+  { name: 'Discord', icon: SiDiscord, color: '#5865F2' },
+  { name: 'Zapier', icon: SiZapier, color: '#FF4F00' },
+  { name: 'Jira', icon: SiJira, color: '#0052CC' },
+  { name: 'Twilio', icon: SiTwilio, color: '#F22F46' },
+  { name: 'Airtable', icon: SiAirtable, color: '#18BFFF' },
+  { name: 'HubSpot', icon: SiHubspot, color: '#FF7A59' },
+  { name: 'Shopify', icon: SiShopify, color: '#95BF47' },
+  { name: 'PostgreSQL', icon: SiPostgresql, color: '#336791' },
+  { name: 'Redis', icon: SiRedis, color: '#DC382D' },
+  { name: 'Docker', icon: SiDocker, color: '#2496ED' },
 ];
 
 const platformHighlights = [
@@ -475,7 +475,7 @@ export default function LandingPage() {
         <div className="marquee-track">
           <div className="marquee-content">
             {[...marqueeItems, ...marqueeItems].map((item, i) => (
-              <span key={i} className="marquee-item" title={item.name} aria-label={item.name}>
+              <span key={i} className="marquee-item" title={item.name} aria-label={item.name} style={{ color: item.color }}>
                 <item.icon aria-hidden="true" />
                 <span className="sr-only">{item.name}</span>
               </span>
@@ -483,7 +483,7 @@ export default function LandingPage() {
           </div>
           <div className="marquee-content" aria-hidden="true">
             {[...marqueeItems, ...marqueeItems].map((item, i) => (
-              <span key={`dup-${i}`} className="marquee-item" title={item.name}>
+              <span key={`dup-${i}`} className="marquee-item" title={item.name} style={{ color: item.color }}>
                 <item.icon aria-hidden="true" />
               </span>
             ))}

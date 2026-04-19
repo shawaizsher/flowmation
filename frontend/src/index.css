@@ -848,9 +848,8 @@ body {
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 9999px;
-  color: var(--foreground-muted);
-  opacity: 0.55;
-  transition: opacity 0.3s, color 0.3s, transform 0.3s, background-color 0.3s;
+  opacity: 0.85;
+  transition: opacity 0.3s, transform 0.3s, background-color 0.3s, box-shadow 0.3s;
   cursor: default;
   user-select: none;
 }
@@ -860,9 +859,9 @@ body {
 }
 .marquee-item:hover {
   opacity: 1;
-  color: var(--foreground-secondary);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.08);
   background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, currentColor 35%, transparent);
 }
 
 /* ── Animated "connecting line" between steps ── */
