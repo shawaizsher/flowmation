@@ -467,6 +467,29 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Drag-and-drop GIF demo ── */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 pb-14">
+        <div className="rounded-3xl border border-surface-border bg-surface-card/70 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/10 dark:shadow-black/40">
+          <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-surface-border bg-surface-hover/40">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-brand-400 mb-1">LIVE DEMO</p>
+              <h3 className="font-display text-lg md:text-xl font-bold text-foreground">Drag and drop workflow nodes in seconds</h3>
+            </div>
+            <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-500 text-xs font-semibold px-3 py-1 border border-emerald-500/30">
+              Looping GIF
+            </span>
+          </div>
+          <div className="p-4 md:p-6">
+            <img
+              src="/flowa-drag-drop-demo.gif"
+              alt="Animated Flowa demo showing a node being dragged from the nodes panel into the canvas and connected"
+              className="w-full rounded-2xl border border-surface-border"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* ── Marquee — Integration logos ── */}
       <section className="relative z-10 py-10 overflow-hidden border-y border-surface-border/50">
         <p className="text-center text-xs font-medium uppercase tracking-widest text-foreground-muted mb-6">
