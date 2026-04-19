@@ -16,7 +16,34 @@ import {
   ChevronRight,
   Terminal,
   Code2,
+  CheckCircle2,
+  Database,
+  Clock3,
+  BarChart3,
+  Building2,
+  Mail,
+  ShoppingCart,
+  Bot,
+  Plus,
+  Minus,
 } from 'lucide-react';
+import {
+  SiOpenai,
+  SiSlack,
+  SiGithub,
+  SiStripe,
+  SiNotion,
+  SiDiscord,
+  SiZapier,
+  SiJira,
+  SiTwilio,
+  SiAirtable,
+  SiHubspot,
+  SiShopify,
+  SiPostgresql,
+  SiRedis,
+  SiDocker,
+} from 'react-icons/si';
 import FlowaLogo from '../components/FlowaLogo';
 
 /* ── Feature data ── */
@@ -68,8 +95,93 @@ const steps = [
 
 /* ── Marquee logos ── */
 const marqueeItems = [
-  'OpenAI', 'Slack', 'GitHub', 'Stripe', 'Notion', 'Discord', 'Zapier', 'Jira',
-  'Twilio', 'Airtable', 'HubSpot', 'Shopify', 'PostgreSQL', 'Redis', 'Docker',
+  { name: 'OpenAI', icon: SiOpenai },
+  { name: 'Slack', icon: SiSlack },
+  { name: 'GitHub', icon: SiGithub },
+  { name: 'Stripe', icon: SiStripe },
+  { name: 'Notion', icon: SiNotion },
+  { name: 'Discord', icon: SiDiscord },
+  { name: 'Zapier', icon: SiZapier },
+  { name: 'Jira', icon: SiJira },
+  { name: 'Twilio', icon: SiTwilio },
+  { name: 'Airtable', icon: SiAirtable },
+  { name: 'HubSpot', icon: SiHubspot },
+  { name: 'Shopify', icon: SiShopify },
+  { name: 'PostgreSQL', icon: SiPostgresql },
+  { name: 'Redis', icon: SiRedis },
+  { name: 'Docker', icon: SiDocker },
+];
+
+const platformHighlights = [
+  {
+    icon: Database,
+    title: 'Production-Ready Core',
+    desc: 'Built with queue workers, retry-aware execution, real-time updates, and encrypted credential storage.',
+  },
+  {
+    icon: Clock3,
+    title: 'Faster Delivery Cycles',
+    desc: 'Ship automation in hours, not weeks, with reusable workflow templates and clear execution traces.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Live Observability',
+    desc: 'Track node-level statuses, execution timing, and failure points as your workflows run.',
+  },
+  {
+    icon: Building2,
+    title: 'Built For Teams',
+    desc: 'Give product, ops, and engineering one shared automation canvas with version-safe collaboration.',
+  },
+];
+
+const useCases = [
+  {
+    icon: Mail,
+    title: 'Lifecycle Messaging',
+    desc: 'Auto-trigger onboarding, retention, and support messages based on user behavior.',
+    tags: ['Email sequences', 'CRM sync', 'Lead routing'],
+  },
+  {
+    icon: ShoppingCart,
+    title: 'E-commerce Ops',
+    desc: 'Connect orders, inventory, shipping, and notifications into one reliable pipeline.',
+    tags: ['Order orchestration', 'Stock alerts', 'Post-purchase flows'],
+  },
+  {
+    icon: Bot,
+    title: 'AI Backoffice',
+    desc: 'Route text, classify requests, and summarize activity with model-driven decision nodes.',
+    tags: ['AI triage', 'Auto classification', 'Human handoff'],
+  },
+];
+
+const dayOneChecklist = [
+  'Visual workflow builder with reusable node patterns',
+  'Real-time run logs with node-by-node execution updates',
+  'Secure credentials vault with encrypted secret storage',
+  'Version history with rollback safety for every workflow',
+  'Webhook and API-first triggers for custom integrations',
+  'Docker-ready deployment for local or self-hosted environments',
+];
+
+const faqs = [
+  {
+    q: 'Can I self-host Flowa in my own infrastructure?',
+    a: 'Yes. Flowa is built for self-hosting with Docker Compose and environment-based configuration for backend, worker, database, and Redis services.',
+  },
+  {
+    q: 'Is this only for engineers?',
+    a: 'No. Engineers can extend nodes and APIs, while product and operations teams can build flows visually with no-code style configuration.',
+  },
+  {
+    q: 'How do I monitor failures and retries?',
+    a: 'Each run includes status tracking and logs. You can inspect execution state, identify failed nodes, and replay flows with controlled retries.',
+  },
+  {
+    q: 'Can I connect external tools and custom APIs?',
+    a: 'Yes. Use the HTTP/API nodes and webhook triggers to integrate external services, then combine them with built-in nodes for orchestration.',
+  },
 ];
 
 /* ── Typewriter hook (dify-style) ── */
@@ -162,7 +274,13 @@ export default function LandingPage() {
   const statsObs = useInView(0.3);
   const stepsObs = useInView(0.2);
   const featObs = useInView(0.1);
+  const highlightsObs = useInView(0.15);
+  const useCasesObs = useInView(0.15);
+  const valueObs = useInView(0.18);
+  const faqObs = useInView(0.18);
   const ctaObs = useInView(0.2);
+  const footerObs = useInView(0.2);
+  const [openFaq, setOpenFaq] = useState(0);
 
   /* Typewriter words */
   const typed = useTypewriter([
@@ -357,12 +475,17 @@ export default function LandingPage() {
         <div className="marquee-track">
           <div className="marquee-content">
             {[...marqueeItems, ...marqueeItems].map((item, i) => (
-              <span key={i} className="marquee-item">{item}</span>
+              <span key={i} className="marquee-item" title={item.name} aria-label={item.name}>
+                <item.icon aria-hidden="true" />
+                <span className="sr-only">{item.name}</span>
+              </span>
             ))}
           </div>
           <div className="marquee-content" aria-hidden="true">
             {[...marqueeItems, ...marqueeItems].map((item, i) => (
-              <span key={`dup-${i}`} className="marquee-item">{item}</span>
+              <span key={`dup-${i}`} className="marquee-item" title={item.name}>
+                <item.icon aria-hidden="true" />
+              </span>
             ))}
           </div>
         </div>
@@ -444,6 +567,134 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Platform Highlights ── */}
+      <section ref={highlightsObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {platformHighlights.map((item, i) => (
+            <div
+              key={item.title}
+              className={`rounded-2xl border border-surface-border bg-surface-card/60 backdrop-blur-sm p-6 hover:border-brand-500/40 transition-all duration-700 ${highlightsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              style={{ transitionDelay: `${i * 120}ms` }}
+            >
+              <div className="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4">
+                <item.icon size={20} className="text-brand-400" />
+              </div>
+              <h3 className="font-display text-lg font-bold mb-2">{item.title}</h3>
+              <p className="text-sm text-foreground-muted leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Use Cases ── */}
+      <section ref={useCasesObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+        <div className="text-center mb-14">
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            USE CASES
+          </span>
+          <h2 className={`font-display text-3xl md:text-5xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            Built for real{' '}
+            <span className="gradient-text-vivid">automation workloads</span>
+          </h2>
+          <p className={`text-foreground-muted max-w-2xl mx-auto font-body text-base transition-all duration-700 delay-150 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            From customer communication to AI-assisted operations, Flowa helps teams automate repetitive work with confidence.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {useCases.map((item, i) => (
+            <div
+              key={item.title}
+              className={`rounded-2xl border border-surface-border bg-surface-card/50 p-6 hover:translate-y-[-2px] transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              style={{ transitionDelay: `${250 + i * 120}ms` }}
+            >
+              <div className="w-11 h-11 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center mb-4">
+                <item.icon size={20} className="text-accent-400" />
+              </div>
+              <h3 className="font-display text-lg font-bold mb-2">{item.title}</h3>
+              <p className="text-sm text-foreground-muted leading-relaxed mb-4">{item.desc}</p>
+              <div className="flex flex-wrap gap-2">
+                {item.tags.map((tag) => (
+                  <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full border border-surface-border text-foreground-secondary bg-surface-hover/50">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Day One Value ── */}
+      <section ref={valueObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+        <div className={`rounded-3xl border border-surface-border bg-surface-card/70 backdrop-blur-sm p-8 md:p-10 transition-all duration-800 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+            <div>
+              <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                WHAT YOU GET
+              </span>
+              <h2 className={`font-display text-3xl md:text-4xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                Everything you need on{' '}
+                <span className="gradient-text-vivid">day one</span>
+              </h2>
+              <p className={`text-foreground-muted font-body text-base leading-relaxed transition-all duration-700 delay-150 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                Start small with one workflow, then scale to cross-team automation with visibility, control, and security built in.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {dayOneChecklist.map((item, i) => (
+                <div
+                  key={item}
+                  className={`flex items-start gap-3 rounded-xl border border-surface-border bg-surface-base/40 px-4 py-3 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+                  style={{ transitionDelay: `${220 + i * 90}ms` }}
+                >
+                  <CheckCircle2 size={18} className="text-emerald-400 mt-0.5 shrink-0" />
+                  <span className="text-sm text-foreground-secondary leading-relaxed">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section ref={faqObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28">
+        <div className="text-center mb-12">
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            FAQ
+          </span>
+          <h2 className={`font-display text-3xl md:text-5xl font-extrabold tracking-[-0.02em] transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            Questions teams ask before{' '}
+            <span className="gradient-text-vivid">launching</span>
+          </h2>
+        </div>
+
+        <div className="space-y-3">
+          {faqs.map((item, idx) => {
+            const isOpen = openFaq === idx;
+            return (
+              <button
+                key={item.q}
+                onClick={() => setOpenFaq(isOpen ? -1 : idx)}
+                className={`w-full text-left rounded-2xl border border-surface-border bg-surface-card/60 p-5 hover:border-brand-500/35 transition-all duration-500 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                style={{ transitionDelay: `${220 + idx * 100}ms` }}
+              >
+                <div className="flex items-center justify-between gap-6">
+                  <h3 className="font-display text-base md:text-lg font-bold">{item.q}</h3>
+                  <span className="text-brand-400 shrink-0">
+                    {isOpen ? <Minus size={18} /> : <Plus size={18} />}
+                  </span>
+                </div>
+                <div className={`grid transition-all duration-300 ${isOpen ? 'grid-rows-[1fr] mt-3' : 'grid-rows-[0fr]'}`}>
+                  <p className="overflow-hidden text-sm text-foreground-muted leading-relaxed">{item.a}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* ── CTA Section ── */}
       <section ref={ctaObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28 text-center">
         <div className={`rounded-3xl p-14 relative overflow-hidden border border-surface-border bg-surface-card transition-all duration-1000 ${ctaObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -482,8 +733,8 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="relative z-10 border-t border-surface-border/50 py-10">
-        <div className="max-w-7xl mx-auto px-8 flex items-center justify-between">
+      <footer ref={footerObs.ref} className="relative z-10 border-t border-surface-border/50 py-10">
+        <div className={`max-w-7xl mx-auto px-8 flex items-center justify-between transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="flex items-center gap-2">
             <FlowaLogo size={24} />
             <span className="font-display text-sm font-medium text-foreground-muted">

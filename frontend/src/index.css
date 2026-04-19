@@ -4,6 +4,21 @@
 
 /* ── Theme CSS Variables ── */
 :root {
+  --brand-50-rgb: 255 241 242;
+  --brand-100-rgb: 255 228 230;
+  --brand-200-rgb: 254 205 211;
+  --brand-300-rgb: 253 164 175;
+  --brand-400-rgb: 251 113 133;
+  --brand-500-rgb: 246 48 73;
+  --brand-600-rgb: 225 29 72;
+  --brand-700-rgb: 190 18 60;
+  --brand-800-rgb: 159 18 57;
+  --brand-900-rgb: 136 19 55;
+
+  --accent-400-rgb: 34 211 238;
+  --accent-500-rgb: 6 182 212;
+  --accent-600-rgb: 8 145 178;
+
   /* Surface / Background */
   --surface-base:   #F8FAFC;
   --surface-card:   #FFFFFF;
@@ -76,7 +91,7 @@
 }
 
 ::selection {
-  background: rgba(246, 48, 73, 0.35);
+  background: rgba(var(--brand-500-rgb), 0.35);
   color: white;
 }
 
@@ -114,7 +129,7 @@ body {
 
 .react-flow__controls-button:hover {
   background: var(--surface-hover) !important;
-  color: #F63049 !important;
+  color: rgb(var(--brand-500-rgb)) !important;
 }
 
 .react-flow__edge-path {
@@ -123,11 +138,11 @@ body {
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #F63049 !important;
+  stroke: rgb(var(--brand-500-rgb)) !important;
 }
 
 .react-flow__connection-line {
-  stroke: #F63049 !important;
+  stroke: rgb(var(--brand-500-rgb)) !important;
   stroke-width: 2 !important;
 }
 
@@ -139,8 +154,8 @@ body {
 }
 
 .react-flow__handle:hover {
-  border-color: #F63049 !important;
-  background: #F63049 !important;
+  border-color: rgb(var(--brand-500-rgb)) !important;
+  background: rgb(var(--brand-500-rgb)) !important;
 }
 
 /* ── Component classes ── */
@@ -210,8 +225,8 @@ body {
 }
 
 @keyframes pulse-brand {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(246, 48, 73, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(246, 48, 73, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--brand-500-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--brand-500-rgb), 0); }
 }
 
 @keyframes node-success-flash {
@@ -275,8 +290,8 @@ body {
 }
 
 @keyframes borderGlow {
-  0%, 100% { border-color: rgba(246, 48, 73, 0.2); }
-  50% { border-color: rgba(246, 48, 73, 0.5); }
+  0%, 100% { border-color: rgba(var(--brand-500-rgb), 0.2); }
+  50% { border-color: rgba(var(--brand-500-rgb), 0.5); }
 }
 
 /* ── NEW: Aurora / Northern-lights gradient ── */
@@ -827,19 +842,27 @@ body {
   animation: marquee 35s linear infinite;
 }
 .marquee-item {
-  white-space: nowrap;
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
   color: var(--foreground-muted);
-  opacity: 0.5;
-  transition: opacity 0.3s, color 0.3s;
+  opacity: 0.55;
+  transition: opacity 0.3s, color 0.3s, transform 0.3s, background-color 0.3s;
   cursor: default;
   user-select: none;
+}
+.marquee-item svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 .marquee-item:hover {
   opacity: 1;
   color: var(--foreground-secondary);
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
 }
 
 /* ── Animated "connecting line" between steps ── */
