@@ -7,7 +7,6 @@ import {
   Users,
   Shield,
   ArrowRight,
-  Play,
   Workflow,
   Sparkles,
   MousePointerClick,
@@ -412,12 +411,6 @@ export default function LandingPage() {
               Start Building Free <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
             </span>
           </Link>
-          <Link
-            to="/login"
-            className="group inline-flex items-center gap-2 border border-surface-border hover:border-brand-500/40 text-foreground-secondary hover:text-foreground px-8 py-4 rounded-xl text-sm font-semibold transition-all duration-300 hover:bg-brand-500/5"
-          >
-            <Play size={14} className="group-hover:scale-110 transition-transform" /> Watch Demo
-          </Link>
         </div>
 
         {/* Terminal preview (dify-style code snippet) */}
@@ -464,29 +457,6 @@ export default function LandingPage() {
               <div className="text-xs text-foreground-muted font-medium uppercase tracking-widest">{stat.label}</div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* ── Drag-and-drop GIF demo ── */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 pb-14">
-        <div className="rounded-3xl border border-surface-border bg-surface-card/70 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/10 dark:shadow-black/40">
-          <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-surface-border bg-surface-hover/40">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-brand-400 mb-1">LIVE DEMO</p>
-              <h3 className="font-display text-lg md:text-xl font-bold text-foreground">Drag and drop workflow nodes in seconds</h3>
-            </div>
-            <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-500 text-xs font-semibold px-3 py-1 border border-emerald-500/30">
-              Looping GIF
-            </span>
-          </div>
-          <div className="p-4 md:p-6">
-            <img
-              src="/flowa-drag-drop-demo.gif"
-              alt="Animated Flowa demo showing a node being dragged from the nodes panel into the canvas and connected"
-              className="w-full rounded-2xl border border-surface-border"
-              loading="lazy"
-            />
-          </div>
         </div>
       </section>
 
