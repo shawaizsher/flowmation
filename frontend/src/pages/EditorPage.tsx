@@ -470,15 +470,25 @@ function EditorCanvas() {
       // Safety timeout — reset after 60s if backend never responds
       executeTimeoutRef.current = setTimeout(() => {
         setExecuting(false);
-        // Mark all pending I/O entries as success with simulated output
+        const timeoutMessage = 'Execution timed out. Backend/worker may be offline.';
+        // Mark all pending/running I/O entries as failed instead of faking success.
         setIoEntries((prev) =>
           prev.map((e) =>
             e.status === 'pending' || e.status === 'running'
-              ? { ...e, status: 'success', output: { message: 'Completed (simulated — backend offline)', data: e.input }, durationMs: Math.floor(Math.random() * 800 + 100) }
+              ? { ...e, status: 'failed', error: timeoutMessage }
               : e
           )
         );
-        toast('Execution timed out — backend may be offline', { icon: '⏱️', duration: 4000 });
+        setNodeStatuses((prev: Record<string, string>) => {
+          const next = { ...prev };
+          nodes.forEach((n) => {
+            if (!next[n.id] || next[n.id] === 'pending' || next[n.id] === 'running') {
+              next[n.id] = 'failed';
+            }
+          });
+          return next;
+        });
+        toast.error(`${timeoutMessage} Please ensure both backend and worker are running.`, { duration: 5000 });
       }, 60000);
 
       // ── Collect per-user credentials for all nodes that have a credentialId ──
@@ -498,7 +508,7 @@ function EditorCanvas() {
       toast.success('Execution started');
     } catch (err: any) {
       if (executeTimeoutRef.current) clearTimeout(executeTimeoutRef.current);
-      toast.error(err.response?.data?.error || 'Failed to execute — is the backend running?');
+      toast.error(err.response?.data?.error || 'Failed to execute — ensure backend and worker are running.');
       setExecuting(false);
     }
   };
