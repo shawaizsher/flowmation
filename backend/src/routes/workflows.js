@@ -8,6 +8,30 @@ const router = express.Router({ mergeParams: true });
 // All routes require authentication + workspace membership
 router.use(authenticate, requireWorkspace);
 
+// ── GET /api/workspaces/:wid/workflows/members ──
+router.get('/members', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT u.id, u.name, u.email, wm.role
+       FROM workspace_members wm
+       JOIN users u ON wm.user_id = u.id
+       WHERE wm.workspace_id = $1 AND u.is_active = 1
+       ORDER BY CASE WHEN wm.user_id = $2 THEN 0 ELSE 1 END, u.name ASC`,
+      [req.workspaceId, req.user.id]
+    );
+
+    const members = result.rows.map((m) => ({
+      ...m,
+      isCurrentUser: m.id === req.user.id,
+    }));
+
+    res.json({ members });
+  } catch (err) {
+    logger.error('List workspace members error:', err);
+    res.status(500).json({ error: 'Failed to load workspace members' });
+  }
+});
+
 // ── GET /api/workspaces/:wid/workflows ──
 router.get('/', async (req, res) => {
   try {
@@ -43,21 +67,26 @@ router.get('/', async (req, res) => {
 // ── POST /api/workspaces/:wid/workflows ──
 router.post('/', async (req, res) => {
   try {
-    const { name, description, graph } = req.body;
+    const { name, description, graph, tags } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Workflow name is required' });
     }
 
+    const normalizedTags = Array.isArray(tags)
+      ? tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).slice(0, 100)
+      : [];
+
     const result = await query(
-      `INSERT INTO workflows (workspace_id, name, description, graph, created_by)
+      `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
        OUTPUT INSERTED.*
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         req.workspaceId,
         name,
         description || '',
         JSON.stringify(graph || { nodes: [], edges: [] }),
+        JSON.stringify(normalizedTags),
         req.user.id
       ]
     );

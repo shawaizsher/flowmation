@@ -56,10 +56,13 @@ export const workflowApi = {
   list: (workspaceId: string, params?: Record<string, string>) =>
     api.get(`/workspaces/${workspaceId}/workflows`, { params }),
 
+  listMembers: (workspaceId: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/members`),
+
   get: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}`),
 
-  create: (workspaceId: string, data: { name: string; description?: string; graph?: unknown }) =>
+  create: (workspaceId: string, data: { name: string; description?: string; graph?: unknown; tags?: string[] }) =>
     api.post(`/workspaces/${workspaceId}/workflows`, data),
 
   update: (workspaceId: string, id: string, data: Record<string, unknown>) =>

@@ -18,6 +18,7 @@ import {
   Zap,
   TrendingUp,
   Activity,
+  Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, aiApi } from '../utils/api';
@@ -32,6 +33,14 @@ interface WorkflowItem {
   tags: string[];
   updated_at: string;
   created_by_name: string;
+}
+
+interface WorkspaceMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isCurrentUser?: boolean;
 }
 
 const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string; dot: string }> = {
@@ -51,6 +60,16 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [selectedWf, setSelectedWf] = useState<string | null>(null);
+
+  // Create workflow modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingWorkflow, setCreatingWorkflow] = useState(false);
+  const [createName, setCreateName] = useState('Untitled Workflow');
+  const [createDescription, setCreateDescription] = useState('');
+  const [collaborationMode, setCollaborationMode] = useState<'solo' | 'multiplayer'>('solo');
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [selectedCollaboratorIds, setSelectedCollaboratorIds] = useState<string[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // AI Generate modal
   const [showAiModal, setShowAiModal] = useState(false);
@@ -79,17 +98,68 @@ export default function DashboardPage() {
     fetchWorkflows();
   }, [fetchWorkflows]);
 
+  const openCreateModal = async () => {
+    if (!workspaceId) return;
+
+    setShowCreateModal(true);
+    setCreateName('Untitled Workflow');
+    setCreateDescription('');
+    setCollaborationMode('solo');
+    setSelectedCollaboratorIds([]);
+
+    try {
+      setLoadingMembers(true);
+      const res = await workflowApi.listMembers(workspaceId);
+      setWorkspaceMembers(res.data.members || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to load workspace users');
+      setWorkspaceMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const toggleCollaborator = (userId: string) => {
+    setSelectedCollaboratorIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
   const handleCreate = async () => {
     if (!workspaceId) return;
+
+    const name = createName.trim();
+    const description = createDescription.trim();
+
+    if (!name) {
+      toast.error('Workflow name is required');
+      return;
+    }
+
+    if (collaborationMode === 'multiplayer' && selectedCollaboratorIds.length === 0) {
+      toast.error('Select at least one collaborator for multiplayer workflows');
+      return;
+    }
+
+    const tags = [
+      `visibility:${collaborationMode}`,
+      ...selectedCollaboratorIds.map((uid) => `collab-user:${uid}`),
+    ];
+
     try {
+      setCreatingWorkflow(true);
       const res = await workflowApi.create(workspaceId, {
-        name: 'Untitled Workflow',
-        description: '',
+        name,
+        description,
+        tags,
       });
       toast.success('Workflow created');
+      setShowCreateModal(false);
       navigate(`/workflows/${res.data.workflow.id}`);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to create workflow');
+    } finally {
+      setCreatingWorkflow(false);
     }
   };
 
@@ -166,6 +236,7 @@ export default function DashboardPage() {
   const selectedWorkflow = workflows.find((w) => w.id === selectedWf);
   const activeCount = workflows.filter((w) => w.status === 'active').length;
   const errorCount = workflows.filter((w) => w.status === 'error').length;
+  const selectableMembers = workspaceMembers.filter((m) => !m.isCurrentUser);
 
   return (
     <div className="h-full flex">
@@ -179,7 +250,7 @@ export default function DashboardPage() {
               Workflows
             </h2>
             <button
-              onClick={handleCreate}
+              onClick={openCreateModal}
               className="w-7 h-7 rounded-lg bg-brand-500 hover:bg-brand-600 text-white flex items-center justify-center transition-all duration-200 shadow-lg shadow-brand-500/25 hover:scale-105 active:scale-95"
               title="New Workflow"
             >
@@ -334,7 +405,7 @@ export default function DashboardPage() {
                 Here's what's happening in your workspace
               </p>
             </div>
-            <button onClick={handleCreate} className="btn-primary flex items-center gap-2">
+            <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
               <Plus size={16} />
               New Workflow
             </button>
@@ -463,7 +534,7 @@ export default function DashboardPage() {
                   <Sparkles size={16} />
                   AI Generate
                 </button>
-                <button onClick={handleCreate} className="btn-primary flex items-center gap-2">
+                <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
                   <Plus size={16} />
                   New Workflow
                 </button>
@@ -510,6 +581,149 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ═══════════ Create Workflow Modal ═══════════ */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card mx-4 w-full max-w-2xl p-6 animate-scale-in">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                <Plus size={20} className="text-brand-400" />
+                New Workflow
+              </h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-foreground-muted hover:text-foreground transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">Workflow Name</label>
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  className="input-field"
+                  placeholder="e.g. Customer Onboarding"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">Description (optional)</label>
+                <textarea
+                  value={createDescription}
+                  onChange={(e) => setCreateDescription(e.target.value)}
+                  className="input-field min-h-20 resize-none"
+                  placeholder="What this workflow does"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-foreground-secondary">Workflow Type</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCollaborationMode('solo')}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      collaborationMode === 'solo'
+                        ? 'border-brand-500/50 bg-brand-500/10'
+                        : 'border-surface-border hover:border-brand-500/30'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-foreground">Solo</p>
+                    <p className="text-xs text-foreground-muted mt-1">Only you will work on this workflow initially.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCollaborationMode('multiplayer')}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      collaborationMode === 'multiplayer'
+                        ? 'border-brand-500/50 bg-brand-500/10'
+                        : 'border-surface-border hover:border-brand-500/30'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-foreground">Multiplayer</p>
+                    <p className="text-xs text-foreground-muted mt-1">Invite teammates so they can collaborate on this workflow.</p>
+                  </button>
+                </div>
+              </div>
+
+              {collaborationMode === 'multiplayer' && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground-secondary">
+                    <Users size={16} className="text-brand-400" />
+                    Add Collaborators
+                  </div>
+
+                  {loadingMembers ? (
+                    <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-4 text-sm text-foreground-muted">
+                      Loading workspace users...
+                    </div>
+                  ) : selectableMembers.length === 0 ? (
+                    <div className="rounded-xl border border-surface-border bg-surface-hover/40 p-4 text-sm text-foreground-muted">
+                      No other users found in this workspace.
+                    </div>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto rounded-xl border border-surface-border">
+                      {selectableMembers.map((member) => {
+                        const selected = selectedCollaboratorIds.includes(member.id);
+                        return (
+                          <button
+                            type="button"
+                            key={member.id}
+                            onClick={() => toggleCollaborator(member.id)}
+                            className={`w-full flex items-center justify-between px-4 py-3 text-left border-b border-surface-border last:border-b-0 transition ${
+                              selected ? 'bg-brand-500/10' : 'hover:bg-surface-hover/50'
+                            }`}
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{member.name}</p>
+                              <p className="text-xs text-foreground-muted">{member.email}</p>
+                            </div>
+                            <div className={`h-5 w-5 rounded border flex items-center justify-center ${selected ? 'border-brand-500 bg-brand-500 text-white' : 'border-surface-border text-transparent'}`}>
+                              ✓
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creatingWorkflow || !createName.trim()}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50"
+              >
+                {creatingWorkflow ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Create Workflow
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════ AI Generate Modal ═══════════ */}
       {showAiModal && (
