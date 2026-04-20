@@ -9,6 +9,7 @@ import ReactFlow, {
   Connection,
   Node,
   Edge,
+  MarkerType,
   ReactFlowProvider,
   useReactFlow,
   BackgroundVariant,
@@ -539,7 +540,27 @@ function EditorCanvas() {
 
   // ── Handlers ──
   const onConnect = useCallback((connection: Connection) => {
-    setEdges((eds) => addEdge({ ...connection, id: `e-${connection.source}-${connection.target}` }, eds));
+    if (!connection.source || !connection.target) return;
+    if (connection.source === connection.target) return;
+
+    const edgeId = `e-${connection.source}-${connection.sourceHandle || 'out'}-${connection.target}-${connection.targetHandle || 'in'}-${Date.now()}`;
+
+    setEdges((eds) =>
+      addEdge(
+        {
+          ...connection,
+          id: edgeId,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#64748b', strokeWidth: 2 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#64748b',
+          },
+        },
+        eds
+      )
+    );
   }, [setEdges]);
 
   const onNodeClick = useCallback((_: any, node: Node) => {
@@ -1018,11 +1039,18 @@ function EditorCanvas() {
             onNodesDelete={onNodesDelete}
             nodeTypes={nodeTypes}
             fitView
+            nodesConnectable
             className="bg-base"
             deleteKeyCode={['Backspace', 'Delete']}
+            connectionLineStyle={{ stroke: '#64748b', strokeWidth: 2 }}
             defaultEdgeOptions={{
+              type: 'smoothstep',
               animated: true,
-              style: { stroke: '#1e2d42', strokeWidth: 2 },
+              style: { stroke: '#64748b', strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#64748b',
+              },
             }}
           >
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e2d42" />

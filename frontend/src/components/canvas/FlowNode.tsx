@@ -63,7 +63,7 @@ function getCategoryFromType(type: string): string {
   return 'utilities';
 }
 
-function FlowNode({ data, selected, id }: NodeProps) {
+function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
   const nodeStatuses = useStore((s) => s.nodeStatuses);
   const status = nodeStatuses[id] as string | undefined;
   const category = getCategoryFromType(data.type || '');
@@ -78,7 +78,7 @@ function FlowNode({ data, selected, id }: NodeProps) {
 
   return (
     <div
-      className={`group relative min-w-[180px] max-w-[240px] rounded-xl border-2 bg-surface-card overflow-hidden transition-all ${
+      className={`group relative min-w-[180px] max-w-[240px] rounded-xl border-2 bg-surface-card overflow-visible transition-all ${
         selected
           ? 'border-brand-500 shadow-lg shadow-brand-500/20'
           : status && statusColors[status]
@@ -107,11 +107,30 @@ function FlowNode({ data, selected, id }: NodeProps) {
         </div>
       )}
 
-      {/* Input handle */}
+      {/* Input connector */}
       <Handle
         type="target"
-        position={Position.Top}
-        className="!h-2.5 !w-2.5 !rounded-full !border-2 !border-[#1e2d42] !bg-brand-400 transition-colors group-hover:!border-brand-400"
+        id="in"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        style={{
+          background: 'var(--surface-card)',
+          borderColor: 'rgb(var(--brand-500-rgb))',
+        }}
+        className="!h-3.5 !w-3.5 !rounded-full !border-2 !shadow-[0_0_0_2px_rgba(246,48,73,0.2)] !left-0 !z-20 transition-all group-hover:!shadow-[0_0_0_4px_rgba(246,48,73,0.25)]"
+      />
+
+      {/* Output connector */}
+      <Handle
+        type="source"
+        id="out"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        style={{
+          background: 'var(--surface-card)',
+          borderColor: 'rgb(var(--brand-500-rgb))',
+        }}
+        className="!h-3.5 !w-3.5 !rounded-full !border-2 !shadow-[0_0_0_2px_rgba(246,48,73,0.2)] !right-0 !z-20 transition-all group-hover:!shadow-[0_0_0_4px_rgba(246,48,73,0.25)]"
       />
 
       {/* Node content */}
@@ -142,12 +161,6 @@ function FlowNode({ data, selected, id }: NodeProps) {
         </div>
       )}
 
-      {/* Output handle */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-2.5 !w-2.5 !rounded-full !border-2 !border-[#1e2d42] !bg-brand-400 transition-colors group-hover:!border-brand-400"
-      />
     </div>
   );
 }
