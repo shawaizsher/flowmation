@@ -206,32 +206,48 @@ registry.register('code_python', {
       default: '# Access input via `data`\nresult = data' }
   },
   execute: async ({ config, input }) => {
-    const { execSync } = require('child_process');
+    const { execFileSync } = require('child_process');
     const fs = require('fs');
     const path = require('path');
     const os = require('os');
-    const code = config.code || 'result = None';
+    const code = (config.code || 'result = None').replace(/\r\n/g, '\n');
+    const indentedCode = code
+      .split('\n')
+      .map((line) => `    ${line}`)
+      .join('\n');
+
     // Write wrapper to a temp file to avoid shell escaping issues
     const wrapper = [
-      'import json, sys',
+      'import ast, contextlib, io, json, sys',
       'data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}',
-      code,
-      'try:',
-      '    print(json.dumps({"result": result}))',
-      'except NameError:',
-      '    print(json.dumps({"result": None}))'
+      '_stdout = io.StringIO()',
+      'with contextlib.redirect_stdout(_stdout):',
+      indentedCode || '    pass',
+      'captured_stdout = _stdout.getvalue().strip()',
+      'if "result" in locals():',
+      '    final_result = result',
+      'elif captured_stdout:',
+      '    last_line = captured_stdout.splitlines()[-1].strip()',
+      '    try:',
+      '        final_result = ast.literal_eval(last_line)',
+      '    except Exception:',
+      '        final_result = last_line',
+      'else:',
+      '    final_result = None',
+      'print(json.dumps({"result": final_result}, default=str))'
     ].join('\n');
+
     const tmpFile = path.join(os.tmpdir(), `flowa_py_${Date.now()}.py`);
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
-      const output = execSync(`python "${tmpFile}" ${JSON.stringify(inputJson)}`, {
+      const output = execFileSync('python', [tmpFile, inputJson], {
         timeout: 30000,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
       // Parse the last line as JSON (in case there's print() output before)
-      const lines = output.trim().split('\n');
+      const lines = output.trim().split(/\r?\n/);
       const lastLine = lines[lines.length - 1];
       try {
         return JSON.parse(lastLine);
