@@ -111,6 +111,9 @@ function EditorCanvas() {
   const graphSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialGraphLoadedRef = useRef(false);
   const lastRemoteChangeTsRef = useRef(0);
+  const executeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const executionPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const executionPollInFlightRef = useRef(false);
 
   const workspaceId = workspace?.id;
 
@@ -259,6 +262,163 @@ function EditorCanvas() {
     };
   }, [id, nodes, edges, workflowName, toPersistedGraph]);
 
+  const clearExecutionMonitors = useCallback(() => {
+    if (executeTimeoutRef.current) {
+      clearTimeout(executeTimeoutRef.current);
+      executeTimeoutRef.current = null;
+    }
+
+    if (executionPollRef.current) {
+      clearInterval(executionPollRef.current);
+      executionPollRef.current = null;
+    }
+
+    executionPollInFlightRef.current = false;
+  }, []);
+
+  const parseLogPayload = useCallback((value: unknown) => {
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const toEntryStatus = useCallback((status: string): NodeIOEntry['status'] => {
+    if (status === 'success' || status === 'failed' || status === 'running' || status === 'pending') {
+      return status;
+    }
+    if (status === 'skipped') return 'success';
+    return 'pending';
+  }, []);
+
+  const syncExecutionFromApi = useCallback(async (execId: string, notifyOnTerminal = true) => {
+    if (!workspaceId || executionPollInFlightRef.current) return false;
+
+    executionPollInFlightRef.current = true;
+    try {
+      const res = await executionApi.get(workspaceId, execId);
+      const execution = res.data?.execution;
+      const logs = Array.isArray(res.data?.nodeLogs) ? res.data.nodeLogs : [];
+
+      if (logs.length > 0) {
+        setNodeStatuses(() => {
+          const next: Record<string, string> = {};
+          logs.forEach((log: any) => {
+            if (log.node_id && log.status) {
+              next[log.node_id] = toEntryStatus(log.status);
+            }
+          });
+          return next;
+        });
+
+        setNodeLogs(
+          logs.map((log: any) => ({
+            nodeId: log.node_id,
+            status: toEntryStatus(log.status),
+            output: parseLogPayload(log.output),
+            error: log.error,
+            durationMs: log.duration_ms,
+          }))
+        );
+
+        setIoEntries((prev) => {
+          const entries = new Map(prev.map((entry) => [entry.nodeId, entry]));
+
+          logs.forEach((log: any) => {
+            const existing = entries.get(log.node_id);
+            entries.set(log.node_id, {
+              nodeId: log.node_id,
+              nodeLabel: log.node_label || existing?.nodeLabel || log.node_id,
+              nodeType: log.node_type || existing?.nodeType || '',
+              status: toEntryStatus(log.status),
+              input: parseLogPayload(log.input) ?? existing?.input,
+              output: parseLogPayload(log.output) ?? existing?.output,
+              error: log.error || existing?.error,
+              durationMs: log.duration_ms ?? existing?.durationMs,
+            });
+          });
+
+          return Array.from(entries.values());
+        });
+      }
+
+      const status = execution?.status;
+      const isTerminal = status === 'success' || status === 'failed' || status === 'cancelled';
+
+      if (isTerminal) {
+        clearExecutionMonitors();
+        setExecuting(false);
+
+        if (notifyOnTerminal) {
+          const duration = execution?.duration_ms ?? execution?.durationMs ?? 0;
+          if (status === 'success') {
+            toast.success(`Execution completed (${duration}ms)`);
+          } else if (status === 'cancelled') {
+            toast('Execution cancelled', { icon: '⏹️' });
+          } else {
+            toast.error(`Execution failed: ${execution?.error || 'Unknown error'}`);
+          }
+        }
+
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    } finally {
+      executionPollInFlightRef.current = false;
+    }
+  }, [workspaceId, clearExecutionMonitors, parseLogPayload, setNodeStatuses, toEntryStatus]);
+
+  const startExecutionMonitoring = useCallback((execId: string) => {
+    clearExecutionMonitors();
+
+    executionPollRef.current = setInterval(() => {
+      syncExecutionFromApi(execId, true);
+    }, 2500);
+
+    // Run an immediate status check so super-fast executions appear instantly.
+    syncExecutionFromApi(execId, true);
+
+    executeTimeoutRef.current = setTimeout(async () => {
+      const finished = await syncExecutionFromApi(execId, true);
+      if (finished) return;
+
+      clearExecutionMonitors();
+      setExecuting(false);
+
+      const timeoutMessage = 'Execution timed out. Backend/worker may be offline.';
+      setIoEntries((prev) =>
+        prev.map((entry) =>
+          entry.status === 'pending' || entry.status === 'running'
+            ? { ...entry, status: 'failed', error: timeoutMessage }
+            : entry
+        )
+      );
+
+      setNodeStatuses((prev: Record<string, string>) => {
+        const next = { ...prev };
+        nodes.forEach((node) => {
+          if (!next[node.id] || next[node.id] === 'pending' || next[node.id] === 'running') {
+            next[node.id] = 'failed';
+          }
+        });
+        return next;
+      });
+
+      toast.error(`${timeoutMessage} Please ensure backend is running and reachable.`, { duration: 5000 });
+    }, 120000);
+  }, [clearExecutionMonitors, nodes, setNodeStatuses, syncExecutionFromApi]);
+
+  useEffect(() => {
+    return () => {
+      clearExecutionMonitors();
+    };
+  }, [clearExecutionMonitors]);
+
   const handleWsMessage = useCallback((msg: any) => {
     switch (msg.type) {
       case 'presence_init':
@@ -323,6 +483,9 @@ function EditorCanvas() {
         setNodeStatuses({});
         // Don't clear ioEntries — they were pre-populated by handleExecute
         setIoVisible(true);
+        if (msg.executionId) {
+          startExecutionMonitoring(msg.executionId);
+        }
         break;
       case 'node_started':
         setNodeStatuses((prev: Record<string, string>) => ({ ...prev, [msg.nodeId]: 'running' }));
@@ -357,7 +520,7 @@ function EditorCanvas() {
         );
         break;
       case 'execution_finished':
-        if (executeTimeoutRef.current) clearTimeout(executeTimeoutRef.current);
+        clearExecutionMonitors();
         if (msg.status === 'success') {
           toast.success(`Execution completed (${msg.durationMs}ms)`);
         } else {
@@ -372,7 +535,7 @@ function EditorCanvas() {
         }
         break;
     }
-  }, [user?.name, setNodeStatuses, normalizeGraph, navigate, setNodes, setEdges]);
+  }, [user?.name, setNodeStatuses, normalizeGraph, navigate, setNodes, setEdges, clearExecutionMonitors, startExecutionMonitoring]);
 
   // ── Handlers ──
   const onConnect = useCallback((connection: Connection) => {
@@ -437,15 +600,13 @@ function EditorCanvas() {
     }
   };
 
-  const executeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const handleExecute = async () => {
     if (!workspaceId || !id) return;
 
     // If already executing, allow cancelling
     if (executing) {
       setExecuting(false);
-      if (executeTimeoutRef.current) clearTimeout(executeTimeoutRef.current);
+      clearExecutionMonitors();
       toast('Execution cancelled', { icon: '⏹️' });
       return;
     }
@@ -467,30 +628,6 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
-      // Safety timeout — reset after 60s if backend never responds
-      executeTimeoutRef.current = setTimeout(() => {
-        setExecuting(false);
-        const timeoutMessage = 'Execution timed out. Backend/worker may be offline.';
-        // Mark all pending/running I/O entries as failed instead of faking success.
-        setIoEntries((prev) =>
-          prev.map((e) =>
-            e.status === 'pending' || e.status === 'running'
-              ? { ...e, status: 'failed', error: timeoutMessage }
-              : e
-          )
-        );
-        setNodeStatuses((prev: Record<string, string>) => {
-          const next = { ...prev };
-          nodes.forEach((n) => {
-            if (!next[n.id] || next[n.id] === 'pending' || next[n.id] === 'running') {
-              next[n.id] = 'failed';
-            }
-          });
-          return next;
-        });
-        toast.error(`${timeoutMessage} Please ensure both backend and worker are running.`, { duration: 5000 });
-      }, 60000);
-
       // ── Collect per-user credentials for all nodes that have a credentialId ──
       const credentialsMap: Record<string, { serviceId: string; values: Record<string, string> }> = {};
       for (const n of nodes) {
@@ -505,10 +642,11 @@ function EditorCanvas() {
 
       const res = await workflowApi.execute(workspaceId, id, undefined, credentialsMap);
       setExecutionId(res.data.executionId);
+      startExecutionMonitoring(res.data.executionId);
       toast.success('Execution started');
     } catch (err: any) {
-      if (executeTimeoutRef.current) clearTimeout(executeTimeoutRef.current);
-      toast.error(err.response?.data?.error || 'Failed to execute — ensure backend and worker are running.');
+      clearExecutionMonitors();
+      toast.error(err.response?.data?.error || 'Failed to execute — ensure backend is running.');
       setExecuting(false);
     }
   };
