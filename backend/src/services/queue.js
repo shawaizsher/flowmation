@@ -5,6 +5,41 @@ const logger = require('../utils/logger');
 
 let executionQueue = null;
 
+function shouldUseInlineFallback() {
+  return process.env.ENABLE_INLINE_EXECUTION_FALLBACK !== 'false';
+}
+
+async function hasActiveWorkers(queue) {
+  try {
+    const workers = await queue.getWorkers();
+    return Array.isArray(workers) && workers.length > 0;
+  } catch (err) {
+    logger.warn(`Could not detect active queue workers: ${err.message}`);
+    // If worker discovery fails, keep queue behavior unchanged.
+    return true;
+  }
+}
+
+function runExecutionInline({ executionId, workflowId, triggerPayload, credentials }) {
+  setImmediate(async () => {
+    try {
+      const { executeWorkflow } = require('../engine/executor');
+      const { getWSManager } = require('./websocket');
+      const wsManager = getWSManager();
+
+      await executeWorkflow(
+        executionId,
+        workflowId,
+        triggerPayload || {},
+        wsManager,
+        credentials || {}
+      );
+    } catch (err) {
+      logger.error(`Inline execution failed for ${executionId}:`, err);
+    }
+  });
+}
+
 function getQueue() {
   if (!executionQueue) {
     executionQueue = new Queue('workflow-executions', {
@@ -33,8 +68,19 @@ async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPa
 
   const executionId = result.rows[0].id;
 
-  // Add to BullMQ queue
+  // Add to BullMQ queue when workers are available.
   const queue = getQueue();
+
+  if (shouldUseInlineFallback()) {
+    const workersOnline = await hasActiveWorkers(queue);
+
+    if (!workersOnline) {
+      logger.warn(`No active workers detected. Running execution inline: ${executionId}`);
+      runExecutionInline({ executionId, workflowId, triggerPayload, credentials });
+      return executionId;
+    }
+  }
+
   await queue.add('execute', {
     executionId,
     workflowId,
