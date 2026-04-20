@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronUp,
   ArrowDownToLine,
   ArrowUpFromLine,
   Copy,
@@ -28,8 +27,14 @@ export interface NodeIOEntry {
   durationMs?: number;
 }
 
+export interface NodeIOEdge {
+  source: string;
+  target: string;
+}
+
 interface IOPanelProps {
   entries: NodeIOEntry[];
+  edges: NodeIOEdge[];
   visible: boolean;
   onToggle: () => void;
 }
@@ -63,6 +68,11 @@ function stringifyCellValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function previewValue(data: unknown, max = 120): string {
+  const raw = formatJsonRaw(data);
+  return raw.length > max ? `${raw.slice(0, max)}...` : raw;
 }
 
 function buildTableData(data: unknown): { headers: string[]; rows: string[][] } {
@@ -127,7 +137,7 @@ const statusTone: Record<string, string> = {
 };
 
 /* ────────── Component ────────── */
-export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
+export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'input' | 'output' | 'error' | 'meta'>('output');
@@ -158,6 +168,39 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
     () => entries.find((entry) => entry.nodeId === selectedEntry),
     [entries, selectedEntry]
   );
+
+  const connectedNodeGroups = useMemo(() => {
+    if (!selectedNode) {
+      return { previousNodes: [] as NodeIOEntry[], nextNodes: [] as NodeIOEntry[] };
+    }
+
+    const entryMap = new Map(entries.map((entry) => [entry.nodeId, entry]));
+
+    const previousIds = Array.from(
+      new Set(
+        edges
+          .filter((edge) => edge.target === selectedNode.nodeId)
+          .map((edge) => edge.source)
+      )
+    );
+
+    const nextIds = Array.from(
+      new Set(
+        edges
+          .filter((edge) => edge.source === selectedNode.nodeId)
+          .map((edge) => edge.target)
+      )
+    );
+
+    return {
+      previousNodes: previousIds
+        .map((nodeId) => entryMap.get(nodeId))
+        .filter((entry): entry is NodeIOEntry => Boolean(entry)),
+      nextNodes: nextIds
+        .map((nodeId) => entryMap.get(nodeId))
+        .filter((entry): entry is NodeIOEntry => Boolean(entry)),
+    };
+  }, [edges, entries, selectedNode]);
 
   const activePayload = useMemo(() => {
     if (!selectedNode) return undefined;
@@ -373,7 +416,7 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
               </div>
 
               {/* Data display */}
-              <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+              <div className="flex-1 overflow-auto p-4 custom-scrollbar space-y-4">
                 {activeTab === 'error' ? (
                   selectedNode.error ? (
                   <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
@@ -430,6 +473,96 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
                     {formatJsonPretty(activePayload)}
                   </pre>
                 )}
+
+                {/* Previous / Next node context */}
+                <div className="rounded-xl border border-surface-border bg-base/20 p-3.5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Connected Node Data</h5>
+                    <span className="text-[11px] text-foreground-muted">
+                      Prev: {connectedNodeGroups.previousNodes.length} · Next: {connectedNodeGroups.nextNodes.length}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                    <div className="rounded-lg border border-surface-border bg-surface-card/50 overflow-hidden">
+                      <div className="border-b border-surface-border bg-base/50 px-3 py-2 text-xs font-semibold text-foreground-secondary">
+                        Previous Nodes
+                      </div>
+                      {connectedNodeGroups.previousNodes.length > 0 ? (
+                        <div className="overflow-auto max-h-64">
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-base/40 sticky top-0">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Node</th>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Input</th>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Output</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {connectedNodeGroups.previousNodes.map((entry) => (
+                                <tr key={`prev-${entry.nodeId}`} className="odd:bg-base/20">
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60">
+                                    <div className="flex items-center gap-1.5">
+                                      {statusIcon[entry.status]}
+                                      <span className="text-foreground">{entry.nodeLabel}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60 text-foreground-secondary break-words whitespace-pre-wrap">
+                                    {previewValue(entry.input)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60 text-foreground-secondary break-words whitespace-pre-wrap">
+                                    {previewValue(entry.output)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="px-3 py-4 text-xs text-foreground-muted">No previous nodes connected.</div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-card/50 overflow-hidden">
+                      <div className="border-b border-surface-border bg-base/50 px-3 py-2 text-xs font-semibold text-foreground-secondary">
+                        Next Nodes
+                      </div>
+                      {connectedNodeGroups.nextNodes.length > 0 ? (
+                        <div className="overflow-auto max-h-64">
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-base/40 sticky top-0">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Node</th>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Input</th>
+                                <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Output</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {connectedNodeGroups.nextNodes.map((entry) => (
+                                <tr key={`next-${entry.nodeId}`} className="odd:bg-base/20">
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60">
+                                    <div className="flex items-center gap-1.5">
+                                      {statusIcon[entry.status]}
+                                      <span className="text-foreground">{entry.nodeLabel}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60 text-foreground-secondary break-words whitespace-pre-wrap">
+                                    {previewValue(entry.input)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top border-b border-surface-border/60 text-foreground-secondary break-words whitespace-pre-wrap">
+                                    {previewValue(entry.output)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="px-3 py-4 text-xs text-foreground-muted">No next nodes connected.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </>
           ) : (

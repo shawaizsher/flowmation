@@ -1060,6 +1060,7 @@ function EditorCanvas() {
           {/* I/O Panel — bottom of canvas */}
           <IOPanel
             entries={ioEntries}
+            edges={edges.map((edge) => ({ source: edge.source, target: edge.target }))}
             visible={ioVisible}
             onToggle={() => setIoVisible(!ioVisible)}
           />
