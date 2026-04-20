@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown,
   ChevronUp,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -11,6 +10,8 @@ import {
   X,
   Maximize2,
   Minimize2,
+  Search,
+  Info,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NodeIcon from './NodeIcon';
@@ -34,8 +35,8 @@ interface IOPanelProps {
 }
 
 /* ────────── Helpers ────────── */
-function formatJson(data: unknown): string {
-  if (data === undefined || data === null) return '—';
+function formatJsonPretty(data: unknown): string {
+  if (data === undefined || data === null) return '-';
   try {
     return JSON.stringify(data, null, 2);
   } catch {
@@ -43,8 +44,72 @@ function formatJson(data: unknown): string {
   }
 }
 
-function truncate(s: string, max: number) {
-  return s.length > max ? s.slice(0, max) + '…' : s;
+function formatJsonRaw(data: unknown): string {
+  if (data === undefined || data === null) return '-';
+  if (typeof data === 'string') return data;
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
+function stringifyCellValue(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildTableData(data: unknown): { headers: string[]; rows: string[][] } {
+  if (data === undefined || data === null) {
+    return { headers: ['Value'], rows: [] };
+  }
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return { headers: ['Value'], rows: [] };
+    }
+
+    const allObjects = data.every((item) => item !== null && typeof item === 'object' && !Array.isArray(item));
+    if (allObjects) {
+      const headers = Array.from(
+        new Set(
+          data
+            .slice(0, 50)
+            .flatMap((item) => Object.keys(item as Record<string, unknown>))
+        )
+      );
+
+      const rows = data.slice(0, 200).map((item) => {
+        const rowObj = item as Record<string, unknown>;
+        return headers.map((header) => stringifyCellValue(rowObj[header]));
+      });
+
+      return { headers, rows };
+    }
+
+    return {
+      headers: ['Index', 'Value'],
+      rows: data.slice(0, 200).map((item, index) => [String(index), stringifyCellValue(item)]),
+    };
+  }
+
+  if (typeof data === 'object') {
+    return {
+      headers: ['Field', 'Value'],
+      rows: Object.entries(data as Record<string, unknown>).map(([key, value]) => [key, stringifyCellValue(value)]),
+    };
+  }
+
+  return {
+    headers: ['Value'],
+    rows: [[stringifyCellValue(data)]],
+  };
 }
 
 const statusIcon: Record<string, JSX.Element> = {
@@ -54,25 +119,76 @@ const statusIcon: Record<string, JSX.Element> = {
   pending: <Clock size={14} className="text-foreground-muted" />,
 };
 
-const statusColor: Record<string, string> = {
-  success: 'border-green-500/30',
-  failed: 'border-red-500/30',
-  running: 'border-yellow-500/30',
-  pending: 'border-surface-border',
+const statusTone: Record<string, string> = {
+  success: 'border-green-500/30 bg-green-500/5',
+  failed: 'border-red-500/30 bg-red-500/5',
+  running: 'border-yellow-500/30 bg-yellow-500/5',
+  pending: 'border-surface-border bg-base/40',
 };
 
 /* ────────── Component ────────── */
 export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
-  const [expanded, setExpanded] = useState(false); // full-height mode
+  const [expanded, setExpanded] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'input' | 'output'>('output');
+  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'error' | 'meta'>('output');
+  const [viewMode, setViewMode] = useState<'json' | 'raw' | 'table'>('json');
+  const [statusFilter, setStatusFilter] = useState<'all' | NodeIOEntry['status']>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredEntries = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return entries.filter((entry) => {
+      const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
+      const matchesQuery =
+        query.length === 0 ||
+        entry.nodeLabel.toLowerCase().includes(query) ||
+        entry.nodeType.toLowerCase().includes(query) ||
+        entry.nodeId.toLowerCase().includes(query);
+      return matchesStatus && matchesQuery;
+    });
+  }, [entries, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedEntry || !filteredEntries.some((entry) => entry.nodeId === selectedEntry)) {
+      setSelectedEntry(filteredEntries[0]?.nodeId ?? null);
+    }
+  }, [filteredEntries, selectedEntry]);
+
+  const selectedNode = useMemo(
+    () => entries.find((entry) => entry.nodeId === selectedEntry),
+    [entries, selectedEntry]
+  );
+
+  const activePayload = useMemo(() => {
+    if (!selectedNode) return undefined;
+    if (activeTab === 'input') return selectedNode.input;
+    if (activeTab === 'output') return selectedNode.output;
+    if (activeTab === 'meta') {
+      return {
+        nodeId: selectedNode.nodeId,
+        nodeLabel: selectedNode.nodeLabel,
+        nodeType: selectedNode.nodeType,
+        status: selectedNode.status,
+        durationMs: selectedNode.durationMs,
+        hasInput: selectedNode.input !== undefined,
+        hasOutput: selectedNode.output !== undefined,
+      };
+    }
+    return selectedNode.error;
+  }, [selectedNode, activeTab]);
+
+  const tableData = useMemo(() => buildTableData(activePayload), [activePayload]);
 
   const handleCopy = (data: unknown) => {
-    navigator.clipboard.writeText(formatJson(data));
+    if (activeTab === 'error') {
+      navigator.clipboard.writeText(typeof data === 'string' ? data : formatJsonRaw(data));
+    } else if (viewMode === 'raw') {
+      navigator.clipboard.writeText(formatJsonRaw(data));
+    } else {
+      navigator.clipboard.writeText(formatJsonPretty(data));
+    }
     toast.success('Copied to clipboard', { duration: 1500 });
   };
-
-  const selectedNode = entries.find((e) => e.nodeId === selectedEntry);
 
   if (!visible) {
     return (
@@ -81,8 +197,7 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
         className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-surface-border bg-surface-card px-4 py-2 text-sm text-foreground-muted shadow-xl hover:text-foreground hover:border-brand-500/40 transition"
       >
         <ArrowUpFromLine size={15} />
-        Input / Output
-        <ChevronUp size={14} />
+        Input / Output Panel
       </button>
     );
   }
@@ -90,18 +205,18 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
   return (
     <div
       className={`absolute bottom-0 left-0 right-0 z-20 flex flex-col border-t border-surface-border bg-surface-card shadow-2xl transition-all ${
-        expanded ? 'h-[70%]' : 'h-72'
+        expanded ? 'h-[82%]' : 'h-[30rem]'
       }`}
     >
       {/* ── Header bar ── */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-surface-border shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-border shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <ArrowDownToLine size={16} className="text-brand-400" />
-            <h3 className="font-display text-sm font-semibold text-foreground">Input / Output</h3>
+            <h3 className="font-display text-sm font-semibold text-foreground">Execution Data</h3>
           </div>
           <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-medium text-brand-400">
-            {entries.length} node{entries.length !== 1 ? 's' : ''}
+            {filteredEntries.length}/{entries.length} node{entries.length !== 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -125,7 +240,35 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
       {/* ── Content ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Node list */}
-        <div className="w-60 shrink-0 border-r border-surface-border overflow-y-auto custom-scrollbar">
+        <div className="w-80 shrink-0 border-r border-surface-border flex flex-col">
+          <div className="p-3 border-b border-surface-border space-y-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search node by name, type, or id"
+                className="w-full rounded-lg border border-surface-border bg-base py-2 pl-8 pr-2 text-xs text-foreground outline-none focus:border-brand-500/50"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(['all', 'running', 'success', 'failed', 'pending'] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium border transition ${
+                    statusFilter === status
+                      ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
+                      : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
           {entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-4 text-center">
               <ArrowUpFromLine size={24} className="mb-2 text-foreground-muted/40" />
@@ -133,13 +276,13 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
             </div>
           ) : (
             <div className="p-1.5 space-y-0.5">
-              {entries.map((entry) => (
+              {filteredEntries.map((entry) => (
                 <button
                   key={entry.nodeId}
                   onClick={() => { setSelectedEntry(entry.nodeId); setActiveTab('output'); }}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition group ${
                     selectedEntry === entry.nodeId
-                      ? 'bg-brand-500/10 border border-brand-500/30'
+                      ? `border ${statusTone[entry.status]}`
                       : 'hover:bg-base/60 border border-transparent'
                   }`}
                 >
@@ -155,48 +298,84 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
                   </div>
                 </button>
               ))}
+
+              {filteredEntries.length === 0 && (
+                <div className="p-4 text-center text-xs text-foreground-muted">No nodes match current filters.</div>
+              )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Right: Detail view */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedNode ? (
             <>
-              {/* Tab bar */}
-              <div className="flex items-center gap-0 border-b border-surface-border shrink-0">
+              {/* Detail header */}
+              <div className="flex items-center justify-between border-b border-surface-border px-4 py-2.5 shrink-0">
+                <div className="min-w-0">
+                  <h4 className="truncate text-sm font-semibold text-foreground">{selectedNode.nodeLabel}</h4>
+                  <p className="truncate text-xs text-foreground-muted">{selectedNode.nodeType} · {selectedNode.nodeId}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {statusIcon[selectedNode.status]}
+                  <span className="text-xs text-foreground-muted">
+                    {selectedNode.durationMs !== undefined ? `${selectedNode.durationMs}ms` : selectedNode.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Option rows */}
+              <div className="border-b border-surface-border shrink-0 px-4 py-2.5 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(['input', 'output', 'error', 'meta'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                        activeTab === tab
+                          ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
+                          : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                      }`}
+                    >
+                      {tab.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {activeTab !== 'error' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wide text-foreground-muted">View</span>
+                    {(['json', 'raw', 'table'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setViewMode(mode)}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                          viewMode === mode
+                            ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
+                            : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                        }`}
+                      >
+                        {mode.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end">
                 <button
-                  onClick={() => setActiveTab('input')}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-                    activeTab === 'input'
-                      ? 'border-brand-500 text-brand-400'
-                      : 'border-transparent text-foreground-muted hover:text-foreground'
-                  }`}
-                >
-                  <ArrowDownToLine size={14} /> Input
-                </button>
-                <button
-                  onClick={() => setActiveTab('output')}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-                    activeTab === 'output'
-                      ? 'border-brand-500 text-brand-400'
-                      : 'border-transparent text-foreground-muted hover:text-foreground'
-                  }`}
-                >
-                  <ArrowUpFromLine size={14} /> Output
-                </button>
-                <div className="flex-1" />
-                <button
-                  onClick={() => handleCopy(activeTab === 'input' ? selectedNode.input : selectedNode.output)}
-                  className="mr-3 flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
+                  onClick={() => handleCopy(activePayload)}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
                 >
                   <Copy size={13} /> Copy
                 </button>
               </div>
+              </div>
 
               {/* Data display */}
               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                {selectedNode.status === 'failed' && activeTab === 'output' && selectedNode.error ? (
+                {activeTab === 'error' ? (
+                  selectedNode.error ? (
                   <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle size={16} className="text-red-400" />
@@ -206,21 +385,59 @@ export default function IOPanel({ entries, visible, onToggle }: IOPanelProps) {
                       {selectedNode.error}
                     </pre>
                   </div>
+                  ) : (
+                    <div className="rounded-lg border border-surface-border bg-base/40 p-4 text-sm text-foreground-muted">
+                      This node completed without an error payload.
+                    </div>
+                  )
+                ) : viewMode === 'table' ? (
+                  tableData.rows.length > 0 ? (
+                    <div className="overflow-auto rounded-lg border border-surface-border">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-base/70">
+                          <tr>
+                            {tableData.headers.map((header) => (
+                              <th key={header} className="border-b border-surface-border px-3 py-2 text-left font-semibold text-foreground-secondary">
+                                {header}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableData.rows.map((row, rowIndex) => (
+                            <tr key={`row-${rowIndex}`} className="odd:bg-base/25">
+                              {row.map((cell, cellIndex) => (
+                                <td key={`cell-${rowIndex}-${cellIndex}`} className="max-w-[320px] border-b border-surface-border/60 px-3 py-2 text-foreground-secondary align-top">
+                                  <div className="whitespace-pre-wrap break-words">{cell}</div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-surface-border bg-base/40 p-4 text-sm text-foreground-muted">
+                      No tabular data available for this view.
+                    </div>
+                  )
+                ) : viewMode === 'raw' ? (
+                  <pre className="whitespace-pre-wrap text-sm text-foreground-secondary font-mono leading-relaxed">
+                    {formatJsonRaw(activePayload)}
+                  </pre>
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm text-foreground-secondary font-mono leading-relaxed">
-                    {formatJson(activeTab === 'input' ? selectedNode.input : selectedNode.output) || (
-                      <span className="text-foreground-muted italic">No {activeTab} data available</span>
-                    )}
+                    {formatJsonPretty(activePayload)}
                   </pre>
                 )}
               </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-6">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/10">
-                <ArrowDownToLine size={24} className="text-brand-400/60" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/10 border border-brand-500/20">
+                <Info size={22} className="text-brand-400/70" />
               </div>
-              <p className="text-sm text-foreground-muted">Select a node to inspect its input and output data</p>
+              <p className="text-sm text-foreground-muted">Select a node from the left list to inspect input, output, metadata, and errors.</p>
             </div>
           )}
         </div>
