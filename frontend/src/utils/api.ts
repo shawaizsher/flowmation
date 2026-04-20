@@ -77,8 +77,13 @@ export const workflowApi = {
   publish: (workspaceId: string, id: string, data?: { label?: string; message?: string }) =>
     api.post(`/workspaces/${workspaceId}/workflows/${id}/publish`, data),
 
-  execute: (workspaceId: string, id: string, inputData?: Record<string, unknown>, credentials?: Record<string, { serviceId: string; values: Record<string, string> }>) =>
-    api.post(`/workspaces/${workspaceId}/workflows/${id}/execute`, { inputData, credentials }),
+  execute: (workspaceId: string, id: string, payload?: Record<string, unknown>, credentials?: Record<string, { serviceId: string; values: Record<string, string> }>) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/execute`, {
+      payload,
+      // Keep compatibility with any backend route still expecting inputData.
+      inputData: payload,
+      credentials,
+    }),
 
   getPresence: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}/presence`),

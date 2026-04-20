@@ -261,6 +261,19 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           return;
         }
 
+        // Gather input from upstream nodes
+        const input = {};
+        incomingEdges.forEach(e => {
+          if (Object.prototype.hasOwnProperty.call(context.nodeOutputs, e.source)) {
+            input[e.source] = context.nodeOutputs[e.source];
+          }
+        });
+
+        // For root non-trigger nodes, expose execution trigger payload as input.
+        if (incomingEdges.length === 0 && triggerPayload && Object.keys(triggerPayload).length > 0) {
+          input.trigger = triggerPayload;
+        }
+
         // Create node log record
         const logResult = await query(
           `INSERT INTO node_logs (execution_id, node_id, node_type, node_label, status, started_at)
@@ -276,7 +289,10 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
             type: 'node_started',
             executionId,
             nodeId: node.id,
-            logId
+            logId,
+            nodeLabel,
+            nodeType,
+            input
           });
         }
 
@@ -292,14 +308,6 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
             resolvedConfig._credentials = credentials[credentialId].values;
             resolvedConfig._credentialServiceId = credentials[credentialId].serviceId;
           }
-
-          // Gather input from upstream nodes
-          const input = {};
-          incomingEdges.forEach(e => {
-            if (context.nodeOutputs[e.source]) {
-              input[e.source] = context.nodeOutputs[e.source];
-            }
-          });
 
           // Get handler from registry
           const handler = registry.get(nodeType);
@@ -346,9 +354,9 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
 
           // Update log with failure
           await query(
-            `UPDATE node_logs SET status = 'failed', error = $1, finished_at = GETDATE(), duration_ms = $2
-             WHERE id = $3`,
-            [err.message, duration, logId]
+            `UPDATE node_logs SET status = 'failed', error = $1, finished_at = GETDATE(), duration_ms = $2, input = $3
+             WHERE id = $4`,
+            [err.message, duration, JSON.stringify(input), logId]
           );
 
           // Broadcast node failed

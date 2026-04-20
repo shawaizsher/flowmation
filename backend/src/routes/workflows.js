@@ -318,11 +318,13 @@ router.post('/:id/execute', async (req, res) => {
     }
 
     const { addExecutionJob } = require('../services/queue');
+    const executionPayload = req.body.payload ?? req.body.inputData ?? {};
+
     const executionId = await addExecutionJob({
       workflowId: req.params.id,
       workspaceId: req.workspaceId,
       triggerType: 'manual',
-      triggerPayload: req.body.payload || {},
+      triggerPayload: executionPayload,
       credentials: req.body.credentials || {}
     });
 
