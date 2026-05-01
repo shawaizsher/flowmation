@@ -505,15 +505,15 @@ export default function LandingPage() {
           {steps.map((s, i) => (
             <div
               key={s.num}
-              className={`relative text-center group transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              className={`relative group transition-all duration-700 border border-surface-border/60 rounded-2xl p-8 bg-surface-card/40 backdrop-blur-sm hover:border-amber-500/30 hover:bg-surface-card/60 hover:-translate-y-1 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
               style={{ transitionDelay: `${400 + i * 200}ms` }}
             >
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-surface-card border border-surface-border flex items-center justify-center mb-6 group-hover:border-brand-500/50 group-hover:shadow-lg group-hover:shadow-brand-500/10 transition-all duration-300 group-hover:-translate-y-1">
-                <s.icon size={24} className="text-foreground-secondary group-hover:text-brand-400 transition-colors duration-300" />
+              <span className="absolute top-4 right-5 text-5xl font-bold font-display text-foreground-muted/10 leading-none select-none">{s.num}</span>
+              <div className="w-14 h-14 rounded-xl bg-surface-hover border border-surface-border flex items-center justify-center mb-6 group-hover:border-amber-500/40 group-hover:shadow-lg group-hover:shadow-amber-500/5 transition-all duration-300">
+                <s.icon size={22} className="text-foreground-secondary group-hover:text-amber-400 transition-colors duration-300" />
               </div>
-              <span className="inline-block text-xs font-mono text-brand-400/60 tracking-widest mb-1">{s.num}</span>
-              <h3 className="font-display text-lg font-bold mt-1 mb-2">{s.title}</h3>
-              <p className="text-sm text-foreground-muted font-body leading-relaxed max-w-[240px] mx-auto">{s.desc}</p>
+              <h3 className="font-display text-xl font-bold mb-3">{s.title}</h3>
+              <p className="text-sm text-foreground-muted font-body leading-relaxed font-light">{s.desc}</p>
             </div>
           ))}
         </div>
