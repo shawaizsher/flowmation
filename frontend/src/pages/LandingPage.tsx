@@ -344,17 +344,17 @@ export default function LandingPage() {
       </div>
 
       {/* ── Nav (glassmorphism) ── */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-surface-base/70 border-b border-surface-border/50">
+      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-surface-base/80 border-b border-surface-border/40 shadow-sm">
         <div className="flex items-center justify-between px-8 py-4 max-w-7xl mx-auto animate-fade-in">
           <div className="flex items-center gap-3 group cursor-default">
-            <FlowaLogo size={36} className="group-hover:scale-110 transition-transform duration-300" />
-            <span className="font-display text-xl font-bold tracking-tight">Flowa</span>
+            <FlowaLogo size={34} className="group-hover:scale-110 transition-transform duration-300" />
+            <span className="font-display text-xl font-bold tracking-wide">Flowa</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm px-4 py-2 rounded-lg font-medium text-foreground-secondary hover:text-foreground transition-colors duration-200">
+          <div className="flex items-center gap-4">
+            <Link to="/login" className="text-sm px-4 py-2 rounded-lg font-medium text-foreground-secondary hover:text-foreground transition-all duration-300 hover:bg-surface-hover/50 uppercase tracking-widest text-xs">
               Sign In
             </Link>
-            <Link to="/register" className="btn-shimmer relative bg-brand-500 hover:bg-brand-600 text-white text-sm px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02]">
+            <Link to="/register" className="btn-shimmer relative bg-brand-500 hover:bg-brand-600 text-white text-xs px-6 py-2.5 rounded-lg font-semibold uppercase tracking-widest transition-all duration-300 shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] hover:-translate-y-0.5 border border-brand-500/50">
               Get Started
             </Link>
           </div>
