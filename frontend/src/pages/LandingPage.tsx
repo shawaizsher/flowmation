@@ -645,15 +645,15 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {dayOneChecklist.map((item, i) => (
                 <div
                   key={item}
-                  className={`flex items-start gap-3 rounded-xl border border-surface-border bg-surface-base/40 px-4 py-3 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+                  className={`flex items-start gap-3 rounded-xl border border-surface-border/60 bg-surface-base/30 px-4 py-3.5 hover:border-amber-500/20 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
                   style={{ transitionDelay: `${220 + i * 90}ms` }}
                 >
-                  <CheckCircle2 size={18} className="text-emerald-400 mt-0.5 shrink-0" />
-                  <span className="text-sm text-foreground-secondary leading-relaxed">{item}</span>
+                  <CheckCircle2 size={16} className="text-amber-400/80 mt-0.5 shrink-0" />
+                  <span className="text-sm text-foreground-secondary leading-relaxed font-light">{item}</span>
                 </div>
               ))}
             </div>
