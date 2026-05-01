@@ -363,7 +363,7 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section
-        className="spotlight-container relative z-10 max-w-5xl mx-auto text-center pt-20 pb-28 px-6"
+        className="spotlight-container relative z-10 max-w-5xl mx-auto text-center pt-24 pb-32 px-6"
         onMouseMove={handleMouseMove}
       >
         {/* Rotating decorative rings */}
@@ -483,6 +483,11 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Section divider ── */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
+        <div className="h-px bg-gradient-to-r from-transparent via-surface-border to-transparent" />
+      </div>
 
       {/* ── How It Works ── */}
       <section ref={stepsObs.ref} className="relative z-10 max-w-5xl mx-auto px-6 py-28">
