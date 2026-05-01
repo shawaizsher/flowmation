@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../store';
-import { useTheme, type Theme } from '../hooks/useTheme';
+import { useTheme, useAccentTheme, type Theme } from '../hooks/useTheme';
 
 type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
 
@@ -46,12 +46,12 @@ export default function SettingsPage() {
   const [failureAlerts, setFailureAlerts] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(false);
 
-  // Appearance — real theme hook
+  // Appearance
   const { theme, setTheme } = useTheme();
+  const { accentTheme, setAccentTheme, accentPalettes } = useAccentTheme();
 
   const handleProfileSave = (e: FormEvent) => {
     e.preventDefault();
-    // In a real app this would call the API
     toast.success('Profile updated');
   };
 
@@ -60,7 +60,6 @@ export default function SettingsPage() {
     if (!currentPw || !newPw) return toast.error('Fill in all fields');
     if (newPw.length < 6) return toast.error('Password must be at least 6 characters');
     if (newPw !== confirmPw) return toast.error('Passwords do not match');
-    // In a real app this would call the API
     toast.success('Password changed');
     setCurrentPw('');
     setNewPw('');
@@ -73,14 +72,12 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <header className="border-b border-surface-border px-8 py-6">
         <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-foreground-muted mt-1">Manage your account and preferences</p>
       </header>
 
       <div className="flex max-w-5xl mx-auto px-8 py-8 gap-8">
-        {/* Settings sidebar tabs */}
         <nav className="w-52 shrink-0 space-y-1">
           {tabs.map((tab) => (
             <button
@@ -98,16 +95,13 @@ export default function SettingsPage() {
           ))}
         </nav>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* ── Profile ── */}
           {activeTab === 'profile' && (
             <div className="card p-6 animate-fade-in">
               <h2 className="font-display text-lg font-bold text-foreground mb-1">Profile</h2>
               <p className="text-sm text-foreground-muted mb-6">Your personal information</p>
 
               <form onSubmit={handleProfileSave} className="space-y-5 max-w-md">
-                {/* Avatar */}
                 <div className="flex items-center gap-4 mb-2">
                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-2xl font-bold uppercase shadow-lg shadow-brand-500/20">
                     {name?.charAt(0) || 'U'}
@@ -154,7 +148,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* ── Security ── */}
           {activeTab === 'security' && (
             <div className="card p-6 animate-fade-in">
               <h2 className="font-display text-lg font-bold text-foreground mb-1 flex items-center gap-2">
@@ -229,7 +222,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* ── Notifications ── */}
           {activeTab === 'notifications' && (
             <div className="card p-6 animate-fade-in">
               <h2 className="font-display text-lg font-bold text-foreground mb-1">Notifications</h2>
@@ -262,7 +254,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* ── Appearance ── */}
           {activeTab === 'appearance' && (
             <div className="card p-6 animate-fade-in">
               <h2 className="font-display text-lg font-bold text-foreground mb-1">Appearance</h2>
@@ -272,7 +263,11 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-3">Theme</label>
                   <div className="flex gap-3">
-                    {([{ key: 'dark', icon: Moon, label: 'Dark' }, { key: 'light', icon: Sun, label: 'Light' }, { key: 'system', icon: Monitor, label: 'System' }] as const).map((t) => (
+                    {([
+                      { key: 'dark', icon: Moon, label: 'Dark' },
+                      { key: 'light', icon: Sun, label: 'Light' },
+                      { key: 'system', icon: Monitor, label: 'System' },
+                    ] as const).map((t) => (
                       <button
                         key={t.key}
                         onClick={() => setTheme(t.key as Theme)}
@@ -294,24 +289,25 @@ export default function SettingsPage() {
                     Accent Color
                   </label>
                   <div className="flex gap-2">
-                    {[
-                      { name: 'Rose', color: 'bg-rose-500' },
-                      { name: 'Cyan', color: 'bg-cyan-500' },
-                      { name: 'Rose', color: 'bg-rose-500' },
-                      { name: 'Amber', color: 'bg-amber-500' },
-                      { name: 'Emerald', color: 'bg-emerald-500' },
-                    ].map((c) => (
+                    {(Object.entries(accentPalettes) as Array<
+                      [keyof typeof accentPalettes, (typeof accentPalettes)[keyof typeof accentPalettes]]
+                    >).map(([key, palette]) => (
                       <button
-                        key={c.name}
-                        title={c.name}
-                        className={`w-8 h-8 rounded-full ${c.color} transition-all duration-200 hover:scale-110 ${
-                          c.name === 'Rose'
+                        key={key}
+                        title={palette.label}
+                        onClick={() => setAccentTheme(key)}
+                        className={`w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 ${
+                          accentTheme === key
                             ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-card'
                             : 'opacity-50 hover:opacity-80'
                         }`}
+                        style={{ backgroundColor: palette.preview }}
                       />
                     ))}
                   </div>
+                  <p className="text-xs text-foreground-muted mt-2">
+                    Selected: {accentPalettes[accentTheme].label}
+                  </p>
                 </div>
               </div>
             </div>
@@ -322,7 +318,6 @@ export default function SettingsPage() {
   );
 }
 
-/* ── Toggle helper ── */
 function ToggleItem({
   label,
   description,

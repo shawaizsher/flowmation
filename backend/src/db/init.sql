@@ -253,6 +253,49 @@ BEGIN
 END
 GO
 
+-- Team users (password for all: admin123)
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'sarah@flowa.dev')
+BEGIN
+  INSERT INTO users (id, email, password_hash, name, role, email_verified)
+  VALUES (
+    'a0000000-0000-0000-0000-000000000002',
+    'sarah@flowa.dev',
+    '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
+    'Sarah Khan',
+    'user',
+    1
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'bilal@flowa.dev')
+BEGIN
+  INSERT INTO users (id, email, password_hash, name, role, email_verified)
+  VALUES (
+    'a0000000-0000-0000-0000-000000000003',
+    'bilal@flowa.dev',
+    '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
+    'Bilal Ahmed',
+    'user',
+    1
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'aisha@flowa.dev')
+BEGIN
+  INSERT INTO users (id, email, password_hash, name, role, email_verified)
+  VALUES (
+    'a0000000-0000-0000-0000-000000000004',
+    'aisha@flowa.dev',
+    '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
+    'Aisha Noor',
+    'user',
+    1
+  );
+END
+GO
+
 -- Default workspace
 IF NOT EXISTS (SELECT * FROM workspaces WHERE slug = 'default')
 BEGIN
@@ -274,6 +317,40 @@ BEGIN
     'b0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001',
     'owner'
+  );
+END
+GO
+
+-- Team members in default workspace
+IF NOT EXISTS (SELECT * FROM workspace_members WHERE workspace_id = 'b0000000-0000-0000-0000-000000000001' AND user_id = 'a0000000-0000-0000-0000-000000000002')
+BEGIN
+  INSERT INTO workspace_members (workspace_id, user_id, role)
+  VALUES (
+    'b0000000-0000-0000-0000-000000000001',
+    'a0000000-0000-0000-0000-000000000002',
+    'admin'
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM workspace_members WHERE workspace_id = 'b0000000-0000-0000-0000-000000000001' AND user_id = 'a0000000-0000-0000-0000-000000000003')
+BEGIN
+  INSERT INTO workspace_members (workspace_id, user_id, role)
+  VALUES (
+    'b0000000-0000-0000-0000-000000000001',
+    'a0000000-0000-0000-0000-000000000003',
+    'editor'
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM workspace_members WHERE workspace_id = 'b0000000-0000-0000-0000-000000000001' AND user_id = 'a0000000-0000-0000-0000-000000000004')
+BEGIN
+  INSERT INTO workspace_members (workspace_id, user_id, role)
+  VALUES (
+    'b0000000-0000-0000-0000-000000000001',
+    'a0000000-0000-0000-0000-000000000004',
+    'viewer'
   );
 END
 GO

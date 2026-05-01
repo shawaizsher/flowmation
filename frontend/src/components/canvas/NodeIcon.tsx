@@ -155,6 +155,17 @@ interface IconDef {
 const ICON_SIZE = 18;
 const SI_SIZE = 16;
 
+const appFavicon = (domain: string) => (
+  <img
+    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+    alt=""
+    className="h-4 w-4 rounded-sm object-contain"
+    loading="lazy"
+    referrerPolicy="no-referrer"
+    draggable={false}
+  />
+);
+
 // ── Master mapping from node type → icon rendering ──
 const iconMap: Record<string, IconDef> = {
   // Triggers
@@ -262,7 +273,7 @@ const iconMap: Record<string, IconDef> = {
   // Analytics
   google_analytics:      { icon: <SiGoogleanalytics size={SI_SIZE} />, bg: 'bg-[#E37400]/20',   fg: 'text-[#E37400]' },
   mixpanel_track:        { icon: <SiMixpanel size={SI_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
-  segment_track:         { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
+  segment_track:         { icon: appFavicon('segment.com'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Utilities
   util_logger:           { icon: <MessageSquare size={ICON_SIZE} />,   bg: 'bg-gray-500/20',    fg: 'text-gray-400' },
@@ -280,24 +291,24 @@ const iconMap: Record<string, IconDef> = {
   gemini_vision:         { icon: <SiGooglegemini size={SI_SIZE} />,    bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   perplexity_search:     { icon: <SiPerplexity size={SI_SIZE} />,      bg: 'bg-cyan-500/20',    fg: 'text-cyan-400' },
   mistral_chat:          { icon: <SiMistralai size={SI_SIZE} />,       bg: 'bg-[#FF7000]/20',   fg: 'text-[#FF7000]' },
-  groq_chat:             { icon: <Zap size={ICON_SIZE} />,             bg: 'bg-[#F55036]/20',   fg: 'text-[#F55036]' },
-  deepseek_chat:         { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-[#0066FF]/20',   fg: 'text-[#0066FF]' },
+  groq_chat:             { icon: appFavicon('groq.com'),               bg: 'bg-white/90',       fg: 'text-slate-900' },
+  deepseek_chat:         { icon: appFavicon('deepseek.com'),           bg: 'bg-white/90',       fg: 'text-slate-900' },
   ollama_chat:           { icon: <SiOllama size={SI_SIZE} />,          bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
   elevenlabs_tts:        { icon: <SiElevenlabs size={SI_SIZE} />,      bg: 'bg-emerald-500/20', fg: 'text-emerald-400' },
   replicate_run:         { icon: <SiReplicate size={SI_SIZE} />,       bg: 'bg-gray-500/20',    fg: 'text-gray-300' },
   openai_embeddings:     { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
   openai_tts:            { icon: <SiOpenai size={SI_SIZE} />,          bg: 'bg-[#10A37F]/20',   fg: 'text-[#10A37F]' },
   langchain_chain:       { icon: <SiLangchain size={SI_SIZE} />,       bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  stability_generate:    { icon: <Layers size={ICON_SIZE} />,          bg: 'bg-[#9B59B6]/20',   fg: 'text-[#9B59B6]' },
-  cohere_generate:       { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-[#39594D]/20',   fg: 'text-[#39594D] dark:text-emerald-400' },
-  cohere_embed:          { icon: <Activity size={ICON_SIZE} />,        bg: 'bg-[#39594D]/20',   fg: 'text-[#39594D] dark:text-emerald-400' },
+  stability_generate:    { icon: appFavicon('stability.ai'),           bg: 'bg-white/90',       fg: 'text-slate-900' },
+  cohere_generate:       { icon: appFavicon('cohere.com'),             bg: 'bg-white/90',       fg: 'text-slate-900' },
+  cohere_embed:          { icon: appFavicon('cohere.com'),             bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Vector Databases
-  pinecone_upsert:       { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  pinecone_query:        { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  qdrant_search:         { icon: <Database size={ICON_SIZE} />,        bg: 'bg-rose-500/20',  fg: 'text-rose-400' },
-  weaviate_query:        { icon: <Database size={ICON_SIZE} />,        bg: 'bg-green-500/20',   fg: 'text-green-400' },
-  chroma_query:          { icon: <Database size={ICON_SIZE} />,        bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
+  pinecone_upsert:       { icon: appFavicon('pinecone.io'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
+  pinecone_query:        { icon: appFavicon('pinecone.io'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
+  qdrant_search:         { icon: appFavicon('qdrant.tech'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
+  weaviate_query:        { icon: appFavicon('weaviate.io'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
+  chroma_query:          { icon: appFavicon('trychroma.com'),          bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Databases (expanded)
   elasticsearch_query:   { icon: <SiElasticsearch size={SI_SIZE} />,   bg: 'bg-yellow-500/20',  fg: 'text-yellow-400' },
@@ -324,7 +335,7 @@ const iconMap: Record<string, IconDef> = {
   asana_create_task:     { icon: <SiAsana size={SI_SIZE} />,           bg: 'bg-[#F06A6A]/20',   fg: 'text-[#F06A6A]' },
   clickup_create_task:   { icon: <SiClickup size={SI_SIZE} />,         bg: 'bg-[#7B68EE]/20',   fg: 'text-[#7B68EE]' },
   todoist_add_task:      { icon: <SiTodoist size={SI_SIZE} />,         bg: 'bg-[#E44332]/20',   fg: 'text-[#E44332]' },
-  monday_create_item:    { icon: <BarChart3 size={ICON_SIZE} />,       bg: 'bg-[#FF3D57]/20',   fg: 'text-[#FF3D57]' },
+  monday_create_item:    { icon: appFavicon('monday.com'),             bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // E-Commerce
   shopify_get_orders:    { icon: <SiShopify size={SI_SIZE} />,         bg: 'bg-[#7AB55C]/20',   fg: 'text-[#7AB55C]' },
@@ -344,7 +355,7 @@ const iconMap: Record<string, IconDef> = {
   zendesk_create_ticket: { icon: <SiZendesk size={SI_SIZE} />,         bg: 'bg-green-500/20',   fg: 'text-green-400' },
   zendesk_update_ticket: { icon: <SiZendesk size={SI_SIZE} />,         bg: 'bg-green-500/20',   fg: 'text-green-400' },
   intercom_message:      { icon: <SiIntercom size={SI_SIZE} />,        bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
-  freshdesk_create_ticket:{ icon: <Shield size={ICON_SIZE} />,         bg: 'bg-green-600/20',   fg: 'text-green-500' },
+  freshdesk_create_ticket:{ icon: appFavicon('freshdesk.com'),         bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Scheduling & Video
   calendly_get_events:   { icon: <SiCalendly size={SI_SIZE} />,        bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
@@ -366,14 +377,14 @@ const iconMap: Record<string, IconDef> = {
   dropbox_upload:        { icon: <SiDropbox size={SI_SIZE} />,         bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   dropbox_list:          { icon: <SiDropbox size={SI_SIZE} />,         bg: 'bg-blue-500/20',    fg: 'text-blue-400' },
   box_upload:            { icon: <SiBox size={SI_SIZE} />,             bg: 'bg-blue-600/20',    fg: 'text-blue-500' },
-  onedrive_upload:       { icon: <FaMicrosoft size={SI_SIZE} />,       bg: 'bg-[#0078D4]/20',   fg: 'text-[#0078D4]' },
+  onedrive_upload:       { icon: appFavicon('onedrive.live.com'),      bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Marketing
   mailchimp_add_member:  { icon: <SiMailchimp size={SI_SIZE} />,       bg: 'bg-[#FFE01B]/20',   fg: 'text-[#FFE01B]' },
   mailchimp_send_campaign:{ icon: <SiMailchimp size={SI_SIZE} />,      bg: 'bg-[#FFE01B]/20',   fg: 'text-[#FFE01B]' },
-  convertkit_add_subscriber:{ icon: <Mail size={ICON_SIZE} />,         bg: 'bg-[#FB6970]/20',   fg: 'text-[#FB6970]' },
-  beehiiv_create_post:   { icon: <Megaphone size={ICON_SIZE} />,       bg: 'bg-[#E8D5B7]/20',   fg: 'text-[#E8D5B7]' },
-  activecampaign_contact:{ icon: <Send size={ICON_SIZE} />,            bg: 'bg-[#356AE6]/20',   fg: 'text-[#356AE6]' },
+  convertkit_add_subscriber:{ icon: appFavicon('convertkit.com'),      bg: 'bg-white/90',       fg: 'text-slate-900' },
+  beehiiv_create_post:   { icon: appFavicon('beehiiv.com'),            bg: 'bg-white/90',       fg: 'text-slate-900' },
+  activecampaign_contact:{ icon: appFavicon('activecampaign.com'),     bg: 'bg-white/90',       fg: 'text-slate-900' },
 
   // Design
   figma_get_file:        { icon: <SiFigma size={SI_SIZE} />,           bg: 'bg-[#A259FF]/20',   fg: 'text-[#A259FF]' },

@@ -7,7 +7,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "worker": "node src/worker.js",
-    "worker:dev": "node --watch src/worker.js"
+    "worker:dev": "node --watch src/worker.js",
+    "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
