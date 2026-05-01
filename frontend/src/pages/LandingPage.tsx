@@ -382,13 +382,13 @@ export default function LandingPage() {
         </div>
 
         {/* Hero headline with typewriter */}
-        <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] mb-8 tracking-tight" style={{ letterSpacing: '-0.02em' }}>
-          <span className="block hero-text-reveal premium-text" style={{ animationDelay: '0.15s' }}>
+        <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] mb-8" style={{ letterSpacing: '-0.01em' }}>
+          <span className="block hero-text-reveal" style={{ animationDelay: '0.15s' }}>
             Build Workflows
           </span>
-          <span className="block hero-text-reveal premium-text" style={{ animationDelay: '0.35s' }}>
+          <span className="block hero-text-reveal italic" style={{ animationDelay: '0.35s' }}>
             at the{' '}
-            <span className="hero-gradient-text text-amber-300/90 dark:text-amber-400">
+            <span className="hero-gradient-text not-italic text-amber-300/90 dark:text-amber-400">
               {typed}
               <span className="typewriter-cursor">|</span>
             </span>
