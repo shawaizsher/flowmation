@@ -693,6 +693,31 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Quote / Manifesto section ── */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center border border-surface-border/50 rounded-3xl p-10 md:p-14 bg-surface-card/30 backdrop-blur-sm">
+          <div>
+            <span className="inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-6">Our Belief</span>
+            <h2 className="font-display text-3xl md:text-4xl font-bold leading-[1.2] mb-6">
+              We used to build things.<br />
+              <span className="italic text-amber-400/80">Then we automated them.</span>
+            </h2>
+            <p className="text-foreground-muted font-body font-light leading-relaxed text-sm mb-4">
+              A few years ago, teams spent weeks writing the same glue code — connecting APIs, retrying failed jobs, syncing data between tools. Our demos went down well, but the effort didn't scale.
+            </p>
+            <p className="text-foreground-muted font-body font-light leading-relaxed text-sm">
+              We realised the problem wasn't the tools — it was the missing orchestration layer. So we built Flowa: one visual canvas to design, run, and monitor any workflow.
+            </p>
+          </div>
+          <div className="border-l border-surface-border/60 pl-10">
+            <blockquote className="font-display text-xl md:text-2xl italic font-medium leading-relaxed text-foreground/80 mb-4">
+              "Teams do not want automation. They want results, reliably."
+            </blockquote>
+            <p className="text-xs uppercase tracking-widest text-amber-500/60 font-semibold">Flowa Team</p>
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA Section ── */}
       <section ref={ctaObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28 text-center">
         <div className={`rounded-3xl p-14 relative overflow-hidden border border-surface-border bg-surface-card transition-all duration-1000 ${ctaObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
