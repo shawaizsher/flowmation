@@ -670,7 +670,7 @@ export default function LandingPage() {
               <button
                 key={item.q}
                 onClick={() => setOpenFaq(isOpen ? -1 : idx)}
-                className={`w-full text-left rounded-2xl border border-surface-border bg-surface-card/60 p-5 hover:border-brand-500/35 transition-all duration-500 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                className={`w-full text-left rounded-2xl border border-surface-border bg-surface-card/60 p-5 hover:border-amber-500/30 hover:bg-surface-card/80 transition-all duration-500 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ transitionDelay: `${220 + idx * 100}ms` }}
               >
                 <div className="flex items-center justify-between gap-6">
