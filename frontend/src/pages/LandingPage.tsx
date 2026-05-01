@@ -538,7 +538,7 @@ export default function LandingPage() {
           {features.map((f, i) => (
             <div
               key={f.title}
-              className={`feature-card group p-7 rounded-2xl border border-surface-border bg-surface-card/50 backdrop-blur-sm transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              className={`feature-card group p-7 rounded-2xl border border-surface-border bg-surface-card/50 backdrop-blur-sm transition-all duration-700 hover:scale-[1.02] hover:border-amber-500/30 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
               style={{ transitionDelay: `${300 + i * 100}ms` }}
             >
               {/* Hover spotlight */}
@@ -566,7 +566,7 @@ export default function LandingPage() {
           {platformHighlights.map((item, i) => (
             <div
               key={item.title}
-              className={`rounded-2xl border border-surface-border bg-surface-card/60 backdrop-blur-sm p-6 hover:border-brand-500/40 transition-all duration-700 ${highlightsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`rounded-2xl border border-surface-border bg-surface-card/60 backdrop-blur-sm p-6 hover:border-amber-500/30 hover:scale-[1.01] hover:translate-y-[-2px] transition-all duration-700 ${highlightsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${i * 120}ms` }}
             >
               <div className="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4">
@@ -598,7 +598,7 @@ export default function LandingPage() {
           {useCases.map((item, i) => (
             <div
               key={item.title}
-              className={`rounded-2xl border border-surface-border bg-surface-card/50 p-6 hover:translate-y-[-2px] transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`rounded-2xl border border-surface-border bg-surface-card/50 p-6 hover:translate-y-[-2px] hover:border-amber-500/30 hover:scale-[1.01] transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${250 + i * 120}ms` }}
             >
               <div className="w-11 h-11 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center mb-4">
