@@ -918,6 +918,46 @@ body {
   animation: shimmer 3s ease-in-out infinite;
 }
 
+/* ── Sophisticated blur-in effect ── */
+@keyframes blurIn {
+  0% {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+.blur-in {
+  animation: blurIn 0.8s ease-out forwards;
+}
+
+/* ── Refined backdrop blur for overlays ── */
+.backdrop-blur-xl {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Elegant hover scale effect ── */
+@keyframes hoverScale {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.02); }
+}
+.hover-scale:hover {
+  animation: hoverScale 0.3s ease-out forwards;
+}
+
+/* ── Glow text effect ── */
+.glow-text {
+  text-shadow: 0 0 20px rgba(246, 48, 73, 0.5), 0 0 40px rgba(246, 48, 73, 0.3);
+}
+
+/* ── Smooth transitions for all interactive elements ── */
+button, a {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ── Premium text shadow effect ── */
 .premium-text {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
