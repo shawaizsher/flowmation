@@ -461,8 +461,8 @@ export default function LandingPage() {
       </section>
 
       {/* ── Marquee — Integration logos ── */}
-      <section className="relative z-10 py-10 overflow-hidden border-y border-surface-border/50">
-        <p className="text-center text-xs font-medium uppercase tracking-widest text-foreground-muted mb-6">
+      <section className="relative z-10 py-10 overflow-hidden border-y border-surface-border/40">
+        <p className="text-center text-xs font-body font-light uppercase tracking-[0.2em] text-foreground-muted/60 mb-8">
           Connects with your favorite tools
         </p>
         <div className="marquee-track">
