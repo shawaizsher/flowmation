@@ -538,20 +538,25 @@ export default function LandingPage() {
           {features.map((f, i) => (
             <div
               key={f.title}
-              className={`feature-card group p-7 rounded-2xl border border-surface-border bg-surface-card/50 backdrop-blur-sm transition-all duration-700 hover:scale-[1.02] hover:border-amber-500/30 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              className={`feature-card group p-7 rounded-2xl border border-surface-border/70 bg-surface-card/40 backdrop-blur-sm transition-all duration-700 hover:scale-[1.02] hover:border-amber-500/25 hover:bg-surface-card/60 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
               style={{ transitionDelay: `${300 + i * 100}ms` }}
             >
               {/* Hover spotlight */}
               <div className="feature-card-glow" />
               <div className="relative z-10">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                  <f.icon size={22} className="text-white" />
+                <div className="flex items-start justify-between mb-5">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                    <f.icon size={20} className="text-white" />
+                  </div>
+                  <span className="text-3xl font-bold font-display text-foreground-muted/10 leading-none select-none">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                 </div>
-                <h3 className="font-display text-base font-bold mb-2 group-hover:text-foreground transition-colors duration-300">
+                <h3 className="font-display text-lg font-bold mb-2 group-hover:text-foreground transition-colors duration-300">
                   {f.title}
                 </h3>
-                <p className="text-sm text-foreground-muted leading-relaxed font-body">{f.desc}</p>
-                <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-brand-400 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                <p className="text-sm text-foreground-muted leading-relaxed font-body font-light">{f.desc}</p>
+                <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-400/70 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
                   Learn more <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
