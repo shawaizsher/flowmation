@@ -382,13 +382,13 @@ export default function LandingPage() {
         </div>
 
         {/* Hero headline with typewriter */}
-        <h1 className="font-display text-5xl md:text-7xl lg:text-[5.5rem] font-extrabold leading-[1.08] mb-8 tracking-[-0.03em]">
-          <span className="block hero-text-reveal" style={{ animationDelay: '0.15s' }}>
+        <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] mb-8 tracking-tight" style={{ letterSpacing: '-0.02em' }}>
+          <span className="block hero-text-reveal premium-text" style={{ animationDelay: '0.15s' }}>
             Build Workflows
           </span>
-          <span className="block hero-text-reveal" style={{ animationDelay: '0.35s' }}>
+          <span className="block hero-text-reveal premium-text" style={{ animationDelay: '0.35s' }}>
             at the{' '}
-            <span className="hero-gradient-text">
+            <span className="hero-gradient-text text-amber-300/90 dark:text-amber-400">
               {typed}
               <span className="typewriter-cursor">|</span>
             </span>
@@ -396,7 +396,7 @@ export default function LandingPage() {
         </h1>
 
         {/* Subline with stagger */}
-        <p className="text-lg md:text-xl text-foreground-muted max-w-2xl mx-auto mb-14 font-body leading-relaxed hero-text-reveal" style={{ animationDelay: '0.6s' }}>
+        <p className="text-lg md:text-xl text-foreground-muted max-w-2xl mx-auto mb-14 font-body leading-relaxed hero-text-reveal font-light" style={{ animationDelay: '0.6s' }}>
           Flowa is a visual, AI-powered workflow automation platform.
           Drag, connect, and let artificial intelligence debug your pipelines — all in real time.
         </p>
@@ -487,12 +487,12 @@ export default function LandingPage() {
       {/* ── How It Works ── */}
       <section ref={stepsObs.ref} className="relative z-10 max-w-5xl mx-auto px-6 py-28">
         <div className="text-center mb-20">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             HOW IT WORKS
           </span>
-          <h2 className={`font-display text-3xl md:text-5xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             Three steps to{' '}
-            <span className="gradient-text-vivid">automate anything</span>
+            <span className="text-amber-400">automate anything</span>
           </h2>
         </div>
 
@@ -522,14 +522,14 @@ export default function LandingPage() {
       {/* ── Features ── */}
       <section ref={featObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-32">
         <div className="text-center mb-20">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             FEATURES
           </span>
-          <h2 className={`font-display text-3xl md:text-5xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             Everything you need to{' '}
-            <span className="gradient-text-vivid">automate</span>
+            <span className="text-amber-400">automate</span>
           </h2>
-          <p className={`text-foreground-muted max-w-lg mx-auto font-body text-base transition-all duration-700 delay-200 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <p className={`text-foreground-muted max-w-lg mx-auto font-body text-base font-light transition-all duration-700 delay-200 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             A complete toolkit for building, debugging, and deploying workflows at any scale.
           </p>
         </div>
@@ -582,14 +582,14 @@ export default function LandingPage() {
       {/* ── Use Cases ── */}
       <section ref={useCasesObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
         <div className="text-center mb-14">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             USE CASES
           </span>
-          <h2 className={`font-display text-3xl md:text-5xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             Built for real{' '}
-            <span className="gradient-text-vivid">automation workloads</span>
+            <span className="text-amber-400">automation workloads</span>
           </h2>
-          <p className={`text-foreground-muted max-w-2xl mx-auto font-body text-base transition-all duration-700 delay-150 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <p className={`text-foreground-muted max-w-2xl mx-auto font-body text-base font-light transition-all duration-700 delay-150 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             From customer communication to AI-assisted operations, Flowa helps teams automate repetitive work with confidence.
           </p>
         </div>
@@ -623,14 +623,14 @@ export default function LandingPage() {
         <div className={`rounded-3xl border border-surface-border bg-surface-card/70 backdrop-blur-sm p-8 md:p-10 transition-all duration-800 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
             <div>
-              <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 WHAT YOU GET
               </span>
-              <h2 className={`font-display text-3xl md:text-4xl font-extrabold mb-4 tracking-[-0.02em] transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className={`font-display text-3xl md:text-4xl font-bold mb-4 transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                 Everything you need on{' '}
-                <span className="gradient-text-vivid">day one</span>
+                <span className="text-amber-400">day one</span>
               </h2>
-              <p className={`text-foreground-muted font-body text-base leading-relaxed transition-all duration-700 delay-150 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <p className={`text-foreground-muted font-body text-base leading-relaxed font-light transition-all duration-700 delay-150 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                 Start small with one workflow, then scale to cross-team automation with visibility, control, and security built in.
               </p>
             </div>
@@ -654,12 +654,12 @@ export default function LandingPage() {
       {/* ── FAQ ── */}
       <section ref={faqObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28">
         <div className="text-center mb-12">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-brand-400 mb-4 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             FAQ
           </span>
-          <h2 className={`font-display text-3xl md:text-5xl font-extrabold tracking-[-0.02em] transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             Questions teams ask before{' '}
-            <span className="gradient-text-vivid">launching</span>
+            <span className="text-amber-400">launching</span>
           </h2>
         </div>
 
@@ -696,11 +696,11 @@ export default function LandingPage() {
           <div className="glow-dot animate-morph-blob w-[300px] h-[300px] bg-brand-500/[0.08] -top-24 -right-24" />
           <div className="glow-dot animate-morph-blob w-[200px] h-[200px] bg-accent-500/[0.05] -bottom-20 -left-20" style={{ animationDelay: '4s' }} />
           <div className="relative z-10">
-            <h2 className="font-display text-3xl md:text-5xl font-extrabold mb-5 tracking-[-0.02em]">
+            <h2 className="font-display text-4xl md:text-5xl font-bold mb-5">
               Ready to{' '}
-              <span className="gradient-text-vivid">automate</span>?
+              <span className="text-amber-400">automate</span>?
             </h2>
-            <p className="text-foreground-muted mb-10 max-w-md mx-auto font-body text-base">
+            <p className="text-foreground-muted mb-10 max-w-md mx-auto font-body text-base font-light">
               Create your free account and start building intelligent workflows in seconds.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
