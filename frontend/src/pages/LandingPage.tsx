@@ -761,15 +761,15 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer ref={footerObs.ref} className="relative z-10 border-t border-surface-border/50 py-10">
+      <footer ref={footerObs.ref} className="relative z-10 border-t border-surface-border/40 py-12">
         <div className={`max-w-7xl mx-auto px-8 flex items-center justify-between transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-          <div className="flex items-center gap-2">
-            <FlowaLogo size={24} />
-            <span className="font-display text-sm font-medium text-foreground-muted">
-              &copy; {new Date().getFullYear()} Flowa
+          <div className="flex items-center gap-3">
+            <FlowaLogo size={22} />
+            <span className="font-display text-sm font-medium text-foreground-muted tracking-wide">
+              Flowa &copy; {new Date().getFullYear()}
             </span>
           </div>
-          <span className="text-sm text-foreground-muted font-body">AI-Native Workflow Automation</span>
+          <span className="text-xs text-foreground-muted/60 font-body font-light uppercase tracking-widest">AI-Native Workflow Automation</span>
         </div>
       </footer>
     </div>
