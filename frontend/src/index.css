@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Smooth scroll behavior ── */
+html {
+  scroll-behavior: smooth;
+}
+
 /* ── Theme CSS Variables ── */
 :root {
   --brand-50-rgb: 255 241 242;
@@ -983,4 +988,69 @@ body {
 }
 .content-fade-in {
   animation: contentFadeIn 0.5s ease-out forwards;
+}
+
+/* ── Sophisticated card entrance ── */
+@keyframes cardEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.card-entrance {
+  animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Enhanced section fade in ── */
+@keyframes sectionFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.section-fade-in {
+  animation: sectionFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Refined glow on focus/hover ── */
+@keyframes glowBorderPulse {
+  0%, 100% {
+    border-color: rgba(246, 48, 73, 0.15);
+    box-shadow: 0 0 0 0 rgba(246, 48, 73, 0.05);
+  }
+  50% {
+    border-color: rgba(246, 48, 73, 0.35);
+    box-shadow: 0 0 12px 0 rgba(246, 48, 73, 0.1);
+  }
+}
+.glow-border-pulse {
+  animation: glowBorderPulse 3s ease-in-out infinite;
+}
+
+/* ── Bounce in animation ── */
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.bounce-in {
+  animation: bounceIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
