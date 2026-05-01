@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
 import AppShell from './components/AppShell';
+import { useTheme, useAccentTheme } from './hooks/useTheme';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useStore((s) => s.token);
@@ -21,6 +22,9 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useTheme();
+  useAccentTheme();
+
   return (
     <Routes>
       <Route path="/" element={<GuestRoute><LandingPage /></GuestRoute>} />

@@ -9,21 +9,21 @@ export default {
     extend: {
       colors: {
         brand: {
-          50:  '#FFF1F2',
-          100: '#FFE4E6',
-          200: '#FECDD3',
-          300: '#FDA4AF',
-          400: '#FB7185',
-          500: '#F63049',  // Primary – Flowa Red (matches logo)
-          600: '#E11D48',  // Hover
-          700: '#BE123C',
-          800: '#9F1239',
-          900: '#881337',
+          50:  'rgb(var(--brand-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--brand-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--brand-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--brand-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--brand-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--brand-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--brand-600-rgb) / <alpha-value>)',
+          700: 'rgb(var(--brand-700-rgb) / <alpha-value>)',
+          800: 'rgb(var(--brand-800-rgb) / <alpha-value>)',
+          900: 'rgb(var(--brand-900-rgb) / <alpha-value>)',
         },
         accent: {
-          400: '#22D3EE',
-          500: '#06B6D4',  // Cyan accent
-          600: '#0891B2',
+          400: 'rgb(var(--accent-400-rgb) / <alpha-value>)',
+          500: 'rgb(var(--accent-500-rgb) / <alpha-value>)',
+          600: 'rgb(var(--accent-600-rgb) / <alpha-value>)',
         },
         /* Surface colors via CSS variables — auto-switch with theme */
         surface: {
@@ -41,10 +41,10 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Inter', 'sans-serif'],
-        hero:    ['Inter', 'sans-serif'],
+        display: ['Playfair Display', 'Georgia', 'serif'],
+        hero:    ['Playfair Display', 'Georgia', 'serif'],
         accent:  ['Caveat', 'cursive'],
-        body:    ['Inter', 'Plus Jakarta Sans', 'sans-serif'],
+        body:    ['Lato', 'Inter', 'sans-serif'],
         mono:    ['JetBrains Mono', 'monospace'],
       },
       backgroundImage: {
