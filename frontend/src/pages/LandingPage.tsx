@@ -371,12 +371,12 @@ export default function LandingPage() {
         <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[450px] h-[450px] rotating-ring-reverse opacity-[0.04] pointer-events-none" />
 
         {/* Floating badge — with pulse ring */}
-        <div className="relative inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-card/60 backdrop-blur-sm px-5 py-2 mb-12 animate-scale-in group cursor-default">
+        <div className="relative inline-flex items-center gap-2.5 rounded-full border border-amber-500/20 bg-amber-500/[0.05] backdrop-blur-sm px-5 py-2 mb-12 animate-scale-in group cursor-default">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
           </span>
-          <span className="text-xs font-medium text-foreground-secondary tracking-wide">
+          <span className="text-xs font-medium text-amber-500/90 tracking-widest uppercase">
             AI-Native Automation Platform
           </span>
         </div>
