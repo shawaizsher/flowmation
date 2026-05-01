@@ -912,3 +912,75 @@ body {
   background-size: 200% 100%;
   animation: shimmer 3s ease-in-out infinite;
 }
+
+/* ── Premium text shadow effect ── */
+.premium-text {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Elegant underline animation ── */
+@keyframes elegantUnderline {
+  0% { width: 0; left: 0; }
+  100% { width: 100%; left: 0; }
+}
+.elegant-line::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(246, 48, 73, 0.8), transparent);
+  animation: elegantUnderline 0.8s ease-out forwards;
+}
+
+/* ── Floating element animation ── */
+@keyframes floatPulse {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.02); }
+}
+.float-pulse {
+  animation: floatPulse 4s ease-in-out infinite;
+}
+
+/* ── Staggered reveal animation for sections ── */
+@keyframes staggerReveal {
+  0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.stagger-reveal {
+  opacity: 0;
+  animation: staggerReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Premium hover lift effect ── */
+@keyframes premiumLift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}
+.premium-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-hover:hover {
+  animation: premiumLift 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Gradient border animation ── */
+@keyframes gradientBorderFlow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+.gradient-border-animated {
+  background: linear-gradient(90deg, rgba(246, 48, 73, 0.3), rgba(6, 182, 212, 0.2), rgba(246, 48, 73, 0.1));
+  background-size: 200% 100%;
+  animation: gradientBorderFlow 4s ease infinite;
+}
+
+/* ── Smooth content fade in ── */
+@keyframes contentFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.content-fade-in {
+  animation: contentFadeIn 0.5s ease-out forwards;
+}
