@@ -815,20 +815,22 @@ function EditorCanvas() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-foreground-muted hover:text-foreground"
+            className="rounded-lg p-1.5 text-foreground-muted hover:bg-surface-border hover:text-foreground transition"
+            title="Back to dashboard"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
+          <div className="h-4 w-px bg-surface-border" />
           <input
             type="text"
             value={workflowName}
             onChange={(e) => setWorkflowName(e.target.value)}
-            className="bg-transparent font-display text-base font-semibold text-foreground outline-none focus:border-b focus:border-brand-500"
+            className="bg-transparent font-display text-base font-bold text-foreground outline-none focus:border-b-2 focus:border-brand-500 min-w-0 max-w-[220px] transition-all"
           />
-          <span className="rounded bg-surface-border px-2 py-0.5 text-sm text-foreground-muted">
+          <span className="rounded-md bg-surface-border px-2 py-0.5 text-xs font-bold text-foreground-muted tracking-wide">
             v{workflowVersion}
           </span>
-          <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-400">
+          <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-bold tracking-widest text-amber-400">
             DRAFT
           </span>
         </div>
@@ -891,9 +893,9 @@ function EditorCanvas() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-lg bg-surface-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-border/80"
+            className="flex items-center gap-1.5 rounded-lg bg-surface-border px-3.5 py-1.5 text-xs font-bold text-foreground hover:bg-surface-hover transition"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Save
           </button>
 
@@ -939,10 +941,10 @@ function EditorCanvas() {
 
           <button
             onClick={handleExecute}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold tracking-wide transition ${
               executing
-                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                : 'btn-primary !py-1.5 !px-3 !text-xs'
+                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                : 'btn-primary !py-1.5 !px-4 !text-xs'
             }`}
           >
             {executing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
@@ -958,22 +960,22 @@ function EditorCanvas() {
           <div className="w-80 shrink-0 flex flex-col border-r border-surface-border bg-surface-card">
             {/* Search header */}
             <div className="p-3 pb-2 border-b border-surface-border">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-display text-sm font-semibold text-foreground">Nodes</h3>
-                <span className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-xs font-medium text-brand-400">{totalNodeCount}</span>
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="font-display text-sm font-bold text-foreground tracking-wide">Node Palette</h3>
+                <span className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-xs font-bold text-brand-400">{totalNodeCount}</span>
               </div>
               <div className="relative">
-                <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
                 <input
                   type="text"
                   placeholder="Search nodes…"
                   value={nodeSearch}
                   onChange={(e) => setNodeSearch(e.target.value)}
-                  className="w-full rounded-lg border border-surface-border bg-base py-2 pl-9 pr-8 text-sm text-foreground outline-none focus:border-brand-500/50"
+                  className="w-full rounded-lg border border-surface-border bg-base py-2 pl-8 pr-8 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal"
                 />
                 {nodeSearch && (
                   <button onClick={() => setNodeSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
-                    <X size={14} />
+                    <X size={13} />
                   </button>
                 )}
               </div>
@@ -985,18 +987,18 @@ function EditorCanvas() {
                 const meta = categoryMeta[category] || { label: category, icon: '📦', color: 'text-foreground-muted' };
                 const isCollapsed = collapsedCategories.has(category);
                 return (
-                  <div key={category} className="mb-1">
+                  <div key={category} className="mb-0.5">
                     <button
                       onClick={() => toggleCategory(category)}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-base/50 group"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-base/60"
                     >
-                      <span className="text-base">{meta.icon}</span>
-                      <span className={`flex-1 text-sm font-semibold ${meta.color}`}>{meta.label}</span>
-                      <span className="rounded-full bg-surface-border px-2 py-0.5 text-[11px] text-foreground-muted">{defs.length}</span>
-                      <ChevronDown size={14} className={`text-foreground-muted transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                      <span className="text-sm">{meta.icon}</span>
+                      <span className={`flex-1 text-xs font-bold uppercase tracking-widest ${meta.color}`}>{meta.label}</span>
+                      <span className="rounded-full bg-surface-border px-2 py-0.5 text-[10px] font-bold text-foreground-muted">{defs.length}</span>
+                      <ChevronDown size={13} className={`text-foreground-muted transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
                     </button>
                     {!isCollapsed && (
-                      <div className="ml-1 mt-0.5 space-y-0.5">
+                      <div className="ml-1 mt-0.5 space-y-0.5 pb-1">
                         {defs.map((def) => (
                           <button
                             key={def.type}
@@ -1005,10 +1007,10 @@ function EditorCanvas() {
                           >
                             <NodeIcon nodeType={def.type} size="sm" />
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-foreground truncate">{def.label}</div>
-                              <div className="text-xs text-foreground-muted truncate">{def.description}</div>
+                              <div className="text-sm font-semibold text-foreground truncate">{def.label}</div>
+                              <div className="text-xs font-medium text-foreground-muted truncate">{def.description}</div>
                             </div>
-                            <Plus size={16} className="shrink-0 text-foreground-muted opacity-0 group-hover/node:opacity-100 transition-opacity" />
+                            <Plus size={15} className="shrink-0 text-brand-400 opacity-0 group-hover/node:opacity-100 transition-opacity" />
                           </button>
                         ))}
                       </div>
@@ -1018,9 +1020,10 @@ function EditorCanvas() {
               })}
 
               {Object.keys(filteredCatalog).length === 0 && (
-                <div className="flex flex-col items-center py-8 text-center">
-                  <Search size={28} className="mb-2 text-foreground-muted/50" />
-                  <p className="text-sm text-foreground-muted">No nodes found for "{nodeSearch}"</p>
+                <div className="flex flex-col items-center py-10 text-center">
+                  <Search size={26} className="mb-3 text-foreground-muted/40" />
+                  <p className="text-sm font-semibold text-foreground-muted">No results</p>
+                  <p className="text-xs text-foreground-muted/60 mt-1">Try a different search term</p>
                 </div>
               )}
             </div>
@@ -1071,35 +1074,39 @@ function EditorCanvas() {
             {/* Config panel */}
             {rightPanel === 'config' && selectedNode && (
               <div className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
                     <NodeIcon nodeType={selectedNode.data.type || ''} size="md" />
-                    <h3 className="font-display text-base font-semibold text-foreground">
-                      {selectedNode.data.label}
-                    </h3>
+                    <div>
+                      <h3 className="font-display text-base font-bold text-foreground leading-tight">
+                        {selectedNode.data.label}
+                      </h3>
+                      <p className="text-xs font-medium text-foreground-muted mt-0.5">{selectedNode.data.type}</p>
+                    </div>
                   </div>
-                  <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
-                    <X size={16} />
+                  <button onClick={() => setRightPanel('none')} className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition mt-0.5">
+                    <X size={15} />
                   </button>
                 </div>
-                <p className="mb-4 text-sm text-foreground-muted">Type: {selectedNode.data.type}</p>
 
                 {/* Config fields */}
                 {selectedNode.data.config && Object.entries(selectedNode.data.config).map(([key, value]) => (
-                  <div key={key} className="mb-3">
-                    <label className="mb-1 block text-sm font-medium text-foreground-muted capitalize">{key}</label>
+                  <div key={key} className="mb-4">
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-foreground-muted">
+                      {key.replace(/_/g, ' ')}
+                    </label>
                     {typeof value === 'boolean' ? (
                       <button
                         onClick={() => handleUpdateNodeConfig(key, !value)}
-                        className={`rounded px-3 py-1.5 text-sm ${value ? 'bg-brand-500/20 text-brand-400' : 'bg-surface-border text-foreground-muted'}`}
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${value ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-surface-border text-foreground-muted border border-surface-border hover:border-brand-500/20'}`}
                       >
-                        {value ? 'On' : 'Off'}
+                        {value ? '● On' : '○ Off'}
                       </button>
                     ) : typeof value === 'string' && (value.length > 80 || key === 'code' || key === 'body') ? (
                       <textarea
                         value={String(value)}
                         onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-base p-2.5 font-mono text-sm text-foreground outline-none focus:border-brand-500/50"
+                        className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
                         rows={4}
                       />
                     ) : (
@@ -1107,7 +1114,8 @@ function EditorCanvas() {
                         type="text"
                         value={String(value ?? '')}
                         onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-base px-2.5 py-2 text-sm text-foreground outline-none focus:border-brand-500/50"
+                        className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
+                        placeholder={`Enter ${key.replace(/_/g, ' ')}…`}
                       />
                     )}
                   </div>
@@ -1190,36 +1198,40 @@ function EditorCanvas() {
             {rightPanel === 'logs' && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-base font-semibold text-foreground">Execution Logs</h3>
-                  <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
-                    <X size={16} />
+                  <h3 className="font-display text-base font-bold text-foreground">Execution Logs</h3>
+                  <button onClick={() => setRightPanel('none')} className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition">
+                    <X size={15} />
                   </button>
                 </div>
 
                 {nodeLogs.length === 0 ? (
-                  <p className="text-sm text-foreground-muted">Run the workflow to see logs here.</p>
+                  <div className="rounded-lg border border-dashed border-surface-border p-6 text-center">
+                    <Play size={22} className="mx-auto mb-2 text-foreground-muted/40" />
+                    <p className="text-sm font-semibold text-foreground-muted">No logs yet</p>
+                    <p className="text-xs text-foreground-muted/60 mt-1">Run the workflow to see execution logs.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {nodeLogs.map((log, i) => (
                       <div key={i} className="rounded-lg border border-surface-border bg-base p-3">
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-sm font-medium text-foreground">{log.nodeId}</span>
-                          <span className={`flex items-center gap-1 text-sm ${
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className="text-sm font-bold text-foreground truncate max-w-[160px]">{log.nodeId}</span>
+                          <span className={`flex items-center gap-1 text-xs font-bold ${
                             log.status === 'success' ? 'text-green-400' : log.status === 'failed' ? 'text-red-400' : 'text-yellow-400'
                           }`}>
-                            {log.status === 'success' ? <CheckCircle2 size={14} /> : log.status === 'failed' ? <AlertCircle size={14} /> : <Clock size={14} />}
-                            {log.status}
+                            {log.status === 'success' ? <CheckCircle2 size={13} /> : log.status === 'failed' ? <AlertCircle size={13} /> : <Clock size={13} />}
+                            {log.status.toUpperCase()}
                           </span>
                         </div>
-                        {log.durationMs && <p className="text-xs text-foreground-muted">{log.durationMs}ms</p>}
+                        {log.durationMs && <p className="text-xs font-medium text-foreground-muted">{log.durationMs}ms</p>}
                         {log.error && (
                           <div className="mt-2">
-                            <p className="text-sm text-red-400">{log.error}</p>
+                            <p className="text-xs font-medium text-red-400">{log.error}</p>
                             <button
                               onClick={() => handleDebugNode(log)}
-                              className="mt-2 flex items-center gap-1 text-sm text-brand-400 hover:text-brand-300"
+                              className="mt-2 flex items-center gap-1.5 text-xs font-bold text-brand-400 hover:text-brand-300 transition"
                             >
-                              <Bug size={14} /> Debug with AI
+                              <Bug size={13} /> Debug with AI
                             </button>
                           </div>
                         )}
