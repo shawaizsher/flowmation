@@ -348,7 +348,7 @@ export default function LandingPage() {
         <div className="flex items-center justify-between px-8 py-4 max-w-7xl mx-auto animate-fade-in">
           <div className="flex items-center gap-3 group cursor-default">
             <FlowaLogo size={34} className="group-hover:scale-110 transition-transform duration-300" />
-            <span className="font-display text-xl font-bold tracking-wide">Flowa</span>
+            <span className="font-body text-lg font-bold tracking-tight text-foreground">Flowa</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login" className="text-sm px-4 py-2 rounded-lg font-medium text-foreground-secondary hover:text-foreground transition-all duration-300 hover:bg-surface-hover/50 uppercase tracking-widest text-xs">
@@ -382,13 +382,13 @@ export default function LandingPage() {
         </div>
 
         {/* Hero headline with typewriter */}
-        <h1 className="font-display text-6xl md:text-7xl lg:text-8xl font-bold leading-[1.05] mb-8">
-          <span className="block hero-text-reveal" style={{ animationDelay: '0.15s' }}>
+        <h1 className="font-display font-bold leading-[1.12] mb-8" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)' }}>
+          <span className="block hero-text-reveal text-foreground" style={{ animationDelay: '0.15s' }}>
             Build Workflows.
           </span>
-          <span className="block hero-text-reveal italic text-foreground/90" style={{ animationDelay: '0.35s' }}>
-            at the{' '}
-            <span className="not-italic text-amber-300/90 dark:text-amber-400">
+          <span className="block hero-text-reveal italic text-foreground" style={{ animationDelay: '0.35s' }}>
+            At the{' '}
+            <span className="not-italic text-amber-400">
               {typed}
               <span className="typewriter-cursor">|</span>
             </span>
@@ -495,9 +495,9 @@ export default function LandingPage() {
           <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             HOW IT WORKS
           </span>
-          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            Three steps to{' '}
-            <span className="text-amber-400">automate anything</span>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            Three steps to<br />
+            <span className="italic text-amber-400">automate anything.</span>
           </h2>
         </div>
 
@@ -530,9 +530,9 @@ export default function LandingPage() {
           <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             FEATURES
           </span>
-          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            Everything you need to{' '}
-            <span className="text-amber-400">automate</span>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            Everything you need.<br />
+            <span className="italic text-amber-400">Nothing you don't.</span>
           </h2>
           <p className={`text-foreground-muted max-w-lg mx-auto font-body text-base font-light transition-all duration-700 delay-200 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             A complete toolkit for building, debugging, and deploying workflows at any scale.
@@ -595,9 +595,9 @@ export default function LandingPage() {
           <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             USE CASES
           </span>
-          <h2 className={`font-display text-4xl md:text-5xl font-bold mb-4 transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            Built for real{' '}
-            <span className="text-amber-400">automation workloads</span>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            Built for real work.<br />
+            <span className="italic text-amber-400">Real automation.</span>
           </h2>
           <p className={`text-foreground-muted max-w-2xl mx-auto font-body text-base font-light transition-all duration-700 delay-150 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             From customer communication to AI-assisted operations, Flowa helps teams automate repetitive work with confidence.
@@ -636,9 +636,9 @@ export default function LandingPage() {
               <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 WHAT YOU GET
               </span>
-              <h2 className={`font-display text-3xl md:text-4xl font-bold mb-4 transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                Everything you need on{' '}
-                <span className="text-amber-400">day one</span>
+              <h2 className={`font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-4 transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                Everything you need.<br />
+                <span className="italic text-amber-400">From day one.</span>
               </h2>
               <p className={`text-foreground-muted font-body text-base leading-relaxed font-light transition-all duration-700 delay-150 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                 Start small with one workflow, then scale to cross-team automation with visibility, control, and security built in.
@@ -667,7 +667,7 @@ export default function LandingPage() {
           <span className={`inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-4 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             FAQ
           </span>
-          <h2 className={`font-display text-4xl md:text-5xl font-bold transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             Questions teams ask before{' '}
             <span className="text-amber-400">launching</span>
           </h2>
@@ -703,9 +703,9 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center border border-surface-border/50 rounded-3xl p-10 md:p-14 bg-surface-card/30 backdrop-blur-sm">
           <div>
             <span className="inline-block text-xs font-semibold uppercase tracking-widest text-amber-500/70 mb-6">Our Belief</span>
-            <h2 className="font-display text-3xl md:text-4xl font-bold leading-[1.2] mb-6">
+            <h2 className="font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-6">
               We used to build things.<br />
-              <span className="italic text-amber-400/80">Then we automated them.</span>
+              <span className="italic text-amber-400">Then we automated them.</span>
             </h2>
             <p className="text-foreground-muted font-body font-light leading-relaxed text-sm mb-4">
               A few years ago, teams spent weeks writing the same glue code — connecting APIs, retrying failed jobs, syncing data between tools. Our demos went down well, but the effort didn't scale.
@@ -731,9 +731,9 @@ export default function LandingPage() {
           <div className="glow-dot animate-morph-blob w-[300px] h-[300px] bg-brand-500/[0.08] -top-24 -right-24" />
           <div className="glow-dot animate-morph-blob w-[200px] h-[200px] bg-accent-500/[0.05] -bottom-20 -left-20" style={{ animationDelay: '4s' }} />
           <div className="relative z-10">
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-5">
-              Ready to{' '}
-              <span className="text-amber-400">automate</span>?
+            <h2 className="font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-5">
+              Ready to automate?<br />
+              <span className="italic text-amber-400">Let's build.</span>
             </h2>
             <p className="text-foreground-muted mb-10 max-w-md mx-auto font-body text-base font-light">
               Create your free account and start building intelligent workflows in seconds.
@@ -765,7 +765,7 @@ export default function LandingPage() {
         <div className={`max-w-7xl mx-auto px-8 flex items-center justify-between transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="flex items-center gap-3">
             <FlowaLogo size={22} />
-            <span className="font-display text-sm font-medium text-foreground-muted tracking-wide">
+            <span className="font-body text-sm font-medium text-foreground-muted">
               Flowa &copy; {new Date().getFullYear()}
             </span>
           </div>
