@@ -78,34 +78,25 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
 
   return (
     <div
-      className={`group relative min-w-[180px] max-w-[240px] rounded-xl border-2 bg-surface-card overflow-visible transition-all ${
+      className={`group relative min-w-[200px] max-w-[260px] rounded-xl border-2 bg-surface-card overflow-visible transition-all duration-150 ${
         selected
-          ? 'border-brand-500 shadow-lg shadow-brand-500/20'
+          ? 'border-brand-500 shadow-xl shadow-brand-500/25 scale-[1.02]'
           : status && statusColors[status]
           ? statusColors[status]
-          : 'border-[#1e2d42] hover:border-[#2a3f5e]'
+          : 'border-[#1e2d42] hover:border-[#3a5070] hover:shadow-lg hover:shadow-black/20'
       }`}
     >
       {/* Delete button — visible on hover */}
       <button
         onClick={handleDelete}
-        className="absolute right-1.5 top-1.5 z-10 hidden rounded-md p-0.5 text-foreground-muted/60 hover:bg-red-500/20 hover:text-red-400 transition group-hover:flex items-center justify-center"
+        className="absolute right-1.5 top-1.5 z-10 hidden rounded-md p-1 text-foreground-muted/60 hover:bg-red-500/20 hover:text-red-400 transition group-hover:flex items-center justify-center"
         title="Delete node"
       >
-        <X size={14} />
+        <X size={13} />
       </button>
 
       {/* Category accent bar */}
-      <div className={`h-[3px] w-full bg-gradient-to-r ${accent}`} />
-
-      {/* Summary / "What this does" label */}
-      {summary && (
-        <div className="px-3 pt-2 pb-0">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground-muted/70 line-clamp-2">
-            {summary}
-          </p>
-        </div>
-      )}
+      <div className={`h-[4px] w-full bg-gradient-to-r ${accent} rounded-t-[10px]`} />
 
       {/* Input connector */}
       <Handle
@@ -117,7 +108,7 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
           background: 'var(--surface-card)',
           borderColor: 'rgb(var(--brand-500-rgb))',
         }}
-        className="!h-3.5 !w-3.5 !rounded-full !border-2 !shadow-[0_0_0_2px_rgba(246,48,73,0.2)] !left-0 !z-20 transition-all group-hover:!shadow-[0_0_0_4px_rgba(246,48,73,0.25)]"
+        className="!h-4 !w-4 !rounded-full !border-2 !shadow-[0_0_0_3px_rgba(246,48,73,0.2)] !left-0 !z-20 transition-all group-hover:!shadow-[0_0_0_5px_rgba(246,48,73,0.25)]"
       />
 
       {/* Output connector */}
@@ -130,24 +121,28 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
           background: 'var(--surface-card)',
           borderColor: 'rgb(var(--brand-500-rgb))',
         }}
-        className="!h-3.5 !w-3.5 !rounded-full !border-2 !shadow-[0_0_0_2px_rgba(246,48,73,0.2)] !right-0 !z-20 transition-all group-hover:!shadow-[0_0_0_4px_rgba(246,48,73,0.25)]"
+        className="!h-4 !w-4 !rounded-full !border-2 !shadow-[0_0_0_3px_rgba(246,48,73,0.2)] !right-0 !z-20 transition-all group-hover:!shadow-[0_0_0_5px_rgba(246,48,73,0.25)]"
       />
 
       {/* Node content */}
-      <div className="flex items-center gap-3 px-3 py-3">
+      <div className="flex items-center gap-3 px-3.5 py-3.5">
         <NodeIcon nodeType={data.type || ''} size="md" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground" title={data.label}>
+          <div className="truncate text-sm font-bold text-foreground leading-tight" title={data.label}>
             {data.label}
           </div>
-          <div className="truncate text-xs text-foreground-muted">{data.type}</div>
+          {summary ? (
+            <div className="truncate text-[11px] font-medium text-foreground-muted mt-0.5">{summary}</div>
+          ) : (
+            <div className="truncate text-[11px] text-foreground-muted/60 mt-0.5">{data.type}</div>
+          )}
         </div>
       </div>
 
       {/* Status badge */}
       {status && statusBadge[status] && (
-        <div className={`mx-3 mb-2.5 flex items-center justify-center rounded-md px-2 py-1 ${statusBadge[status].bg}`}>
-          <span className={`text-xs font-medium ${statusBadge[status].text}`}>
+        <div className={`mx-3 mb-3 flex items-center justify-center gap-1 rounded-md px-2 py-1.5 ${statusBadge[status].bg}`}>
+          <span className={`text-xs font-bold tracking-wide ${statusBadge[status].text}`}>
             {statusBadge[status].label}
           </span>
         </div>
@@ -155,9 +150,9 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
 
       {/* Running pulse */}
       {status === 'running' && (
-        <div className="absolute -right-1 -top-1 h-3 w-3">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-50" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-yellow-400" />
+        <div className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-60" />
+          <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-yellow-400" />
         </div>
       )}
 
