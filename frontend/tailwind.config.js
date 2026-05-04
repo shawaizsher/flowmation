@@ -41,10 +41,10 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Playfair Display', 'Georgia', 'serif'],
-        hero:    ['Playfair Display', 'Georgia', 'serif'],
+        display: ['Cormorant Garamond', 'Georgia', 'serif'],
+        hero:    ['Cormorant Garamond', 'Georgia', 'serif'],
         accent:  ['Caveat', 'cursive'],
-        body:    ['Lato', 'Inter', 'sans-serif'],
+        body:    ['Inter', 'sans-serif'],
         mono:    ['JetBrains Mono', 'monospace'],
       },
       backgroundImage: {
