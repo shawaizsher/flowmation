@@ -24,6 +24,7 @@ import {
   Sparkles,
   History,
   Users,
+  Bot,
   ChevronDown,
   Plus,
   Search,
@@ -48,6 +49,7 @@ import FlowNode from '../components/canvas/FlowNode';
 import NodeIcon from '../components/canvas/NodeIcon';
 import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
+import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
 
@@ -76,7 +78,7 @@ function EditorCanvas() {
 
   // Panels — both open by default for easier understanding
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
-  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'none'>('config');
+  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'none'>('config');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // Node catalog (local)
@@ -887,6 +889,13 @@ function EditorCanvas() {
           >
             <Key size={16} />
           </button>
+          <button
+            onClick={() => setRightPanel(rightPanel === 'ai' ? 'none' : 'ai')}
+            className={`rounded p-1.5 ${rightPanel === 'ai' ? 'bg-brand-500/20 text-brand-400' : 'text-foreground-muted hover:text-foreground'}`}
+            title="AI Workflow Assistant"
+          >
+            <Bot size={16} />
+          </button>
 
           <div className="mx-2 h-5 w-px bg-surface-border" />
 
@@ -1382,6 +1391,23 @@ function EditorCanvas() {
                   <p className="text-sm text-foreground-muted">Select a failed node to debug.</p>
                 )}
               </div>
+            )}
+
+            {/* AI Workflow Assistant panel */}
+            {rightPanel === 'ai' && (
+              <WorkflowAssistant
+                workspaceId={workspaceId || ''}
+                workflowNodes={nodes}
+                workflowEdges={edges}
+                onWorkflowUpdate={(updatedNodes, updatedEdges) => {
+                  suppressGraphSyncRef.current = true;
+                  setNodes(updatedNodes as any);
+                  setEdges(updatedEdges as any);
+                  setTimeout(() => { suppressGraphSyncRef.current = false; }, 50);
+                  setTimeout(() => { reactFlowInstance.fitView({ padding: 0.15 }); }, 100);
+                }}
+                onClose={() => setRightPanel('none')}
+              />
             )}
 
             {/* Default welcome panel — when no specific panel or no node selected */}
