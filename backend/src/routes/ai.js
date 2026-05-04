@@ -231,6 +231,28 @@ router.post('/suggest-nodes', async (req, res) => {
   }
 });
 
+// ── POST /api/workspaces/:wid/ai/chat ──
+router.post('/chat', async (req, res) => {
+  try {
+    const { message, history, workflow } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'message is required' });
+    }
+
+    const result = await aiService.workflowChat({
+      message,
+      history: Array.isArray(history) ? history : [],
+      workflow: workflow || { nodes: [], edges: [] },
+    });
+
+    res.json(result);
+  } catch (err) {
+    logger.error('AI chat error:', err);
+    res.status(500).json({ error: 'AI chat failed' });
+  }
+});
+
 // ── POST /api/workspaces/:wid/ai/document-workflow ──
 router.post('/document-workflow', async (req, res) => {
   try {

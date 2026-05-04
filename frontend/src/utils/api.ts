@@ -147,6 +147,15 @@ export const aiApi = {
 
   documentWorkflow: (workspaceId: string, workflowId: string) =>
     api.post(`/workspaces/${workspaceId}/ai/document-workflow`, { workflowId }),
+
+  workflowChat: (
+    workspaceId: string,
+    data: {
+      message: string;
+      history: { role: 'user' | 'assistant'; content: string }[];
+      workflow: { nodes: unknown[]; edges: unknown[] };
+    }
+  ) => api.post(`/workspaces/${workspaceId}/ai/chat`, data),
 };
 
 /* ------------------------------------------------------------------ */
