@@ -1397,11 +1397,17 @@ function EditorCanvas() {
             {rightPanel === 'ai' && (
               <WorkflowAssistant
                 workspaceId={workspaceId || ''}
+                workflowId={id || ''}
                 workflowNodes={nodes}
                 workflowEdges={edges}
                 onWorkflowUpdate={(updatedNodes, updatedEdges) => {
+                  const normalizedNodes = (updatedNodes as any[]).map(n => ({
+                    ...n,
+                    type: 'flowNode',
+                    data: { ...n.data, type: n.data?.type || n.type },
+                  }));
                   suppressGraphSyncRef.current = true;
-                  setNodes(updatedNodes as any);
+                  setNodes(normalizedNodes);
                   setEdges(updatedEdges as any);
                   setTimeout(() => { suppressGraphSyncRef.current = false; }, 50);
                   setTimeout(() => { reactFlowInstance.fitView({ padding: 0.15 }); }, 100);

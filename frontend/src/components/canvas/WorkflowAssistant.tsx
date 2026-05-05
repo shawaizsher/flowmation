@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, Workflow, Sparkles, X } from 'lucide-react';
+import { Send, Bot, Loader2, Workflow, X, Trash2 } from 'lucide-react';
 import { aiApi } from '../../utils/api';
 
 interface ChatMessage {
@@ -10,13 +10,14 @@ interface ChatMessage {
 
 interface WorkflowAssistantProps {
   workspaceId: string;
+  workflowId: string;
   workflowNodes: unknown[];
   workflowEdges: unknown[];
   onWorkflowUpdate: (nodes: unknown[], edges: unknown[]) => void;
   onClose: () => void;
 }
 
-const GREETING = "Hi! Describe the automation you want to build, or tell me what to change in the current workflow. I can create, edit, and connect nodes for you.";
+const GREETING = "Hi, I'm Freckles! Describe the automation you want to build, or tell me what to change. I can create, edit, and connect nodes for you.";
 
 const SUGGESTIONS = [
   'Create a workflow that sends a Slack message when a webhook is received',
@@ -26,19 +27,40 @@ const SUGGESTIONS = [
 
 export default function WorkflowAssistant({
   workspaceId,
+  workflowId,
   workflowNodes,
   workflowEdges,
   onWorkflowUpdate,
   onClose,
 }: WorkflowAssistantProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: GREETING },
-  ]);
+  const storageKey = `freckles-${workflowId}`;
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const stored = localStorage.getItem(`freckles-${workflowId}`);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [{ role: 'assistant', content: GREETING }];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(messages.length === 1);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch {}
+  }, [messages, storageKey]);
+
+  const clearHistory = () => {
+    const fresh = [{ role: 'assistant' as const, content: GREETING }];
+    setMessages(fresh);
+    setShowSuggestions(true);
+    try { localStorage.removeItem(storageKey); } catch {}
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,15 +124,24 @@ export default function WorkflowAssistant({
           <div className="w-6 h-6 rounded-md bg-brand-500/15 flex items-center justify-center">
             <Bot size={13} className="text-brand-400" />
           </div>
-          <span className="font-display text-sm font-bold text-foreground">Workflow AI</span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">Beta</span>
+          <span className="font-display text-sm font-bold text-foreground">Freckles</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">AI</span>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition"
-        >
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={clearHistory}
+            title="Clear chat history"
+            className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition"
+          >
+            <Trash2 size={13} />
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -119,7 +150,7 @@ export default function WorkflowAssistant({
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
               <div className="w-5 h-5 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0 mt-0.5 mr-2">
-                <Sparkles size={10} className="text-brand-400" />
+                <Bot size={10} className="text-brand-400" />
               </div>
             )}
             <div
@@ -143,7 +174,7 @@ export default function WorkflowAssistant({
         {loading && (
           <div className="flex justify-start items-center gap-2">
             <div className="w-5 h-5 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0">
-              <Sparkles size={10} className="text-brand-400" />
+              <Bot size={10} className="text-brand-400" />
             </div>
             <div className="bg-base border border-surface-border rounded-xl px-3 py-2.5">
               <div className="flex gap-1.5 items-center">
