@@ -130,21 +130,46 @@ app.use((err, req, res, next) => {
 
 // ── Start server ──
 async function start() {
+  // Database is required — fail fast if unavailable
   try {
     await initDb();
-    await initRedis();
-    await initEmail();
-    const wsManager = initWebSocket(server);
-    wsManager.initRedisSubscriber();
-
-    server.listen(PORT, () => {
-      logger.info(`🚀 Flowa backend running on port ${PORT}`);
-      logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
   } catch (err) {
-    logger.error('Failed to start server:', err);
+    logger.error('Fatal: cannot connect to database:', err.message);
     process.exit(1);
   }
+
+  // Redis is optional — server functions without it (WebSocket pub/sub disabled)
+  let redisOk = false;
+  try {
+    await initRedis();
+    redisOk = true;
+  } catch (err) {
+    logger.warn('Redis unavailable — real-time collaboration and job queue disabled:', err.message);
+    logger.warn('Start Redis to enable these features.');
+  }
+
+  // Email is optional — log but continue
+  try {
+    await initEmail();
+  } catch (err) {
+    logger.warn('Email service unavailable:', err.message);
+  }
+
+  // WebSocket init — only subscribe to Redis if it connected
+  const wsManager = initWebSocket(server);
+  if (redisOk) {
+    try {
+      wsManager.initRedisSubscriber();
+    } catch (err) {
+      logger.warn('WebSocket Redis subscriber failed:', err.message);
+    }
+  }
+
+  server.listen(PORT, () => {
+    logger.info(`🚀 Flowa backend running on port ${PORT}`);
+    logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (!redisOk) logger.warn('   ⚠  Redis offline — real-time features disabled');
+  });
 }
 
 start();
