@@ -1,9 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useStore } from '../store';
 
 export type Theme = 'dark' | 'light' | 'system';
 export type AccentTheme = 'rose' | 'ocean' | 'amber' | 'emerald' | 'slate';
 
-const STORAGE_KEY = 'flowa-theme';
+// Keys are scoped per user so each account remembers its own preference
+function themeKey(userId?: string | null)  { return userId ? `flowa-theme-${userId}`        : 'flowa-theme'; }
+function accentKey(userId?: string | null) { return userId ? `flowa-accent-${userId}`       : 'flowa-accent-theme'; }
+
+const STORAGE_KEY = 'flowa-theme';        // kept for back-compat reads
 const ACCENT_STORAGE_KEY = 'flowa-accent-theme';
 
 type Palette = {
@@ -173,18 +178,30 @@ function applyAccent(accentTheme: AccentTheme) {
 }
 
 export function useTheme() {
+  const userId = useStore((s) => s.user?.id ?? null);
+  const key    = themeKey(userId);
+
   const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    return stored || 'light';
+    // Check user-scoped key first, then legacy global key, then default dark
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(STORAGE_KEY);
+    return (stored as Theme | null) ?? 'dark';
   });
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
-    localStorage.setItem(STORAGE_KEY, t);
+    localStorage.setItem(key, t);
     applyTheme(t);
-  }, []);
+  }, [key]);
 
-  // Apply on mount
+  // Re-read from storage whenever the logged-in user changes
+  useEffect(() => {
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(STORAGE_KEY);
+    const resolved = (stored as Theme | null) ?? 'dark';
+    setThemeState(resolved);
+    applyTheme(resolved);
+  }, [key]);
+
+  // Apply on first mount
   useEffect(() => {
     applyTheme(theme);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -204,16 +221,27 @@ export function useTheme() {
 }
 
 export function useAccentTheme() {
+  const userId = useStore((s) => s.user?.id ?? null);
+  const key    = accentKey(userId);
+
   const [accentTheme, setAccentThemeState] = useState<AccentTheme>(() => {
-    const stored = localStorage.getItem(ACCENT_STORAGE_KEY) as AccentTheme | null;
-    return stored || 'rose';
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(ACCENT_STORAGE_KEY);
+    return (stored as AccentTheme | null) ?? 'rose';
   });
 
   const setAccentTheme = useCallback((accent: AccentTheme) => {
     setAccentThemeState(accent);
-    localStorage.setItem(ACCENT_STORAGE_KEY, accent);
+    localStorage.setItem(key, accent);
     applyAccent(accent);
-  }, []);
+  }, [key]);
+
+  // Re-read when user changes
+  useEffect(() => {
+    const stored = localStorage.getItem(key) ?? localStorage.getItem(ACCENT_STORAGE_KEY);
+    const resolved = (stored as AccentTheme | null) ?? 'rose';
+    setAccentThemeState(resolved);
+    applyAccent(resolved);
+  }, [key]);
 
   useEffect(() => {
     applyAccent(accentTheme);

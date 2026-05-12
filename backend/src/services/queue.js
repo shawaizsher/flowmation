@@ -42,14 +42,19 @@ function runExecutionInline({ executionId, workflowId, triggerPayload, credentia
 
 function getQueue() {
   if (!executionQueue) {
-    executionQueue = new Queue('workflow-executions', {
-      connection: getRedis(),
-      defaultJobOptions: {
-        removeOnComplete: { count: 100 },
-        removeOnFail: { count: 50 },
-        attempts: 1
-      }
-    });
+    try {
+      executionQueue = new Queue('workflow-executions', {
+        connection: getRedis(),
+        defaultJobOptions: {
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 50 },
+          attempts: 1
+        }
+      });
+    } catch (err) {
+      logger.warn('BullMQ queue unavailable (Redis down) — inline execution fallback active:', err.message);
+      return null;
+    }
   }
   return executionQueue;
 }
@@ -68,11 +73,11 @@ async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPa
 
   const executionId = result.rows[0].id;
 
-  // Add to BullMQ queue when workers are available.
+  // Add to BullMQ queue when workers are available; fall back to inline otherwise.
   const queue = getQueue();
 
-  if (shouldUseInlineFallback()) {
-    const workersOnline = await hasActiveWorkers(queue);
+  if (!queue || shouldUseInlineFallback()) {
+    const workersOnline = queue ? await hasActiveWorkers(queue) : false;
 
     if (!workersOnline) {
       logger.warn(`No active workers detected. Running execution inline: ${executionId}`);
