@@ -124,7 +124,7 @@ export default function WorkflowAssistant({
           <div className="w-6 h-6 rounded-md bg-brand-500/15 flex items-center justify-center">
             <Bot size={13} className="text-brand-400" />
           </div>
-          <span className="font-display text-sm font-bold text-foreground">Freckles</span>
+          <span className="font-body text-sm font-bold text-foreground">Freckles</span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">AI</span>
         </div>
         <div className="flex items-center gap-1">

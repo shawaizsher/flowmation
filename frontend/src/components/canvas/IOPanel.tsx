@@ -256,7 +256,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <ArrowDownToLine size={16} className="text-brand-400" />
-            <h3 className="font-display text-sm font-semibold text-foreground">Execution Data</h3>
+            <h3 className="font-body text-sm font-semibold text-foreground">Execution Data</h3>
           </div>
           <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-medium text-brand-400">
             {filteredEntries.length}/{entries.length} node{entries.length !== 1 ? 's' : ''}
