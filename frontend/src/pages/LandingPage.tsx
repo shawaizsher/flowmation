@@ -15,6 +15,7 @@ import {
 import FlowaLogo from '../components/FlowaLogo';
 import { Radar, IconContainer } from '../components/Radar';
 import WorkflowAnimation from '../components/WorkflowAnimation';
+import { useTheme } from '../hooks/useTheme';
 
 /* ── Theme helper ── */
 function mkTheme(dark: boolean) {
@@ -187,7 +188,12 @@ export default function LandingPage() {
   const ctaObs        = useInView(0.2);
   const footerObs     = useInView(0.2);
   const [openFaq, setOpenFaq] = useState(0);
-  const [isDark, setIsDark]   = useState(true);
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark   = resolvedTheme === 'dark';
+  const setIsDark = (v: boolean | ((p: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(isDark) : v;
+    setTheme(next ? 'dark' : 'light');
+  };
 
   const t = mkTheme(isDark);
 

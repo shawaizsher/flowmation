@@ -78,7 +78,7 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
 
   return (
     <div
-      className={`group relative min-w-[200px] max-w-[260px] rounded-xl border-2 bg-surface-card overflow-visible transition-all duration-150 ${
+      className={`group relative min-w-[200px] max-w-[260px] rounded-none border-2 bg-surface-card overflow-visible transition-all duration-150 ${
         selected
           ? 'border-brand-500 shadow-xl shadow-brand-500/25 scale-[1.02]'
           : status && statusColors[status]
@@ -96,7 +96,7 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
       </button>
 
       {/* Category accent bar */}
-      <div className={`h-[4px] w-full bg-gradient-to-r ${accent} rounded-t-[10px]`} />
+      <div className={`h-[4px] w-full bg-gradient-to-r ${accent}`} />
 
       {/* Input connector */}
       <Handle
@@ -141,7 +141,7 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
 
       {/* Status badge */}
       {status && statusBadge[status] && (
-        <div className={`mx-3 mb-3 flex items-center justify-center gap-1 rounded-md px-2 py-1.5 ${statusBadge[status].bg}`}>
+        <div className={`mx-3 mb-3 flex items-center justify-center gap-1 rounded-none px-2 py-1.5 ${statusBadge[status].bg}`}>
           <span className={`text-xs font-bold tracking-wide ${statusBadge[status].text}`}>
             {statusBadge[status].label}
           </span>
