@@ -828,7 +828,7 @@ function EditorCanvas() {
             type="text"
             value={workflowName}
             onChange={(e) => setWorkflowName(e.target.value)}
-            className="bg-transparent font-display text-base font-bold text-foreground outline-none focus:border-b-2 focus:border-brand-500 min-w-0 max-w-[220px] transition-all"
+            className="bg-transparent font-body text-base font-bold text-foreground outline-none focus:border-b-2 focus:border-brand-500 min-w-0 max-w-[220px] transition-all"
           />
           <span className="rounded-md bg-surface-border px-2 py-0.5 text-xs font-bold text-foreground-muted tracking-wide">
             v{workflowVersion}
@@ -971,7 +971,7 @@ function EditorCanvas() {
             {/* Search header */}
             <div className="p-3 pb-2 border-b border-surface-border">
               <div className="flex items-center justify-between mb-2.5">
-                <h3 className="font-display text-sm font-bold text-foreground tracking-wide">Node Palette</h3>
+                <h3 className="font-body text-sm font-bold text-foreground tracking-wide">Node Palette</h3>
                 <span className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-xs font-bold text-brand-400">{totalNodeCount}</span>
               </div>
               <div className="relative">
@@ -1088,7 +1088,7 @@ function EditorCanvas() {
                   <div className="flex items-center gap-2.5">
                     <NodeIcon nodeType={selectedNode.data.type || ''} size="md" />
                     <div>
-                      <h3 className="font-display text-base font-bold text-foreground leading-tight">
+                      <h3 className="font-body text-base font-bold text-foreground leading-tight">
                         {selectedNode.data.label}
                       </h3>
                       <p className="text-xs font-medium text-foreground-muted mt-0.5">{selectedNode.data.type}</p>
@@ -1321,7 +1321,7 @@ function EditorCanvas() {
             {rightPanel === 'logs' && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-base font-bold text-foreground">Execution Logs</h3>
+                  <h3 className="font-body text-base font-bold text-foreground">Execution Logs</h3>
                   <button onClick={() => setRightPanel('none')} className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition">
                     <X size={15} />
                   </button>
@@ -1374,7 +1374,7 @@ function EditorCanvas() {
             {rightPanel === 'versions' && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-base font-semibold text-foreground">Version History</h3>
+                  <h3 className="font-body text-base font-semibold text-foreground">Version History</h3>
                   <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
                     <X size={16} />
                   </button>
@@ -1447,7 +1447,7 @@ function EditorCanvas() {
             {rightPanel === 'debug' && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
+                  <h3 className="font-body text-base font-semibold text-foreground flex items-center gap-2">
                     <Bug size={18} className="text-brand-400" /> AI Debugger
                   </h3>
                   <button onClick={() => { setRightPanel('logs'); setDebugResult(null); }} className="text-foreground-muted hover:text-foreground">
@@ -1535,7 +1535,7 @@ function EditorCanvas() {
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10">
                   <Sparkles size={28} className="text-brand-400" />
                 </div>
-                <h3 className="font-display text-base font-semibold text-foreground mb-2">Node Inspector</h3>
+                <h3 className="font-body text-base font-semibold text-foreground mb-2">Node Inspector</h3>
                 <p className="text-sm text-foreground-muted leading-relaxed mb-6">
                   Click on any node in the canvas to view and edit its configuration here.
                 </p>

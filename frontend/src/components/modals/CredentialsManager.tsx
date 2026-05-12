@@ -129,7 +129,7 @@ function CredentialForm({
         </button>
         <NodeIcon nodeType={service.fields.length > 0 ? service.icon : ''} size="md" />
         <div>
-          <h3 className="font-display text-base font-semibold text-foreground">
+          <h3 className="font-body text-base font-semibold text-foreground">
             {existing ? 'Edit' : 'Add'} {service.label} Credential
           </h3>
           <p className="text-xs text-foreground-muted">{service.description}</p>
@@ -246,7 +246,7 @@ export default function CredentialsManager({ open, onClose, preselectedServiceId
             <div className="flex items-center justify-between border-b border-surface-border p-4">
               <div className="flex items-center gap-2">
                 <Key size={20} className="text-brand-400" />
-                <h2 className="font-display text-lg font-bold text-foreground">Credentials</h2>
+                <h2 className="font-body text-lg font-bold text-foreground">Credentials</h2>
                 <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-medium text-brand-400">
                   {credentials.length}
                 </span>
@@ -342,7 +342,7 @@ export default function CredentialsManager({ open, onClose, preselectedServiceId
                 <ArrowLeft size={18} />
               </button>
               <div>
-                <h2 className="font-display text-base font-bold text-foreground">Select Service</h2>
+                <h2 className="font-body text-base font-bold text-foreground">Select Service</h2>
                 <p className="text-xs text-foreground-muted">Choose which service to configure credentials for</p>
               </div>
             </div>

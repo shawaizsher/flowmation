@@ -39,7 +39,7 @@ export default function AppShell() {
         <div className="flex items-center gap-2.5 px-4 py-5 border-b border-surface-border">
           <FlowaLogo size={32} className="min-w-[32px]" />
           {!collapsed && (
-            <span className="font-display text-lg font-bold tracking-tight text-foreground truncate">
+            <span className="font-body text-lg font-bold tracking-tight text-foreground truncate">
               Flowa
             </span>
           )}
