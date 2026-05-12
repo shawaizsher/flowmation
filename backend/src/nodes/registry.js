@@ -1,5 +1,8 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 
 class NodeRegistry {
   constructor() {
@@ -86,27 +89,76 @@ registry.register('scheduleTrigger', {
 
 registry.register('httpRequest', {
   label: 'HTTP Request',
-  description: 'Make any HTTP request to an external API',
+  description: 'Make any HTTP request to an external API with advanced options',
   category: 'http',
   icon: '🌐',
   inputs: [{ name: 'data', type: 'any' }],
   outputs: [
     { name: 'body', type: 'any' },
     { name: 'statusCode', type: 'number' },
-    { name: 'headers', type: 'object' }
+    { name: 'headers', type: 'object' },
+    { name: 'fullResponse', type: 'object' }
   ],
   configSchema: {
-    method: { type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'], default: 'GET' },
+    // Basic request
+    method: { type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], default: 'GET' },
     url: { type: 'text', label: 'URL', required: true },
+
+    // Query Parameters
+    parameters: { type: 'json', label: 'Query Parameters', default: '{}', description: 'URL query string parameters' },
+
+    // Request Headers
     headers: { type: 'json', label: 'Headers', default: '{}' },
+
+    // Request Body
     body: { type: 'json', label: 'Request Body' },
-    timeout: { type: 'number', label: 'Timeout (s)', default: 30 },
-    followRedirects: { type: 'boolean', label: 'Follow Redirects', default: true }
+    bodyType: { type: 'select', options: ['auto', 'json', 'form', 'raw'], default: 'auto', description: 'Request body content type' },
+
+    // Authentication
+    authType: { type: 'select', options: ['none', 'basic', 'bearer', 'api_key', 'oauth2'], default: 'none' },
+    basicAuthUsername: { type: 'text', label: 'Username', description: 'For Basic Auth' },
+    basicAuthPassword: { type: 'text', label: 'Password', description: 'For Basic Auth' },
+    bearerToken: { type: 'text', label: 'Bearer Token', description: 'For Bearer Token Auth' },
+    apiKeyName: { type: 'text', label: 'API Key Header Name', description: 'e.g., X-API-Key' },
+    apiKeyValue: { type: 'text', label: 'API Key Value' },
+
+    // Request Options
+    timeout: { type: 'number', label: 'Timeout (seconds)', default: 30 },
+    followRedirects: { type: 'boolean', label: 'Follow Redirects', default: true },
+    maxRedirects: { type: 'number', label: 'Max Redirects', default: 5 },
+
+    // SSL/TLS
+    verifySSL: { type: 'boolean', label: 'Verify SSL Certificate', default: true },
+
+    // Response Options
+    returnFullResponse: { type: 'boolean', label: 'Return Full Response', default: false },
+    responseType: { type: 'select', options: ['auto', 'json', 'text', 'arraybuffer'], default: 'auto' },
+
+    // Proxy (optional)
+    useProxy: { type: 'boolean', label: 'Use Proxy', default: false },
+    proxyUrl: { type: 'text', label: 'Proxy URL', description: 'e.g., http://proxy.example.com:8080' }
   },
   execute: async ({ config }) => {
     let headers = config.headers;
     if (typeof headers === 'string') {
       try { headers = JSON.parse(headers); } catch { headers = {}; }
+    }
+    headers = headers || {};
+
+    let params = config.parameters;
+    if (typeof params === 'string') {
+      try { params = JSON.parse(params); } catch { params = {}; }
+    }
+    params = params || {};
+
+    // Handle authentication
+    if (config.authType === 'basic' && config.basicAuthUsername && config.basicAuthPassword) {
+      const credentials = Buffer.from(`${config.basicAuthUsername}:${config.basicAuthPassword}`).toString('base64');
+      headers['Authorization'] = `Basic ${credentials}`;
+    } else if (config.authType === 'bearer' && config.bearerToken) {
+      headers['Authorization'] = `Bearer ${config.bearerToken}`;
+    } else if (config.authType === 'api_key' && config.apiKeyName && config.apiKeyValue) {
+      headers[config.apiKeyName] = config.apiKeyValue;
     }
 
     let body = config.body;
@@ -114,22 +166,60 @@ registry.register('httpRequest', {
       try { body = JSON.parse(body); } catch { /* keep as string */ }
     }
 
-    const response = await axios({
+    // Set content-type based on body type
+    if (body && config.bodyType === 'form') {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else if (body && config.bodyType === 'json') {
+      headers['Content-Type'] = 'application/json';
+    } else if (body && config.bodyType === 'auto' && typeof body === 'object') {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    // Build axios config
+    const axiosConfig = {
       method: config.method || 'GET',
       url: config.url,
-      headers: headers || {},
+      headers,
+      params,
       data: body,
       timeout: (config.timeout || 30) * 1000,
-      maxRedirects: config.followRedirects !== false ? 5 : 0,
-      validateStatus: () => true
-    });
+      maxRedirects: config.followRedirects !== false ? (config.maxRedirects || 5) : 0,
+      validateStatus: () => true,
+      ...(config.responseType && config.responseType !== 'auto' && { responseType: config.responseType })
+    };
 
-    return {
+    // Handle proxy if specified
+    if (config.useProxy && config.proxyUrl) {
+      const proxyUrl = new URL(config.proxyUrl);
+      axiosConfig.httpAgent = new (require('http').Agent)({ proxy: config.proxyUrl });
+      axiosConfig.httpsAgent = new (require('https').Agent)({ proxy: config.proxyUrl });
+    }
+
+    // Handle SSL verification
+    if (!config.verifySSL) {
+      axiosConfig.httpsAgent = new (require('https').Agent)({ rejectUnauthorized: false });
+    }
+
+    const response = await axios(axiosConfig);
+
+    const result = {
       statusCode: response.status,
       body: response.data,
       headers: response.headers,
       success: response.status >= 200 && response.status < 300
     };
+
+    if (config.returnFullResponse) {
+      result.fullResponse = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data,
+        config: { url: response.config.url, method: response.config.method }
+      };
+    }
+
+    return result;
   }
 });
 

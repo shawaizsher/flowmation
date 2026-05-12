@@ -46,6 +46,7 @@ import toast from 'react-hot-toast';
 import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
 import { useStore } from '../store';
 import FlowNode from '../components/canvas/FlowNode';
+import BanterLoader from '../components/BanterLoader';
 import NodeIcon from '../components/canvas/NodeIcon';
 import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
@@ -1098,37 +1099,150 @@ function EditorCanvas() {
                   </button>
                 </div>
 
-                {/* Config fields */}
-                {selectedNode.data.config && Object.entries(selectedNode.data.config).map(([key, value]) => (
-                  <div key={key} className="mb-4">
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-foreground-muted">
-                      {key.replace(/_/g, ' ')}
-                    </label>
-                    {typeof value === 'boolean' ? (
-                      <button
-                        onClick={() => handleUpdateNodeConfig(key, !value)}
-                        className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${value ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-surface-border text-foreground-muted border border-surface-border hover:border-brand-500/20'}`}
-                      >
-                        {value ? '● On' : '○ Off'}
-                      </button>
-                    ) : typeof value === 'string' && (value.length > 80 || key === 'code' || key === 'body') ? (
-                      <textarea
-                        value={String(value)}
-                        onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
-                        rows={4}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={String(value ?? '')}
-                        onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
-                        placeholder={`Enter ${key.replace(/_/g, ' ')}…`}
-                      />
-                    )}
-                  </div>
-                ))}
+                {/* Config fields — enhanced with sections & conditional visibility */}
+                {selectedNode.data.config && (() => {
+                  const config = selectedNode.data.config;
+                  const nodeType = selectedNode.data.type || '';
+
+                  // Field grouping for HTTP Request nodes
+                  const fieldGroups = nodeType === 'httpRequest' ? {
+                    'Basic Request': ['method', 'url'],
+                    'Query & Parameters': ['parameters'],
+                    'Headers': ['headers'],
+                    'Request Body': ['body', 'bodyType'],
+                    'Authentication': ['authType', 'basicAuthUsername', 'basicAuthPassword', 'bearerToken', 'apiKeyName', 'apiKeyValue'],
+                    'Request Options': ['timeout', 'followRedirects', 'maxRedirects', 'responseType', 'returnFullResponse'],
+                    'SSL & Security': ['verifySSL'],
+                    'Proxy': ['useProxy', 'proxyUrl']
+                  } : null;
+
+                  // Conditional field visibility
+                  const shouldShowField = (fieldName: string, allConfig: Record<string, any>) => {
+                    if (nodeType !== 'httpRequest') return true;
+
+                    // Show auth fields only if their auth type is selected
+                    if (fieldName.startsWith('basicAuth') && allConfig.authType !== 'basic') return false;
+                    if (fieldName.startsWith('bearerToken') && allConfig.authType !== 'bearer') return false;
+                    if (fieldName.startsWith('apiKey') && allConfig.authType !== 'api_key') return false;
+
+                    // Show proxy URL only if useProxy is enabled
+                    if (fieldName === 'proxyUrl' && !allConfig.useProxy) return false;
+
+                    return true;
+                  };
+
+                  // Helper to format field labels
+                  const formatLabel = (key: string) => {
+                    return key
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/_/g, ' ')
+                      .trim()
+                      .split(' ')
+                      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(' ');
+                  };
+
+                  if (fieldGroups) {
+                    // Render grouped fields for HTTP Request
+                    return Object.entries(fieldGroups).map(([groupName, fieldNames]) => {
+                      const visibleFields = fieldNames.filter(f => shouldShowField(f, config) && f in config);
+                      if (visibleFields.length === 0) return null;
+
+                      return (
+                        <div key={groupName} className="mb-6 border-b border-surface-border pb-4">
+                          <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-brand-400">{groupName}</h4>
+                          <div className="space-y-3">
+                            {visibleFields.map((key) => {
+                              const value = config[key];
+                              return (
+                                <div key={key}>
+                                  <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                                    {formatLabel(key)}
+                                  </label>
+                                  {typeof value === 'boolean' ? (
+                                    <button
+                                      onClick={() => handleUpdateNodeConfig(key, !value)}
+                                      className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition text-center ${value ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-surface-border text-foreground-muted border border-surface-border hover:border-brand-500/20'}`}
+                                    >
+                                      {value ? '✓ Enabled' : '○ Disabled'}
+                                    </button>
+                                  ) : key === 'method' || key === 'authType' || key === 'bodyType' || key === 'responseType' ? (
+                                    <select
+                                      value={String(value ?? '')}
+                                      onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                                      className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
+                                    >
+                                      {key === 'method' && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                      ))}
+                                      {key === 'authType' && ['none', 'basic', 'bearer', 'api_key', 'oauth2'].map(t => (
+                                        <option key={t} value={t}>{t.replace(/_/g, ' ').toUpperCase()}</option>
+                                      ))}
+                                      {key === 'bodyType' && ['auto', 'json', 'form', 'raw'].map(t => (
+                                        <option key={t} value={t}>{t.toUpperCase()}</option>
+                                      ))}
+                                      {key === 'responseType' && ['auto', 'json', 'text', 'arraybuffer'].map(t => (
+                                        <option key={t} value={t}>{t.toUpperCase()}</option>
+                                      ))}
+                                    </select>
+                                  ) : (value as string)?.length > 80 || key === 'body' || key === 'headers' || key === 'parameters' ? (
+                                    <textarea
+                                      value={String(value ?? '')}
+                                      onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                                      className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
+                                      rows={key === 'body' ? 5 : 3}
+                                      placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
+                                    />
+                                  ) : (
+                                    <input
+                                      type={key.includes('Password') || key.includes('Token') || key.includes('Key') ? 'password' : 'text'}
+                                      value={String(value ?? '')}
+                                      onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                                      className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
+                                      placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }).filter(Boolean);
+                  } else {
+                    // Default rendering for other node types
+                    return Object.entries(config).map(([key, value]) => (
+                      <div key={key} className="mb-4">
+                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-foreground-muted">
+                          {formatLabel(key)}
+                        </label>
+                        {typeof value === 'boolean' ? (
+                          <button
+                            onClick={() => handleUpdateNodeConfig(key, !value)}
+                            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${value ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-surface-border text-foreground-muted border border-surface-border hover:border-brand-500/20'}`}
+                          >
+                            {value ? '● On' : '○ Off'}
+                          </button>
+                        ) : (value as string)?.length > 80 || key === 'code' || key === 'body' ? (
+                          <textarea
+                            value={String(value ?? '')}
+                            onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                            className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
+                            rows={4}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={String(value ?? '')}
+                            onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                            className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
+                            placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
+                          />
+                        )}
+                      </div>
+                    ));
+                  }
+                })()}
 
                 {/* ── Credential Picker (for API nodes) ── */}
                 {(() => {
@@ -1343,8 +1457,7 @@ function EditorCanvas() {
 
                 {debugging ? (
                   <div className="flex flex-col items-center py-8">
-                    <Loader2 size={28} className="mb-3 animate-spin text-brand-400" />
-                    <p className="text-sm text-foreground-muted">Analyzing failure…</p>
+                    <BanterLoader label="Analyzing failure…" />
                   </div>
                 ) : debugResult ? (
                   <div className="space-y-3">
