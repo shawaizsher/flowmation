@@ -157,7 +157,7 @@ export default function WorkflowAssistant({
               className={`max-w-[82%] rounded-xl px-3 py-2.5 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-brand-500/15 border border-brand-500/20 text-foreground'
-                  : 'bg-base border border-surface-border text-foreground'
+                  : 'bg-surface-input border border-surface-border text-foreground'
               }`}
             >
               <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
@@ -176,7 +176,7 @@ export default function WorkflowAssistant({
             <div className="w-5 h-5 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0">
               <Bot size={10} className="text-brand-400" />
             </div>
-            <div className="bg-base border border-surface-border rounded-xl px-3 py-2.5">
+            <div className="bg-surface-input border border-surface-border rounded-xl px-3 py-2.5">
               <div className="flex gap-1.5 items-center">
                 <Loader2 size={12} className="animate-spin text-brand-400" />
                 <span className="text-xs font-medium text-foreground-muted">Thinking…</span>
@@ -192,7 +192,7 @@ export default function WorkflowAssistant({
               <button
                 key={i}
                 onClick={() => sendMessage(s)}
-                className="w-full text-left text-xs font-medium px-3 py-2 rounded-lg border border-surface-border bg-base text-foreground-muted hover:border-brand-500/30 hover:text-foreground hover:bg-surface-hover transition"
+                className="w-full text-left text-xs font-medium px-3 py-2 rounded-lg border border-surface-border bg-surface-input text-foreground-muted hover:border-brand-500/30 hover:text-foreground hover:bg-surface-hover transition"
               >
                 {s}
               </button>
@@ -214,7 +214,7 @@ export default function WorkflowAssistant({
             placeholder="Describe a workflow or request a change…"
             rows={2}
             disabled={loading}
-            className="flex-1 resize-none rounded-lg border border-surface-border bg-base px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50 disabled:opacity-60"
+            className="flex-1 resize-none rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50 disabled:opacity-60"
           />
           <button
             onClick={() => sendMessage(input)}
