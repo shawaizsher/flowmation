@@ -133,7 +133,7 @@ const statusTone: Record<string, string> = {
   success: 'border-green-500/30 bg-green-500/5',
   failed: 'border-red-500/30 bg-red-500/5',
   running: 'border-yellow-500/30 bg-yellow-500/5',
-  pending: 'border-surface-border bg-base/40',
+  pending: 'border-surface-border bg-surface-hover',
 };
 
 /* ────────── Component ────────── */
@@ -291,7 +291,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search node by name, type, or id"
-                className="w-full rounded-lg border border-surface-border bg-base py-2 pl-8 pr-2 text-xs text-foreground outline-none focus:border-brand-500/50"
+                className="w-full rounded-lg border border-surface-border bg-surface-input py-2 pl-8 pr-2 text-xs text-foreground outline-none focus:border-brand-500/50"
               />
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -302,7 +302,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                   className={`rounded-md px-2 py-1 text-[11px] font-medium border transition ${
                     statusFilter === status
                       ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                      : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                      : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-surface-hover'
                   }`}
                 >
                   {status}
@@ -326,7 +326,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition group ${
                     selectedEntry === entry.nodeId
                       ? `border ${statusTone[entry.status]}`
-                      : 'hover:bg-base/60 border border-transparent'
+                      : 'hover:bg-surface-hover border border-transparent'
                   }`}
                 >
                   <NodeIcon nodeType={entry.nodeType} size="sm" />
@@ -378,7 +378,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                       className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
                         activeTab === tab
                           ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                          : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                          : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-surface-hover'
                       }`}
                     >
                       {tab.toUpperCase()}
@@ -396,7 +396,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                         className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
                           viewMode === mode
                             ? 'border-brand-500/50 bg-brand-500/15 text-brand-400'
-                            : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-base'
+                            : 'border-surface-border text-foreground-muted hover:text-foreground hover:bg-surface-hover'
                         }`}
                       >
                         {mode.toUpperCase()}
@@ -429,7 +429,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                     </pre>
                   </div>
                   ) : (
-                    <div className="rounded-lg border border-surface-border bg-base/40 p-4 text-sm text-foreground-muted">
+                    <div className="rounded-lg border border-surface-border bg-surface-hover p-4 text-sm text-foreground-muted">
                       This node completed without an error payload.
                     </div>
                   )
@@ -437,7 +437,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                   tableData.rows.length > 0 ? (
                     <div className="overflow-auto rounded-lg border border-surface-border">
                       <table className="min-w-full text-xs">
-                        <thead className="bg-base/70">
+                        <thead className="bg-surface-hover">
                           <tr>
                             {tableData.headers.map((header) => (
                               <th key={header} className="border-b border-surface-border px-3 py-2 text-left font-semibold text-foreground-secondary">
@@ -448,7 +448,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                         </thead>
                         <tbody>
                           {tableData.rows.map((row, rowIndex) => (
-                            <tr key={`row-${rowIndex}`} className="odd:bg-base/25">
+                            <tr key={`row-${rowIndex}`} className="odd:bg-surface-hover">
                               {row.map((cell, cellIndex) => (
                                 <td key={`cell-${rowIndex}-${cellIndex}`} className="max-w-[320px] border-b border-surface-border/60 px-3 py-2 text-foreground-secondary align-top">
                                   <div className="whitespace-pre-wrap break-words">{cell}</div>
@@ -460,7 +460,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                       </table>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-surface-border bg-base/40 p-4 text-sm text-foreground-muted">
+                    <div className="rounded-lg border border-surface-border bg-surface-hover p-4 text-sm text-foreground-muted">
                       No tabular data available for this view.
                     </div>
                   )
@@ -475,7 +475,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                 )}
 
                 {/* Previous / Next node context */}
-                <div className="rounded-xl border border-surface-border bg-base/20 p-3.5">
+                <div className="rounded-xl border border-surface-border bg-surface-hover p-3.5">
                   <div className="mb-3 flex items-center justify-between">
                     <h5 className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Connected Node Data</h5>
                     <span className="text-[11px] text-foreground-muted">
@@ -485,13 +485,13 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
 
                   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                     <div className="rounded-lg border border-surface-border bg-surface-card/50 overflow-hidden">
-                      <div className="border-b border-surface-border bg-base/50 px-3 py-2 text-xs font-semibold text-foreground-secondary">
+                      <div className="border-b border-surface-border bg-surface-hover px-3 py-2 text-xs font-semibold text-foreground-secondary">
                         Previous Nodes
                       </div>
                       {connectedNodeGroups.previousNodes.length > 0 ? (
                         <div className="overflow-auto max-h-64">
                           <table className="min-w-full text-xs">
-                            <thead className="bg-base/40 sticky top-0">
+                            <thead className="bg-surface-hover sticky top-0">
                               <tr>
                                 <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Node</th>
                                 <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Input</th>
@@ -500,7 +500,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                             </thead>
                             <tbody>
                               {connectedNodeGroups.previousNodes.map((entry) => (
-                                <tr key={`prev-${entry.nodeId}`} className="odd:bg-base/20">
+                                <tr key={`prev-${entry.nodeId}`} className="odd:bg-surface-hover">
                                   <td className="px-3 py-2 align-top border-b border-surface-border/60">
                                     <div className="flex items-center gap-1.5">
                                       {statusIcon[entry.status]}
@@ -524,13 +524,13 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                     </div>
 
                     <div className="rounded-lg border border-surface-border bg-surface-card/50 overflow-hidden">
-                      <div className="border-b border-surface-border bg-base/50 px-3 py-2 text-xs font-semibold text-foreground-secondary">
+                      <div className="border-b border-surface-border bg-surface-hover px-3 py-2 text-xs font-semibold text-foreground-secondary">
                         Next Nodes
                       </div>
                       {connectedNodeGroups.nextNodes.length > 0 ? (
                         <div className="overflow-auto max-h-64">
                           <table className="min-w-full text-xs">
-                            <thead className="bg-base/40 sticky top-0">
+                            <thead className="bg-surface-hover sticky top-0">
                               <tr>
                                 <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Node</th>
                                 <th className="px-3 py-2 text-left font-semibold text-foreground-secondary border-b border-surface-border">Input</th>
@@ -539,7 +539,7 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                             </thead>
                             <tbody>
                               {connectedNodeGroups.nextNodes.map((entry) => (
-                                <tr key={`next-${entry.nodeId}`} className="odd:bg-base/20">
+                                <tr key={`next-${entry.nodeId}`} className="odd:bg-surface-hover">
                                   <td className="px-3 py-2 align-top border-b border-surface-border/60">
                                     <div className="flex items-center gap-1.5">
                                       {statusIcon[entry.status]}

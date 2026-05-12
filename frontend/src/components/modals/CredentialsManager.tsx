@@ -55,7 +55,7 @@ function FieldInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={field.placeholder || ''}
-          className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 pr-10 text-sm text-foreground font-mono outline-none focus:border-brand-500/50 transition"
+          className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 pr-10 text-sm text-foreground font-mono outline-none focus:border-brand-500/50 transition"
         />
         {field.type === 'password' && (
           <button
@@ -153,7 +153,7 @@ function CredentialForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="My API Key"
-            className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
+            className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
           />
         </div>
 
@@ -278,7 +278,7 @@ export default function CredentialsManager({ open, onClose, preselectedServiceId
                   {credentials.map((cred) => {
                     const service = serviceDefinitions.find((s) => s.serviceId === cred.serviceId);
                     return (
-                      <div key={cred.id} className="group flex items-center gap-3 rounded-lg border border-surface-border bg-base p-3 hover:border-brand-500/30 transition">
+                      <div key={cred.id} className="group flex items-center gap-3 rounded-lg border border-surface-border bg-surface-input p-3 hover:border-brand-500/30 transition">
                         <NodeIcon nodeType={service?.icon || ''} size="md" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export default function CredentialsManager({ open, onClose, preselectedServiceId
                   placeholder="Search services…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-surface-border bg-base py-2.5 pl-9 pr-3 text-sm text-foreground outline-none focus:border-brand-500/50"
+                  className="w-full rounded-lg border border-surface-border bg-surface-input py-2.5 pl-9 pr-3 text-sm text-foreground outline-none focus:border-brand-500/50"
                   autoFocus
                 />
               </div>
@@ -374,7 +374,7 @@ export default function CredentialsManager({ open, onClose, preselectedServiceId
                         setEditingCred(null);
                         setView('form');
                       }}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-base transition group"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-surface-hover transition group"
                     >
                       <NodeIcon nodeType={service.icon} size="md" />
                       <div className="flex-1 min-w-0">
