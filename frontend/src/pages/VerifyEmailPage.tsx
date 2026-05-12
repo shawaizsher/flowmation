@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import FlowaLogo from '../components/FlowaLogo';
+import BanterLoader from '../components/BanterLoader';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -64,9 +65,8 @@ export default function VerifyEmailPage() {
 
         <div className="card p-8">
           {status === 'loading' && (
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 size={48} className="text-brand-500 animate-spin" />
-              <h2 className="font-display text-xl font-bold text-foreground">Verifying your email…</h2>
+            <div className="flex flex-col items-center gap-6 py-2">
+              <BanterLoader label="Verifying your email…" />
               <p className="text-sm text-foreground-muted">Please wait while we confirm your address.</p>
             </div>
           )}
