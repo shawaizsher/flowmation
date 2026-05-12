@@ -14,6 +14,7 @@ import {
 } from 'react-icons/si';
 import FlowaLogo from '../components/FlowaLogo';
 import { Radar, IconContainer } from '../components/Radar';
+import WorkflowAnimation from '../components/WorkflowAnimation';
 
 /* ── Theme helper ── */
 function mkTheme(dark: boolean) {
@@ -177,6 +178,7 @@ export default function LandingPage() {
   const statsObs      = useInView(0.3);
   const radarObs      = useInView(0.2);
   const stepsObs      = useInView(0.2);
+  const workflowObs   = useInView(0.15);
   const featObs       = useInView(0.1);
   const highlightsObs = useInView(0.15);
   const useCasesObs   = useInView(0.15);
@@ -457,6 +459,52 @@ export default function LandingPage() {
               <p className="text-sm font-body leading-relaxed font-light" style={{ color: t.textMuted }}>{s.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Workflow Animation ── */}
+      <section ref={workflowObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-24">
+        <div className="text-center mb-12">
+          <span
+            className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.7)' }}
+          >
+            LIVE PREVIEW
+          </span>
+          <h2
+            className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ color: t.text }}
+          >
+            Watch a workflow<br />
+            <span className="italic" style={{ color: '#F63049' }}>execute in real time.</span>
+          </h2>
+          <p
+            className={`max-w-lg mx-auto font-body text-base font-light transition-all duration-700 delay-150 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            style={{ color: t.textMuted }}
+          >
+            Nodes fire in parallel, data flows between them, and every step is logged — exactly as you'd see it in the editor.
+          </p>
+        </div>
+
+        <div
+          className={`rounded-3xl border p-6 md:p-10 overflow-x-auto transition-all duration-700 delay-200 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          style={{ background: t.cardBg, borderColor: t.border }}
+        >
+          {/* Running badge */}
+          <div className="flex items-center gap-2 mb-6">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#10b981' }} />
+              <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#10b981' }} />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#10b981' }}>
+              Running
+            </span>
+            <span className="text-xs ml-auto font-mono" style={{ color: t.textDim }}>
+              exec_a4f9c2 · 4 nodes active
+            </span>
+          </div>
+
+          <WorkflowAnimation isDark={isDark} />
         </div>
       </section>
 
