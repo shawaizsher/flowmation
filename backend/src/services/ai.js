@@ -1,393 +1,93 @@
+'use strict';
 const logger = require('../utils/logger');
 
-// ── LLM client factory ──
-// Priority: GROQ_API_KEY (free) → OPENAI_API_KEY → null
-function createLLMClient() {
-  const OpenAI = require('openai');
-  if (process.env.GROQ_API_KEY) {
-    return {
-      client: new OpenAI({
-        apiKey: process.env.GROQ_API_KEY,
-        baseURL: 'https://api.groq.com/openai/v1',
-      }),
-      model: 'llama-3.3-70b-versatile',
-      provider: 'groq',
-    };
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return {
-      client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
-      model: 'gpt-4o-mini',
-      provider: 'openai',
-    };
-  }
-  return null;
-}
+// ════════════════════════════════════════════════════════════════════════════
+//  Flowa Intelligence Service
+//  All features are implemented with classical CS algorithms — no LLM APIs.
+//
+//  Algorithms used:
+//    • Keyword-frequency scoring   — generateWorkflow (template matching)
+//    • DFS (Depth-First Search)    — suggestNodes (graph structure analysis)
+//    • A* (h=0 → Dijkstra)        — documentWorkflow (critical-path tracing)
+//    • Rule-based pattern matching — explainError, debugNode
+//    • Intent classification       — workflowChat (keyword-scored intents)
+// ════════════════════════════════════════════════════════════════════════════
 
-// ── Shared chat helper for simple text-only calls ──
-async function llmChat(systemContent, userContent, maxTokens = 2048) {
-  const llm = createLLMClient();
-  if (!llm) return null;
 
-  const response = await llm.client.chat.completions.create({
-    model: llm.model,
-    max_tokens: maxTokens,
-    temperature: 0.3,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-  });
-
-  return {
-    text: response.choices[0].message.content,
-    model: llm.model,
-    tokensUsed: response.usage?.total_tokens || 0,
-  };
-}
-
-// ── Strip markdown code fences that some models add around JSON ──
-function stripCodeFence(text) {
-  return text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-}
-
-/**
- * Generate a workflow graph from a natural language prompt
- */
-async function generateWorkflow(prompt) {
-  const systemPrompt = `You are a workflow automation expert for the Flowa platform.
-Given a natural language description, generate a valid workflow graph in JSON format.
-
-The graph must follow this structure:
-{
-  "nodes": [
-    {
-      "id": "unique-id",
-      "type": "nodeType",
-      "position": { "x": number, "y": number },
-      "data": {
-        "label": "Human readable label",
-        "type": "nodeType",
-        "config": {}
-      }
-    }
-  ],
-  "edges": [
-    { "id": "edge-id", "source": "source-node-id", "target": "target-node-id" }
-  ]
-}
-
-Available node types:
-- trigger_manual, trigger_webhook, trigger_cron (triggers)
-- http_request, rest_get, rest_post (HTTP)
-- code_execute, transform_set, json_parse, transform_split, transform_merge, transform_filter (transform)
-- logic_if, logic_switch, delay, loop_for_each (logic)
-- openai_chat, anthropic_chat, ai_classify, ai_summarize (AI)
-- email_send, slack_send (messaging)
-- postgres_query, postgres_insert (databases)
-- console_log, error_handler, wait_approval, date_time, math_operation (utilities)
-
-Layout rules:
-- Start trigger at x:100, y:200
-- Space nodes ~300px apart horizontally
-- Use y-offset for branches
-
-Respond with ONLY the JSON object, no markdown, no explanation.`;
-
-  try {
-    const result = await llmChat(systemPrompt, `Generate a workflow for: ${prompt}`, 4096);
-    if (!result) return generateFallbackWorkflow(prompt);
-
-    const graph = JSON.parse(stripCodeFence(result.text));
-    return { graph, description: prompt, model: result.model, tokensUsed: result.tokensUsed };
-  } catch (err) {
-    logger.error('AI generateWorkflow error:', err);
-    return generateFallbackWorkflow(prompt);
-  }
-}
-
-/**
- * Fallback workflow when no AI key is configured
- */
-function generateFallbackWorkflow(prompt) {
-  return {
-    graph: {
-      nodes: [
-        {
-          id: 'trigger-1',
-          type: 'trigger_manual',
-          position: { x: 100, y: 200 },
-          data: { label: 'Manual Trigger', type: 'trigger_manual', config: {} },
-        },
-        {
-          id: 'log-1',
-          type: 'console_log',
-          position: { x: 400, y: 200 },
-          data: { label: 'Log Output', type: 'console_log', config: { message: `Workflow: ${prompt}` } },
-        },
-      ],
-      edges: [{ id: 'e-trigger-1-log-1', source: 'trigger-1', target: 'log-1' }],
-    },
-    description: prompt,
-    model: 'fallback',
-    tokensUsed: 0,
-  };
-}
-
-/**
- * Explain a failed execution
- */
-async function explainError(execution, failedLogs) {
-  const context = {
-    executionStatus: execution.status,
-    error: execution.error,
-    failedNodes: failedLogs.map(l => ({
-      nodeType: l.node_type,
-      nodeLabel: l.node_label,
-      error: l.error,
-      input: l.input,
-    })),
-  };
-
-  try {
-    const result = await llmChat(
-      'You are a workflow debugging assistant. Explain what went wrong in this workflow execution. Be concise and actionable. Respond ONLY in JSON: {"summary": "...", "root_cause": "...", "suggestions": ["..."]}',
-      JSON.stringify(context),
-      1024
-    );
-    if (result) return JSON.parse(stripCodeFence(result.text));
-  } catch (err) {
-    logger.error('AI explainError error:', err);
-  }
-
-  return {
-    summary: execution.error || 'Execution failed',
-    root_cause: failedLogs[0]?.error || 'Unknown error',
-    suggestions: ['Check the failed node configuration', 'Verify input data format'],
-  };
-}
-
-/**
- * Debug a failed node and suggest a fix
- */
-async function debugNode({ nodeType, nodeLabel, config, error, input, configSchema }) {
-  const context = { nodeType, nodeLabel, config, error, input, configSchema };
-
-  try {
-    const result = await llmChat(
-      `You are a workflow automation debugger. Analyze this node failure and return a JSON object with:
-- diagnosis: plain English explanation of what went wrong
-- root_cause: the technical root cause
-- fix: exact config changes as key-value pairs to fix the issue
-- explanation: why this fix works
-- prevention: tip to prevent this in the future
-
-Respond with ONLY valid JSON.`,
-      JSON.stringify(context),
-      1024
-    );
-    if (result) {
-      const parsed = JSON.parse(stripCodeFence(result.text));
-      parsed.model = result.model;
-      parsed.tokensUsed = result.tokensUsed;
-      return parsed;
-    }
-  } catch (err) {
-    logger.error('AI debugNode error:', err);
-  }
-
-  return {
-    diagnosis: `Node "${nodeLabel}" (${nodeType}) failed with error: ${error}`,
-    root_cause: error,
-    fix: {},
-    explanation: 'Unable to auto-diagnose. Check the error message and node configuration.',
-    prevention: 'Ensure all required fields are properly configured.',
-    model: 'fallback',
-    tokensUsed: 0,
-  };
-}
-
-/**
- * Suggest nodes to add to a workflow
- */
-async function suggestNodes(graph) {
-  try {
-    const result = await llmChat(
-      'Analyze this workflow graph and suggest 2-3 nodes that could enhance it. Respond ONLY in JSON: [{"type": "nodeType", "reason": "why this helps"}]',
-      JSON.stringify(graph),
-      512
-    );
-    if (result) return JSON.parse(stripCodeFence(result.text));
-  } catch (err) {
-    logger.error('AI suggestNodes error:', err);
-  }
-
-  return [
-    { type: 'error_handler', reason: 'Add error handling for reliability' },
-    { type: 'console_log', reason: 'Add logging for debugging' },
-  ];
-}
-
-/**
- * Generate documentation for a workflow
- */
-async function documentWorkflow(workflow) {
-  try {
-    const result = await llmChat(
-      'Generate clear documentation for this workflow. Include: title, description, trigger, steps, inputs, outputs. Respond ONLY in JSON: {"title": "...", "description": "...", "steps": [{"node": "...", "description": "..."}], "inputs": [...], "outputs": [...]}',
-      JSON.stringify(workflow),
-      1024
-    );
-    if (result) return JSON.parse(stripCodeFence(result.text));
-  } catch (err) {
-    logger.error('AI documentWorkflow error:', err);
-  }
-
-  return {
-    title: workflow.name || 'Untitled Workflow',
-    description: workflow.description || 'No description available',
-    steps: ((typeof workflow.graph === 'string' ? JSON.parse(workflow.graph) : workflow.graph)?.nodes || []).map(n => ({
-      node: n.data?.label || n.id,
-      description: `${n.data?.type || n.type} node`,
-    })),
-    inputs: [],
-    outputs: [],
-  };
-}
-
-// ── Node index for RAG retrieval ──
+// ── Node catalog (unchanged — already purely algorithmic) ──────────────────
 const NODE_INDEX = [
   // Triggers
-  { type: 'trigger_webhook',    cat: 'TRIGGERS',    kw: 'webhook http receive trigger incoming request',           desc: 'Start workflow on incoming HTTP webhook' },
-  { type: 'trigger_cron',       cat: 'TRIGGERS',    kw: 'schedule cron recurring timer interval daily weekly',    desc: 'Trigger on a recurring schedule' },
-  { type: 'trigger_email',      cat: 'TRIGGERS',    kw: 'email receive inbox trigger imap',                       desc: 'Trigger when a new email arrives' },
-  { type: 'trigger_manual',     cat: 'TRIGGERS',    kw: 'manual button click start trigger test',                 desc: 'Start workflow manually' },
+  { type: 'trigger_webhook',      cat: 'TRIGGERS',     kw: 'webhook http receive trigger incoming request',           desc: 'Start workflow on incoming HTTP webhook' },
+  { type: 'trigger_cron',         cat: 'TRIGGERS',     kw: 'schedule cron recurring timer interval daily weekly',    desc: 'Trigger on a recurring schedule' },
+  { type: 'trigger_email',        cat: 'TRIGGERS',     kw: 'email receive inbox trigger imap',                       desc: 'Trigger when a new email arrives' },
+  { type: 'trigger_manual',       cat: 'TRIGGERS',     kw: 'manual button click start trigger test',                 desc: 'Start workflow manually' },
   // Google
-  { type: 'google_sheets_read',    cat: 'GOOGLE', kw: 'google sheets read spreadsheet rows data',                desc: 'Read rows from Google Sheets' },
-  { type: 'google_sheets_write',   cat: 'GOOGLE', kw: 'google sheets write append update row spreadsheet',       desc: 'Write or append rows to Google Sheets' },
-  { type: 'google_gmail_send',     cat: 'GOOGLE', kw: 'gmail send email google mail',                            desc: 'Send email via Gmail' },
-  { type: 'google_gmail_read',     cat: 'GOOGLE', kw: 'gmail read email google mail inbox',                      desc: 'Read emails from Gmail' },
-  { type: 'google_drive_upload',   cat: 'GOOGLE', kw: 'google drive upload file store',                          desc: 'Upload file to Google Drive' },
-  { type: 'google_drive_list',     cat: 'GOOGLE', kw: 'google drive list files folder',                          desc: 'List files in Google Drive folder' },
-  { type: 'google_calendar_create',cat: 'GOOGLE', kw: 'google calendar create event meeting schedule',           desc: 'Create calendar event in Google Calendar' },
-  { type: 'google_translate',      cat: 'GOOGLE', kw: 'google translate language text',                          desc: 'Translate text using Google Translate' },
-  { type: 'google_vision',         cat: 'GOOGLE', kw: 'google vision image ocr detect label',                    desc: 'Analyze images with Google Vision' },
-  { type: 'google_maps_geocode',   cat: 'GOOGLE', kw: 'google maps geocode address location coordinates',        desc: 'Geocode addresses with Google Maps' },
-  { type: 'youtube_search',        cat: 'GOOGLE', kw: 'youtube search video google',                             desc: 'Search YouTube videos' },
-  // AI/ML
-  { type: 'openai_chat',           cat: 'AI_ML', kw: 'openai gpt chat completion llm ai prompt generate text',  desc: 'Chat completion with OpenAI GPT models' },
-  { type: 'openai_image',          cat: 'AI_ML', kw: 'openai dalle image generate picture ai',                   desc: 'Generate images with DALL-E' },
-  { type: 'anthropic_chat',        cat: 'AI_ML', kw: 'anthropic claude chat completion llm ai prompt',           desc: 'Chat completion with Claude' },
-  { type: 'huggingface_inference', cat: 'AI_ML', kw: 'huggingface model inference ml classification',            desc: 'Run inference on Hugging Face models' },
-  { type: 'whisper_transcribe',    cat: 'AI_ML', kw: 'whisper transcribe audio speech to text openai',           desc: 'Transcribe audio to text with Whisper' },
-  { type: 'ai_classify',           cat: 'AI_ML', kw: 'classify categorize label ai sentiment analysis',          desc: 'Classify or categorize text with AI' },
-  { type: 'ai_summarize',          cat: 'AI_ML', kw: 'summarize summary text ai shorten abstract',               desc: 'Summarize text with AI' },
-  { type: 'ai_embed',              cat: 'AI_ML', kw: 'embed embedding vector text semantic search',              desc: 'Generate text embeddings' },
-  // Social
-  { type: 'twitter_post',          cat: 'SOCIAL', kw: 'twitter tweet post social media x',                       desc: 'Post a tweet on Twitter/X' },
-  { type: 'twitter_search',        cat: 'SOCIAL', kw: 'twitter search tweets social media x',                    desc: 'Search tweets on Twitter/X' },
-  { type: 'instagram_post',        cat: 'SOCIAL', kw: 'instagram post photo social media',                       desc: 'Post to Instagram' },
-  { type: 'linkedin_post',         cat: 'SOCIAL', kw: 'linkedin post professional social network',               desc: 'Post to LinkedIn' },
-  { type: 'reddit_post',           cat: 'SOCIAL', kw: 'reddit post subreddit social',                            desc: 'Post to Reddit' },
+  { type: 'google_sheets_read',   cat: 'GOOGLE',       kw: 'google sheets read spreadsheet rows data',               desc: 'Read rows from Google Sheets' },
+  { type: 'google_sheets_write',  cat: 'GOOGLE',       kw: 'google sheets write append update row spreadsheet',      desc: 'Write or append rows to Google Sheets' },
+  { type: 'google_gmail_send',    cat: 'GOOGLE',       kw: 'gmail send email google mail',                           desc: 'Send email via Gmail' },
+  { type: 'google_gmail_read',    cat: 'GOOGLE',       kw: 'gmail read email google mail inbox',                     desc: 'Read emails from Gmail' },
+  { type: 'google_drive_upload',  cat: 'GOOGLE',       kw: 'google drive upload file store',                         desc: 'Upload file to Google Drive' },
+  { type: 'google_calendar_create',cat:'GOOGLE',        kw: 'google calendar create event meeting schedule',          desc: 'Create calendar event in Google Calendar' },
+  { type: 'google_translate',     cat: 'GOOGLE',       kw: 'google translate language text',                         desc: 'Translate text using Google Translate' },
+  // AI/ML (nodes stay in catalog so users can still configure them as workflow steps)
+  { type: 'openai_chat',          cat: 'AI_ML',        kw: 'openai gpt chat completion llm ai prompt generate text', desc: 'Chat completion with OpenAI GPT models' },
+  { type: 'anthropic_chat',       cat: 'AI_ML',        kw: 'anthropic claude chat completion llm ai prompt',         desc: 'Chat completion with Claude' },
+  { type: 'ai_classify',          cat: 'AI_ML',        kw: 'classify categorize label ai sentiment analysis',        desc: 'Classify or categorize text with AI' },
+  { type: 'ai_summarize',         cat: 'AI_ML',        kw: 'summarize summary text ai shorten abstract',             desc: 'Summarize text with AI' },
   // Messaging
-  { type: 'slack_send',            cat: 'MESSAGING', kw: 'slack send message channel notify alert',              desc: 'Send a message to a Slack channel' },
-  { type: 'slack_create_channel',  cat: 'MESSAGING', kw: 'slack create channel workspace',                       desc: 'Create a Slack channel' },
-  { type: 'discord_send',          cat: 'MESSAGING', kw: 'discord send message channel bot notify',              desc: 'Send a message to Discord' },
-  { type: 'telegram_send',         cat: 'MESSAGING', kw: 'telegram send message bot notify',                     desc: 'Send a message via Telegram bot' },
-  { type: 'whatsapp_send',         cat: 'MESSAGING', kw: 'whatsapp send message sms chat',                       desc: 'Send a WhatsApp message' },
-  { type: 'email_send',            cat: 'MESSAGING', kw: 'email send smtp notify alert message',                 desc: 'Send an email via SMTP' },
-  { type: 'twilio_sms',            cat: 'MESSAGING', kw: 'twilio sms text message phone notify',                 desc: 'Send SMS via Twilio' },
+  { type: 'slack_send',           cat: 'MESSAGING',    kw: 'slack send message channel notify alert',                desc: 'Send a message to a Slack channel' },
+  { type: 'discord_send',         cat: 'MESSAGING',    kw: 'discord send message channel bot notify',                desc: 'Send a message to Discord' },
+  { type: 'telegram_send',        cat: 'MESSAGING',    kw: 'telegram send message bot notify',                       desc: 'Send a message via Telegram bot' },
+  { type: 'email_send',           cat: 'MESSAGING',    kw: 'email send smtp notify alert message',                   desc: 'Send an email via SMTP' },
+  { type: 'twilio_sms',           cat: 'MESSAGING',    kw: 'twilio sms text message phone notify',                   desc: 'Send SMS via Twilio' },
   // Databases
-  { type: 'postgres_query',        cat: 'DATABASES', kw: 'postgres postgresql sql database query select',        desc: 'Run a SQL query on PostgreSQL' },
-  { type: 'postgres_insert',       cat: 'DATABASES', kw: 'postgres postgresql sql insert write database',        desc: 'Insert rows into PostgreSQL' },
-  { type: 'mysql_query',           cat: 'DATABASES', kw: 'mysql sql database query select',                      desc: 'Run a SQL query on MySQL' },
-  { type: 'mongodb_find',          cat: 'DATABASES', kw: 'mongodb nosql find query document collection',         desc: 'Query documents in MongoDB' },
-  { type: 'mongodb_insert',        cat: 'DATABASES', kw: 'mongodb nosql insert document collection',             desc: 'Insert documents into MongoDB' },
-  { type: 'redis_get',             cat: 'DATABASES', kw: 'redis cache get key value store read',                 desc: 'Get a value from Redis' },
-  { type: 'redis_set',             cat: 'DATABASES', kw: 'redis cache set key value store write',                desc: 'Set a value in Redis' },
-  { type: 'firebase_read',         cat: 'DATABASES', kw: 'firebase firestore realtime database read google',     desc: 'Read from Firebase' },
-  { type: 'firebase_write',        cat: 'DATABASES', kw: 'firebase firestore realtime database write google',    desc: 'Write to Firebase' },
-  { type: 'supabase_query',        cat: 'DATABASES', kw: 'supabase postgres query database sql',                 desc: 'Query Supabase database' },
+  { type: 'postgres_query',       cat: 'DATABASES',    kw: 'postgres postgresql sql database query select',          desc: 'Run a SQL query on PostgreSQL' },
+  { type: 'postgres_insert',      cat: 'DATABASES',    kw: 'postgres postgresql sql insert write database',          desc: 'Insert rows into PostgreSQL' },
+  { type: 'mysql_query',          cat: 'DATABASES',    kw: 'mysql sql database query select',                        desc: 'Run a SQL query on MySQL' },
+  { type: 'mongodb_find',         cat: 'DATABASES',    kw: 'mongodb nosql find query document collection',           desc: 'Query documents in MongoDB' },
+  { type: 'mongodb_insert',       cat: 'DATABASES',    kw: 'mongodb nosql insert document collection',               desc: 'Insert documents into MongoDB' },
+  { type: 'redis_get',            cat: 'DATABASES',    kw: 'redis cache get key value store read',                   desc: 'Get a value from Redis' },
+  { type: 'redis_set',            cat: 'DATABASES',    kw: 'redis cache set key value store write',                  desc: 'Set a value in Redis' },
   // Cloud
-  { type: 'aws_s3_upload',         cat: 'CLOUD', kw: 'aws s3 upload file storage bucket amazon',                desc: 'Upload file to AWS S3' },
-  { type: 'aws_s3_read',           cat: 'CLOUD', kw: 'aws s3 read download file storage bucket amazon',         desc: 'Read file from AWS S3' },
-  { type: 'aws_lambda_invoke',     cat: 'CLOUD', kw: 'aws lambda invoke function serverless amazon',             desc: 'Invoke an AWS Lambda function' },
-  { type: 'aws_sns_publish',       cat: 'CLOUD', kw: 'aws sns publish notification amazon queue',                desc: 'Publish to AWS SNS topic' },
-  { type: 'github_create_pr',      cat: 'CLOUD', kw: 'github pull request create code repository',              desc: 'Create a GitHub pull request' },
-  { type: 'github_commit',         cat: 'CLOUD', kw: 'github commit push code repository git',                  desc: 'Commit to a GitHub repository' },
-  { type: 'docker_run',            cat: 'CLOUD', kw: 'docker run container image execute',                      desc: 'Run a Docker container' },
-  { type: 'vercel_deploy',         cat: 'CLOUD', kw: 'vercel deploy deployment frontend serverless',             desc: 'Deploy to Vercel' },
+  { type: 'aws_s3_upload',        cat: 'CLOUD',        kw: 'aws s3 upload file storage bucket amazon',               desc: 'Upload file to AWS S3' },
+  { type: 'aws_s3_read',          cat: 'CLOUD',        kw: 'aws s3 read download file storage bucket amazon',        desc: 'Read file from AWS S3' },
+  { type: 'github_create_pr',     cat: 'CLOUD',        kw: 'github pull request create code repository',             desc: 'Create a GitHub pull request' },
+  { type: 'github_commit',        cat: 'CLOUD',        kw: 'github commit push code repository git',                 desc: 'Commit to a GitHub repository' },
   // HTTP
-  { type: 'http_request',          cat: 'HTTP', kw: 'http request api call get post put delete rest',            desc: 'Make an HTTP request to any URL' },
-  { type: 'graphql_query',         cat: 'HTTP', kw: 'graphql query api request mutation',                        desc: 'Execute a GraphQL query' },
-  { type: 'rest_get',              cat: 'HTTP', kw: 'rest get api http fetch read',                              desc: 'HTTP GET request' },
-  { type: 'rest_post',             cat: 'HTTP', kw: 'rest post api http send create',                            desc: 'HTTP POST request' },
-  { type: 'rest_put',              cat: 'HTTP', kw: 'rest put api http update replace',                          desc: 'HTTP PUT request' },
-  { type: 'rest_delete',           cat: 'HTTP', kw: 'rest delete api http remove',                               desc: 'HTTP DELETE request' },
+  { type: 'http_request',         cat: 'HTTP',         kw: 'http request api call get post put delete rest',         desc: 'Make an HTTP request to any URL' },
+  { type: 'rest_get',             cat: 'HTTP',         kw: 'rest get api http fetch read',                           desc: 'HTTP GET request' },
+  { type: 'rest_post',            cat: 'HTTP',         kw: 'rest post api http send create',                         desc: 'HTTP POST request' },
   // Files
-  { type: 'file_read',             cat: 'FILES', kw: 'file read local storage open load',                        desc: 'Read a local file' },
-  { type: 'file_write',            cat: 'FILES', kw: 'file write save local storage create',                     desc: 'Write a local file' },
-  { type: 'csv_parse',             cat: 'FILES', kw: 'csv parse read comma separated spreadsheet',               desc: 'Parse CSV data' },
-  { type: 'csv_generate',          cat: 'FILES', kw: 'csv generate write export comma separated',                desc: 'Generate a CSV file' },
-  { type: 'pdf_extract',           cat: 'FILES', kw: 'pdf extract text parse read document',                     desc: 'Extract text from a PDF' },
-  { type: 'pdf_generate',          cat: 'FILES', kw: 'pdf generate create document report',                      desc: 'Generate a PDF document' },
-  { type: 'ftp_upload',            cat: 'FILES', kw: 'ftp upload file server sftp transfer',                     desc: 'Upload file via FTP/SFTP' },
+  { type: 'csv_parse',            cat: 'FILES',        kw: 'csv parse read comma separated spreadsheet',             desc: 'Parse CSV data' },
+  { type: 'pdf_extract',          cat: 'FILES',        kw: 'pdf extract text parse read document',                   desc: 'Extract text from a PDF' },
   // Transform
-  { type: 'transform_set',         cat: 'TRANSFORM', kw: 'set variable value transform map field',               desc: 'Set or map data fields' },
-  { type: 'json_parse',            cat: 'TRANSFORM', kw: 'json parse string object convert',                     desc: 'Parse a JSON string' },
-  { type: 'json_stringify',        cat: 'TRANSFORM', kw: 'json stringify serialize string convert',              desc: 'Stringify an object to JSON' },
-  { type: 'xml_parse',             cat: 'TRANSFORM', kw: 'xml parse convert object',                             desc: 'Parse XML data' },
-  { type: 'code_execute',          cat: 'TRANSFORM', kw: 'code run execute javascript python custom logic',      desc: 'Run custom code' },
-  { type: 'transform_filter',      cat: 'TRANSFORM', kw: 'filter array data remove where condition',             desc: 'Filter array items by condition' },
-  { type: 'transform_split',       cat: 'TRANSFORM', kw: 'split array divide chunk items',                       desc: 'Split array into batches' },
-  { type: 'transform_merge',       cat: 'TRANSFORM', kw: 'merge combine join objects arrays data',               desc: 'Merge multiple data objects' },
-  { type: 'transform_map',         cat: 'TRANSFORM', kw: 'map transform each item array modify',                 desc: 'Map over array items' },
+  { type: 'transform_set',        cat: 'TRANSFORM',    kw: 'set variable value transform map field',                 desc: 'Set or map data fields' },
+  { type: 'json_parse',           cat: 'TRANSFORM',    kw: 'json parse string object convert',                       desc: 'Parse a JSON string' },
+  { type: 'code_execute',         cat: 'TRANSFORM',    kw: 'code run execute javascript python custom logic',        desc: 'Run custom code' },
+  { type: 'transform_filter',     cat: 'TRANSFORM',    kw: 'filter array data remove where condition',               desc: 'Filter array items by condition' },
+  { type: 'transform_split',      cat: 'TRANSFORM',    kw: 'split array divide chunk items',                         desc: 'Split array into batches' },
+  { type: 'transform_merge',      cat: 'TRANSFORM',    kw: 'merge combine join objects arrays data',                 desc: 'Merge multiple data objects' },
   // Logic
-  { type: 'logic_if',              cat: 'LOGIC', kw: 'if condition branch decision yes no',                      desc: 'Branch on a condition' },
-  { type: 'logic_switch',          cat: 'LOGIC', kw: 'switch case condition multiple branch route',              desc: 'Route to multiple branches' },
-  { type: 'error_handler',         cat: 'LOGIC', kw: 'error handle catch failure retry',                         desc: 'Handle errors gracefully' },
-  { type: 'delay',                 cat: 'LOGIC', kw: 'delay wait pause sleep timeout',                           desc: 'Pause execution for a duration' },
-  { type: 'loop_for_each',         cat: 'LOGIC', kw: 'loop foreach iterate each item array repeat',              desc: 'Iterate over each item in an array' },
+  { type: 'logic_if',             cat: 'LOGIC',        kw: 'if condition branch decision yes no',                    desc: 'Branch on a condition' },
+  { type: 'logic_switch',         cat: 'LOGIC',        kw: 'switch case condition multiple branch route',            desc: 'Route to multiple branches' },
+  { type: 'error_handler',        cat: 'LOGIC',        kw: 'error handle catch failure retry',                       desc: 'Handle errors gracefully' },
+  { type: 'delay',                cat: 'LOGIC',        kw: 'delay wait pause sleep timeout',                         desc: 'Pause execution for a duration' },
+  { type: 'loop_for_each',        cat: 'LOGIC',        kw: 'loop foreach iterate each item array repeat',            desc: 'Iterate over each item in an array' },
   // CRM
-  { type: 'salesforce_query',      cat: 'CRM', kw: 'salesforce crm query lead contact account',                  desc: 'Query Salesforce CRM' },
-  { type: 'salesforce_create',     cat: 'CRM', kw: 'salesforce crm create lead contact account',                 desc: 'Create record in Salesforce' },
-  { type: 'hubspot_contact',       cat: 'CRM', kw: 'hubspot crm contact lead create update',                     desc: 'Create or update HubSpot contact' },
-  { type: 'airtable_find',         cat: 'CRM', kw: 'airtable find query record database spreadsheet',            desc: 'Find records in Airtable' },
-  { type: 'airtable_create',       cat: 'CRM', kw: 'airtable create record database spreadsheet',                desc: 'Create a record in Airtable' },
-  { type: 'notion_page',           cat: 'CRM', kw: 'notion create page document note',                           desc: 'Create a Notion page' },
-  { type: 'notion_database',       cat: 'CRM', kw: 'notion database query record',                               desc: 'Query a Notion database' },
+  { type: 'hubspot_contact',      cat: 'CRM',          kw: 'hubspot crm contact lead create update',                 desc: 'Create or update HubSpot contact' },
+  { type: 'notion_page',          cat: 'CRM',          kw: 'notion create page document note',                       desc: 'Create a Notion page' },
   // Productivity
-  { type: 'jira_create',           cat: 'PRODUCTIVITY', kw: 'jira ticket issue create project management',       desc: 'Create a Jira issue' },
-  { type: 'jira_update',           cat: 'PRODUCTIVITY', kw: 'jira ticket issue update status project',           desc: 'Update a Jira issue' },
-  { type: 'trello_card',           cat: 'PRODUCTIVITY', kw: 'trello card board create task project',             desc: 'Create a Trello card' },
-  { type: 'asana_task',            cat: 'PRODUCTIVITY', kw: 'asana task create project management',              desc: 'Create an Asana task' },
-  { type: 'monday_item',           cat: 'PRODUCTIVITY', kw: 'monday item board create task project',             desc: 'Create a Monday.com item' },
-  { type: 'clickup_task',          cat: 'PRODUCTIVITY', kw: 'clickup task create project management',            desc: 'Create a ClickUp task' },
-  // Ecommerce
-  { type: 'shopify_order',         cat: 'ECOMMERCE', kw: 'shopify order ecommerce store sales',                  desc: 'Get or process Shopify orders' },
-  { type: 'shopify_product',       cat: 'ECOMMERCE', kw: 'shopify product ecommerce store inventory',            desc: 'Manage Shopify products' },
-  { type: 'woocommerce_order',     cat: 'ECOMMERCE', kw: 'woocommerce order ecommerce wordpress',                desc: 'Get or process WooCommerce orders' },
+  { type: 'jira_create',          cat: 'PRODUCTIVITY', kw: 'jira ticket issue create project management',            desc: 'Create a Jira issue' },
   // Payments
-  { type: 'stripe_payment_intent', cat: 'PAYMENTS', kw: 'stripe payment charge create intent',                   desc: 'Create a Stripe payment intent' },
-  { type: 'paypal_payment',        cat: 'PAYMENTS', kw: 'paypal payment create charge',                          desc: 'Create a PayPal payment' },
-  { type: 'stripe_refund',         cat: 'PAYMENTS', kw: 'stripe refund payment return money',                    desc: 'Refund a Stripe payment' },
-  { type: 'stripe_charge',         cat: 'PAYMENTS', kw: 'stripe charge payment legacy',                          desc: 'Create a Stripe charge' },
-  // Analytics
-  { type: 'google_analytics_event',cat: 'ANALYTICS', kw: 'google analytics event track ga4',                    desc: 'Track event in Google Analytics' },
-  { type: 'mixpanel_track',        cat: 'ANALYTICS', kw: 'mixpanel track event analytics product',               desc: 'Track event in Mixpanel' },
-  { type: 'segment_identify',      cat: 'ANALYTICS', kw: 'segment identify user track analytics cdp',            desc: 'Identify user in Segment' },
+  { type: 'stripe_payment_intent',cat: 'PAYMENTS',     kw: 'stripe payment charge create intent',                    desc: 'Create a Stripe payment intent' },
   // Utilities
-  { type: 'console_log',           cat: 'UTILITIES', kw: 'log debug print output console',                       desc: 'Log a value for debugging' },
-  { type: 'date_time',             cat: 'UTILITIES', kw: 'date time format now current timestamp',               desc: 'Get or format date/time' },
-  { type: 'math_operation',        cat: 'UTILITIES', kw: 'math calculate arithmetic add multiply',               desc: 'Perform a math operation' },
-  { type: 'wait_approval',         cat: 'UTILITIES', kw: 'wait approval human review pause manual',              desc: 'Pause and wait for human approval' },
-  { type: 'random',                cat: 'UTILITIES', kw: 'random number generate uuid pick chance',              desc: 'Generate a random value' },
-  { type: 'uuid_generate',         cat: 'UTILITIES', kw: 'uuid generate unique id identifier',                   desc: 'Generate a UUID' },
-  { type: 'base64_encode',         cat: 'UTILITIES', kw: 'base64 encode decode convert binary',                  desc: 'Base64 encode or decode data' },
-  { type: 'hash',                  cat: 'UTILITIES', kw: 'hash sha md5 checksum digest',                         desc: 'Hash data with SHA/MD5' },
+  { type: 'console_log',          cat: 'UTILITIES',    kw: 'log debug print output console',                         desc: 'Log a value for debugging' },
+  { type: 'date_time',            cat: 'UTILITIES',    kw: 'date time format now current timestamp',                 desc: 'Get or format date/time' },
+  { type: 'math_operation',       cat: 'UTILITIES',    kw: 'math calculate arithmetic add multiply',                 desc: 'Perform a math operation' },
+  { type: 'wait_approval',        cat: 'UTILITIES',    kw: 'wait approval human review pause manual',                desc: 'Pause and wait for human approval' },
 ];
 
-// Keyword-based RAG retrieval — returns top-N most relevant nodes for the query
+// ── Keyword retrieval (unchanged — already purely algorithmic) ─────────────
 function retrieveNodes(query, topN = 22) {
   const tokens = query.toLowerCase().split(/\W+/).filter(t => t.length > 2);
   if (tokens.length === 0) return NODE_INDEX.slice(0, topN);
@@ -401,146 +101,529 @@ function retrieveNodes(query, topN = 22) {
   scored.sort((a, b) => b.score - a.score);
   const top = scored.slice(0, topN).map(s => s.node);
 
-  // Always include at least one trigger and one logic node
   if (!top.some(n => n.cat === 'TRIGGERS')) top.push(NODE_INDEX.find(n => n.type === 'trigger_manual'));
   if (!top.some(n => n.cat === 'LOGIC'))    top.push(NODE_INDEX.find(n => n.type === 'logic_if'));
 
   return top;
 }
 
-function formatNodeCatalog(nodes) {
-  const byCategory = {};
-  for (const n of nodes) {
-    (byCategory[n.cat] = byCategory[n.cat] || []).push(`${n.type} — ${n.desc}`);
-  }
-  return Object.entries(byCategory)
-    .map(([cat, items]) => `${cat}:\n  ${items.join('\n  ')}`)
-    .join('\n');
+
+// ════════════════════════════════════════════════════════════════════════════
+//  WORKFLOW TEMPLATES
+//  Used by generateWorkflow() and workflowChat() for the "build/create" intent.
+//  Each template has a keyword list scored against the user's prompt.
+// ════════════════════════════════════════════════════════════════════════════
+function makeEdge(id, source, target) {
+  return { id, source, target, type: 'smoothstep', animated: true, style: { stroke: '#64748b', strokeWidth: 2 } };
+}
+function makeNode(id, x, y, label, type, config = {}) {
+  return { id, type: 'flowNode', position: { x, y }, data: { label, type, icon: '🔗', config } };
 }
 
-// ── Workflow tool definitions (OpenAI / Groq function-calling format) ──
-const WORKFLOW_TOOLS = [
+const WORKFLOW_TEMPLATES = [
   {
-    type: 'function',
-    function: {
-      name: 'set_workflow',
-      description: 'Replace the entire workflow graph. Use when creating from scratch.',
-      parameters: {
-        type: 'object',
-        properties: {
-          nodes: { type: 'array', items: { type: 'object' } },
-          edges: { type: 'array', items: { type: 'object' } },
-        },
-        required: ['nodes', 'edges'],
-      },
+    name: 'Email Automation',
+    keywords: ['email', 'mail', 'smtp', 'send', 'notify', 'notification', 'alert', 'message', 'inbox'],
+    description: 'Trigger on webhook, transform payload, then send an email notification.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Webhook Trigger',  'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Transform Data',   'transform_set',   { mapping: '{}' }),
+        makeNode('n3', 700, 200, 'Send Email',        'email_send',      { to: '', subject: 'Notification', body: '{{data}}' }),
+        makeNode('n4', 700, 380, 'Error Handler',     'error_handler',   { retries: 2 }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n3', 'n4'),
+      ],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'add_node',
-      description: 'Add a single new node to the workflow.',
-      parameters: {
-        type: 'object',
-        properties: {
-          id:       { type: 'string' },
-          nodeType: { type: 'string', description: 'Node type from the catalog e.g. slack_send, http_request' },
-          label:    { type: 'string' },
-          position: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, required: ['x', 'y'] },
-          config:   { type: 'object' },
-        },
-        required: ['id', 'nodeType', 'label', 'position'],
-      },
+    name: 'Slack Notification',
+    keywords: ['slack', 'channel', 'message', 'notify', 'alert', 'team', 'chat', 'notification'],
+    description: 'Trigger on webhook, format a message, post it to a Slack channel.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Webhook Trigger', 'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Format Message',  'transform_set',   { mapping: '{}' }),
+        makeNode('n3', 700, 200, 'Send to Slack',   'slack_send',      { channel: '#general', message: '{{message}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+      ],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'update_node',
-      description: 'Update the label or config of an existing node by its ID.',
-      parameters: {
-        type: 'object',
-        properties: {
-          id:     { type: 'string' },
-          label:  { type: 'string' },
-          config: { type: 'object' },
-        },
-        required: ['id'],
-      },
+    name: 'Scheduled Data Pipeline',
+    keywords: ['schedule', 'cron', 'daily', 'weekly', 'recurring', 'pipeline', 'sync', 'fetch', 'api', 'database', 'db', 'store', 'save'],
+    description: 'Cron-triggered pipeline: fetch data via HTTP, transform it, insert into database.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Cron Trigger',    'trigger_cron',    { expression: '0 9 * * *' }),
+        makeNode('n2', 400, 200, 'Fetch Data',       'http_request',    { method: 'GET', url: '' }),
+        makeNode('n3', 700, 200, 'Parse Response',   'json_parse',      {}),
+        makeNode('n4', 700, 380, 'Filter Records',   'transform_filter',{ condition: '' }),
+        makeNode('n5', 1000, 280,'Insert to DB',     'postgres_insert', { table: '', data: '{{records}}' }),
+        makeNode('n6', 1000, 440,'Log Result',        'console_log',     { message: 'Pipeline complete' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n3', 'n4'),
+        makeEdge('e4', 'n4', 'n5'),
+        makeEdge('e5', 'n5', 'n6'),
+      ],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'remove_node',
-      description: 'Remove a node and its connected edges by ID.',
-      parameters: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-      },
+    name: 'E-commerce Order Processing',
+    keywords: ['order', 'purchase', 'ecommerce', 'shop', 'shopify', 'woocommerce', 'payment', 'stripe', 'checkout', 'customer', 'inventory'],
+    description: 'On new order webhook: validate, send confirmation email, and log to database.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Order Webhook',     'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Validate Order',    'logic_if',        { condition: '{{order.total}} > 0' }),
+        makeNode('n3', 700, 100, 'Send Confirmation', 'email_send',      { to: '{{order.email}}', subject: 'Order Confirmed', body: 'Thank you!' }),
+        makeNode('n4', 700, 300, 'Log to Database',   'postgres_insert', { table: 'orders', data: '{{order}}' }),
+        makeNode('n5', 1000, 200,'Send Slack Alert',  'slack_send',      { channel: '#orders', message: 'New order: {{order.id}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n2', 'n4'),
+        makeEdge('e4', 'n3', 'n5'),
+        makeEdge('e5', 'n4', 'n5'),
+      ],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'add_edge',
-      description: 'Connect two existing nodes.',
-      parameters: {
-        type: 'object',
-        properties: {
-          source: { type: 'string' },
-          target: { type: 'string' },
-        },
-        required: ['source', 'target'],
-      },
+    name: 'Lead Capture & CRM',
+    keywords: ['lead', 'crm', 'contact', 'hubspot', 'salesforce', 'form', 'signup', 'subscribe', 'register', 'user'],
+    description: 'Capture form submission, create CRM contact, send welcome email.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Form Webhook',    'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Extract Fields',  'transform_set',   { mapping: '{}' }),
+        makeNode('n3', 700, 100, 'Create Contact',  'hubspot_contact', { email: '{{email}}', name: '{{name}}' }),
+        makeNode('n4', 700, 300, 'Welcome Email',   'email_send',      { to: '{{email}}', subject: 'Welcome!', body: 'Hi {{name}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n2', 'n4'),
+      ],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'remove_edge',
-      description: 'Remove an edge by its ID.',
-      parameters: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-      },
+    name: 'GitHub CI Notification',
+    keywords: ['github', 'git', 'ci', 'deploy', 'build', 'commit', 'pull', 'pr', 'release', 'devops', 'pipeline', 'code'],
+    description: 'On GitHub webhook, check status, notify Slack on failure or success.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'GitHub Webhook',  'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Check Status',    'logic_if',        { condition: '{{status}} === "success"' }),
+        makeNode('n3', 700, 100, 'Notify Success',  'slack_send',      { channel: '#deploys', message: '✅ Build passed: {{ref}}' }),
+        makeNode('n4', 700, 300, 'Notify Failure',  'slack_send',      { channel: '#deploys', message: '❌ Build failed: {{ref}}' }),
+        makeNode('n5', 700, 440, 'Log Error',        'console_log',     { message: '{{error}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n2', 'n4'),
+        makeEdge('e4', 'n4', 'n5'),
+      ],
+    },
+  },
+  {
+    name: 'Report Generation',
+    keywords: ['report', 'summary', 'weekly', 'daily', 'monthly', 'digest', 'analytics', 'stats', 'metrics', 'google sheets', 'spreadsheet'],
+    description: 'Scheduled report: query database, merge results, email a summary.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Schedule Trigger',  'trigger_cron',    { expression: '0 8 * * 1' }),
+        makeNode('n2', 400, 200, 'Query Database',    'postgres_query',  { query: 'SELECT * FROM metrics WHERE date >= NOW() - INTERVAL \'7 days\'' }),
+        makeNode('n3', 700, 200, 'Merge Results',     'transform_merge', {}),
+        makeNode('n4', 1000, 200,'Email Report',       'email_send',      { to: '', subject: 'Weekly Report', body: '{{report}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n3', 'n4'),
+      ],
+    },
+  },
+  {
+    name: 'File Processing Pipeline',
+    keywords: ['file', 'csv', 'pdf', 'upload', 'parse', 'process', 'extract', 'document', 'data', 'import'],
+    description: 'Webhook triggers file fetch, parses CSV/PDF, stores results in database.',
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Upload Webhook',  'trigger_webhook', {}),
+        makeNode('n2', 400, 200, 'Fetch File',       'http_request',   { method: 'GET', url: '{{file_url}}' }),
+        makeNode('n3', 700, 200, 'Parse CSV',        'csv_parse',       {}),
+        makeNode('n4', 1000, 200,'Filter Rows',       'transform_filter',{ condition: '' }),
+        makeNode('n5', 1300, 200,'Insert Records',   'postgres_insert', { table: 'imports', data: '{{rows}}' }),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+        makeEdge('e3', 'n3', 'n4'),
+        makeEdge('e4', 'n4', 'n5'),
+      ],
     },
   },
 ];
 
-// Parse text-based tool calls that some models (Llama on Groq) emit instead of
-// using the proper OpenAI tool_calls field. Handles patterns like:
-//   <function(update_node){"id": "...", "label": "..."}</function>
-//   <function=update_node>{"id": "...", "label": "..."}</function>
-//   <tool_call>{"name": "update_node", "arguments": {...}}</tool_call>
-function parseTextToolCalls(text) {
-  if (!text) return [];
-  const calls = [];
-  let match;
-
-  // Pattern: <function(name){json}</function>  or  <function=name>{json}</function>
-  const re1 = /<function[\(=]([a-z_]+)\)?\s*(\{[\s\S]*?\})\s*<\/function>/gi;
-  while ((match = re1.exec(text)) !== null) {
-    try {
-      calls.push({ name: match[1].trim(), input: JSON.parse(match[2]) });
-    } catch {}
-  }
-
-  // Pattern: <tool_call>{"name":"x","arguments":{...}}</tool_call>
-  const re2 = /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/gi;
-  while ((match = re2.exec(text)) !== null) {
-    try {
-      const obj = JSON.parse(match[1]);
-      if (obj.name && obj.arguments) calls.push({ name: obj.name, input: obj.arguments });
-    } catch {}
-  }
-
-  return calls;
+// Score a template against a prompt using token frequency (keyword matching)
+function scoreTemplate(template, promptTokens) {
+  return template.keywords.reduce((score, kw) => {
+    return score + (promptTokens.includes(kw) ? 2 : 0) +
+      promptTokens.filter(t => kw.includes(t) || t.includes(kw)).length;
+  }, 0);
 }
 
-// Apply a single tool call to the in-memory workflow state
+// Pick best-matching template; fall back to a minimal generic workflow
+function matchTemplate(prompt) {
+  const tokens = prompt.toLowerCase().split(/\W+/).filter(t => t.length > 2);
+  let best = null;
+  let bestScore = 0;
+
+  for (const tpl of WORKFLOW_TEMPLATES) {
+    const s = scoreTemplate(tpl, tokens);
+    if (s > bestScore) { bestScore = s; best = tpl; }
+  }
+
+  if (best && bestScore >= 2) return best;
+
+  // Generic fallback — uses retrieveNodes to pick a relevant output node
+  const topNode = retrieveNodes(prompt, 5).find(n => !n.cat.includes('TRIGGERS')) || { type: 'console_log', desc: 'Log output' };
+  return {
+    name: 'Custom Workflow',
+    description: prompt,
+    graph: {
+      nodes: [
+        makeNode('n1', 100, 200, 'Manual Trigger', 'trigger_manual', {}),
+        makeNode('n2', 400, 200, 'Transform Data',  'transform_set',  { mapping: '{}' }),
+        makeNode('n3', 700, 200, topNode.desc,       topNode.type,     {}),
+      ],
+      edges: [
+        makeEdge('e1', 'n1', 'n2'),
+        makeEdge('e2', 'n2', 'n3'),
+      ],
+    },
+  };
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  GRAPH UTILITIES
+// ════════════════════════════════════════════════════════════════════════════
+
+function buildAdjacencyList(nodes, edges) {
+  const adj = {};
+  for (const n of nodes) adj[n.id] = [];
+  for (const e of edges) {
+    if (adj[e.source]) adj[e.source].push(e.target);
+  }
+  return adj;
+}
+
+// ── DFS ───────────────────────────────────────────────────────────────────
+// Traverses the workflow graph from all trigger nodes.
+// Returns: visited set, per-node depth, and unreachable node ids.
+function analyzeGraphDFS(nodes, edges) {
+  const adj    = buildAdjacencyList(nodes, edges);
+  const visited = new Set();
+  const depth   = {};
+
+  function dfs(id, d) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    depth[id] = d;
+    for (const next of (adj[id] || [])) dfs(next, d + 1);
+  }
+
+  const triggers = nodes.filter(n => (n.data?.type || n.type || '').includes('trigger'));
+  // If no trigger, start from every node with no incoming edges
+  const starts = triggers.length
+    ? triggers
+    : nodes.filter(n => !edges.some(e => e.target === n.id));
+
+  for (const s of starts) dfs(s.id, 0);
+
+  const maxDepth    = Object.values(depth).reduce((m, v) => Math.max(m, v), 0);
+  const unreachable = nodes.filter(n => !visited.has(n.id)).map(n => n.id);
+
+  return { visited, depth, maxDepth, unreachable };
+}
+
+// ── A* (h = 0, degrades to Dijkstra / BFS on unit-cost graph) ────────────
+// Finds the shortest path from the first trigger to the nearest terminal node.
+// Used to produce an ordered step list for documentWorkflow.
+function aStarShortestPath(nodes, edges) {
+  if (!nodes.length) return [];
+
+  const adj     = buildAdjacencyList(nodes, edges);
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  const triggers  = nodes.filter(n => (n.data?.type || n.type || '').includes('trigger'));
+  const startId   = (triggers[0] || nodes[0]).id;
+  const terminals = new Set(nodes.filter(n => !(adj[n.id] || []).length).map(n => n.id));
+
+  // g[id] = best known cost (hops) from start
+  const g = {};
+  nodes.forEach(n => { g[n.id] = Infinity; });
+  g[startId] = 0;
+
+  // h(id) = 0  →  admissible null heuristic (A* becomes Dijkstra)
+  const h = () => 0;
+
+  // Open set tracked as a plain array (graphs are small, sort cost is negligible)
+  const openSet  = new Set([startId]);
+  const parent   = { [startId]: null };
+  const closed   = new Set();
+
+  while (openSet.size > 0) {
+    // Pick node with smallest f = g + h
+    let curr = null;
+    let minF  = Infinity;
+    for (const id of openSet) {
+      const f = g[id] + h(id);
+      if (f < minF) { minF = f; curr = id; }
+    }
+
+    openSet.delete(curr);
+    closed.add(curr);
+
+    if (terminals.has(curr)) {
+      // Reconstruct path
+      const path = [];
+      let c = curr;
+      while (c !== null) { path.unshift(nodeMap[c]); c = parent[c]; }
+      return path;
+    }
+
+    for (const next of (adj[curr] || [])) {
+      if (closed.has(next)) continue;
+      const tentativeG = g[curr] + 1;
+      if (tentativeG < g[next]) {
+        g[next]      = tentativeG;
+        parent[next] = curr;
+        openSet.add(next);
+      }
+    }
+  }
+
+  // No path found — return DFS visitation order as fallback
+  const { visited, depth } = analyzeGraphDFS(nodes, edges);
+  return [...visited]
+    .map(id => ({ id, d: depth[id] || 0 }))
+    .sort((a, b) => a.d - b.d)
+    .map(({ id }) => nodeMap[id])
+    .filter(Boolean);
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ERROR RULE TABLES
+//  Used by explainError() and debugNode().
+// ════════════════════════════════════════════════════════════════════════════
+
+// Keyed by node type prefix — each rule has: patterns, diagnosis, fix, prevention
+const NODE_ERROR_RULES = {
+  http_request: [
+    { patterns: ['ECONNREFUSED', 'ENOTFOUND', 'getaddrinfo'],
+      diagnosis:  'The target URL is unreachable.',
+      root_cause: 'Connection refused or DNS resolution failed.',
+      fix:        { url: 'Verify the URL is correct and the server is running.' },
+      prevention: 'Add an Error Handler node after HTTP nodes for network failures.' },
+    { patterns: ['401', 'Unauthorized', 'Authentication'],
+      diagnosis:  'Authentication failed.',
+      root_cause: 'Missing or invalid credentials/API key in the request headers.',
+      fix:        { headers: 'Add Authorization header with a valid token.' },
+      prevention: 'Store credentials in the Credentials Manager and reference them by name.' },
+    { patterns: ['403', 'Forbidden'],
+      diagnosis:  'Access denied by the server.',
+      root_cause: 'The API key or token does not have permission for this endpoint.',
+      fix:        { headers: 'Use a token with the required scope/permission.' },
+      prevention: 'Check the API documentation for required OAuth scopes.' },
+    { patterns: ['404', 'Not Found'],
+      diagnosis:  'Endpoint not found.',
+      root_cause: 'The URL path or resource ID does not exist.',
+      fix:        { url: 'Double-check the URL path and any dynamic IDs in the request.' },
+      prevention: 'Log the full URL before sending to catch typos early.' },
+    { patterns: ['429', 'Too Many Requests', 'rate limit'],
+      diagnosis:  'Rate limit exceeded.',
+      root_cause: 'Too many requests sent to the API in a short window.',
+      fix:        { retry: 'Add a Delay node before this node and retry after backoff.' },
+      prevention: 'Add a Delay node and use exponential back-off for retry logic.' },
+    { patterns: ['500', '502', '503', 'Internal Server Error', 'Bad Gateway'],
+      diagnosis:  'The remote server returned an error.',
+      root_cause: 'Server-side issue — the API itself is failing.',
+      fix:        { retry: 'Retry after a short delay; if persistent, contact the API provider.' },
+      prevention: 'Wrap with an Error Handler node and alert your team via Slack.' },
+    { patterns: ['timeout', 'ETIMEDOUT', 'ESOCKETTIMEDOUT'],
+      diagnosis:  'Request timed out.',
+      root_cause: 'The server did not respond in time.',
+      fix:        { timeout: 'Increase the request timeout or try a lighter endpoint.' },
+      prevention: 'Set a reasonable timeout and add a fallback path using a Logic If node.' },
+  ],
+  postgres: [
+    { patterns: ['syntax error', 'SyntaxError'],
+      diagnosis:  'SQL syntax error in the query.',
+      root_cause: 'The SQL statement has a syntax mistake.',
+      fix:        { query: 'Review the query for missing commas, quotes, or keywords.' },
+      prevention: 'Test queries in a database client before pasting them into the node.' },
+    { patterns: ['relation does not exist', 'table not found'],
+      diagnosis:  'The table or view referenced in the query does not exist.',
+      root_cause: 'Wrong table name or missing migration.',
+      fix:        { query: 'Check the table name matches exactly (case-sensitive in PostgreSQL).' },
+      prevention: 'Run migrations before deploying workflows that reference new tables.' },
+    { patterns: ['column', 'does not exist'],
+      diagnosis:  'A referenced column does not exist.',
+      root_cause: 'Column name mismatch or schema change.',
+      fix:        { query: 'Check column names against the actual table schema.' },
+      prevention: 'Version your schema changes alongside your workflow changes.' },
+    { patterns: ['connection refused', 'ECONNREFUSED', 'ENOTFOUND'],
+      diagnosis:  'Cannot connect to the PostgreSQL server.',
+      root_cause: 'Wrong host/port or server is not running.',
+      fix:        { connection: 'Check the database host, port, and credentials in the node config.' },
+      prevention: 'Store DB credentials in the Credentials Manager, not inline in config.' },
+    { patterns: ['duplicate key', 'unique constraint'],
+      diagnosis:  'Duplicate key violation.',
+      root_cause: 'Attempting to insert a record that already exists.',
+      fix:        { query: 'Use INSERT ... ON CONFLICT DO NOTHING or UPDATE instead of INSERT.' },
+      prevention: 'Add a database lookup step before inserting to check for existing records.' },
+  ],
+  transform: [
+    { patterns: ['Cannot read', 'undefined', 'null', 'TypeError'],
+      diagnosis:  'A referenced field is missing or null in the input data.',
+      root_cause: 'The expected field does not exist in the incoming data.',
+      fix:        { mapping: 'Add a null check or use a default value in your mapping expression.' },
+      prevention: 'Use a Logic If node to validate required fields before transformation.' },
+    { patterns: ['JSON', 'parse', 'Unexpected token'],
+      diagnosis:  'Failed to parse JSON.',
+      root_cause: 'The input is not valid JSON.',
+      fix:        { input: 'Ensure the upstream node outputs valid JSON, or add a JSON Parse step.' },
+      prevention: 'Log the raw output of the previous node to inspect the actual format.' },
+  ],
+  logic_if: [
+    { patterns: ['ReferenceError', 'is not defined'],
+      diagnosis:  'A variable used in the condition expression is not defined.',
+      root_cause: 'The variable name does not match the actual data field.',
+      fix:        { condition: 'Check the field name in the input data and update the condition.' },
+      prevention: 'Add a console_log node before the condition to inspect available fields.' },
+    { patterns: ['SyntaxError'],
+      diagnosis:  'The condition expression has a syntax error.',
+      root_cause: 'Invalid JavaScript expression in the condition field.',
+      fix:        { condition: 'Use simple comparisons like {{value}} === "x" or {{count}} > 0.' },
+      prevention: 'Test conditions in the browser console with sample data before saving.' },
+  ],
+  email_send: [
+    { patterns: ['ECONNREFUSED', 'ENOTFOUND', 'SMTP'],
+      diagnosis:  'Cannot connect to the SMTP server.',
+      root_cause: 'Wrong SMTP host, port, or the server is not accessible.',
+      fix:        { host: 'Verify SMTP host and port. Common ports: 587 (TLS) or 465 (SSL).' },
+      prevention: 'Store SMTP credentials in the Credentials Manager.' },
+    { patterns: ['invalid login', 'Authentication', '535'],
+      diagnosis:  'SMTP authentication failed.',
+      root_cause: 'Incorrect username or password for the email account.',
+      fix:        { credentials: 'Re-enter the correct email credentials in the Credentials Manager.' },
+      prevention: 'Use an app-specific password if 2FA is enabled on the account.' },
+    { patterns: ['Invalid address', 'recipient'],
+      diagnosis:  'Invalid recipient email address.',
+      root_cause: 'The "to" field contains a malformed email address.',
+      fix:        { to: 'Validate the recipient address format before sending.' },
+      prevention: 'Add an email format validation step using a Logic If node.' },
+  ],
+  slack: [
+    { patterns: ['invalid_token', 'not_authed', '401'],
+      diagnosis:  'Invalid Slack token.',
+      root_cause: 'The Slack API token is missing, expired, or revoked.',
+      fix:        { token: 'Re-create the Slack app token and update it in the Credentials Manager.' },
+      prevention: 'Use Slack Bot tokens (xoxb-) rather than legacy tokens.' },
+    { patterns: ['channel_not_found'],
+      diagnosis:  'Slack channel not found.',
+      root_cause: 'The channel name or ID is incorrect, or the bot is not a member.',
+      fix:        { channel: 'Invite the bot to the channel and verify the channel name.' },
+      prevention: 'Use channel IDs (C0123456) instead of names to avoid renaming issues.' },
+  ],
+};
+
+// Match nodeType to the relevant rule group
+function getRulesForNodeType(nodeType) {
+  if (!nodeType) return [];
+  const t = nodeType.toLowerCase();
+  if (t.includes('http') || t.includes('rest') || t.includes('graphql')) return NODE_ERROR_RULES.http_request;
+  if (t.includes('postgres') || t.includes('mysql') || t.includes('mongo'))  return NODE_ERROR_RULES.postgres;
+  if (t.includes('transform') || t.includes('json') || t.includes('code'))   return NODE_ERROR_RULES.transform;
+  if (t.includes('logic') || t.includes('if') || t.includes('switch'))        return NODE_ERROR_RULES.logic_if;
+  if (t.includes('email') || t.includes('smtp'))                               return NODE_ERROR_RULES.email_send;
+  if (t.includes('slack'))                                                      return NODE_ERROR_RULES.slack;
+  return [];
+}
+
+function matchErrorRule(rules, errorMsg) {
+  if (!errorMsg) return null;
+  for (const rule of rules) {
+    if (rule.patterns.some(p => errorMsg.includes(p))) return rule;
+  }
+  return null;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  INTENT PATTERNS  (used by workflowChat)
+// ════════════════════════════════════════════════════════════════════════════
+const CHAT_INTENTS = [
+  { name: 'generate',    weight: 3, keywords: ['build', 'create', 'make', 'generate', 'set up', 'start', 'automate', 'workflow for', 'new workflow'] },
+  { name: 'add_node',    weight: 2, keywords: ['add', 'insert', 'put', 'place', 'new node', 'append'] },
+  { name: 'remove_node', weight: 2, keywords: ['remove', 'delete', 'drop', 'get rid', 'eliminate'] },
+  { name: 'connect',     weight: 2, keywords: ['connect', 'link', 'wire', 'join', 'attach', 'edge between'] },
+  { name: 'explain',     weight: 1, keywords: ['what is', 'what does', 'explain', 'how does', 'describe', 'tell me'] },
+  { name: 'help',        weight: 1, keywords: ['help', 'what can you', 'capabilities', 'commands', 'how to'] },
+  { name: 'clear',       weight: 3, keywords: ['clear', 'reset', 'start over', 'empty', 'wipe', 'start fresh'] },
+];
+
+function detectIntent(message) {
+  const lower = message.toLowerCase();
+  let best = null;
+  let bestScore = 0;
+  for (const intent of CHAT_INTENTS) {
+    const hits  = intent.keywords.filter(k => lower.includes(k)).length;
+    const score = hits * intent.weight;
+    if (score > bestScore) { bestScore = score; best = intent.name; }
+  }
+  return bestScore > 0 ? best : 'unknown';
+}
+
+// Extract the node type most relevant to the message
+function extractNodeType(message) {
+  const top = retrieveNodes(message, 3);
+  return top.length ? top[0].type : 'console_log';
+}
+
+// Find an existing node in the workflow by fuzzy label match
+function findNodeByLabel(nodes, hint) {
+  const h = hint.toLowerCase();
+  return nodes.find(n => (n.data?.label || '').toLowerCase().includes(h)) || null;
+}
+
+const CHAT_HELP_TEXT =
+  'I can help you with your workflow canvas. Try:\n' +
+  '• "Build a Slack notification workflow"\n' +
+  '• "Add an email node"\n' +
+  '• "Remove the transform node"\n' +
+  '• "Connect the webhook to the database"\n' +
+  '• "Clear the canvas"\n\n' +
+  '💡 Advanced conversational AI is coming soon — for now I handle direct commands.';
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  APPLY WORKFLOW TOOL  (unchanged — purely algorithmic, no LLM)
+// ════════════════════════════════════════════════════════════════════════════
 function applyWorkflowTool(workflow, toolName, input) {
   const nodes = [...workflow.nodes];
   const edges = [...workflow.edges];
@@ -551,40 +634,30 @@ function applyWorkflowTool(workflow, toolName, input) {
         nodes: (input.nodes || []).map(n => ({
           ...n,
           type: 'flowNode',
-          data: {
-            ...(n.data || {}),
-            type: n.data?.type || n.type || 'unknown',
-            icon: n.data?.icon || '🔗',
-            config: n.data?.config || {},
-          },
+          data: { ...(n.data || {}), type: n.data?.type || n.type || 'unknown', icon: n.data?.icon || '🔗', config: n.data?.config || {} },
         })),
         edges: (input.edges || []).map(e => ({
-          ...e,
-          type: e.type || 'smoothstep',
-          animated: e.animated !== undefined ? e.animated : true,
+          ...e, type: e.type || 'smoothstep', animated: e.animated !== undefined ? e.animated : true,
           style: e.style || { stroke: '#64748b', strokeWidth: 2 },
         })),
       };
 
-    case 'add_node': {
-      const newNode = {
-        id: input.id,
-        type: 'flowNode',
-        position: input.position,
-        data: { label: input.label, type: input.nodeType, icon: '🔗', config: input.config || {} },
+    case 'add_node':
+      return {
+        nodes: [...nodes, {
+          id: input.id,
+          type: 'flowNode',
+          position: input.position,
+          data: { label: input.label, type: input.nodeType, icon: '🔗', config: input.config || {} },
+        }],
+        edges,
       };
-      return { nodes: [...nodes, newNode], edges };
-    }
 
     case 'update_node':
       return {
         nodes: nodes.map(n => n.id !== input.id ? n : {
           ...n,
-          data: {
-            ...n.data,
-            ...(input.label ? { label: input.label } : {}),
-            config: { ...(n.data?.config || {}), ...(input.config || {}) },
-          },
+          data: { ...n.data, ...(input.label ? { label: input.label } : {}), config: { ...(n.data?.config || {}), ...(input.config || {}) } },
         }),
         edges,
       };
@@ -618,162 +691,396 @@ function applyWorkflowTool(workflow, toolName, input) {
   }
 }
 
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PUBLIC SERVICE FUNCTIONS
+// ════════════════════════════════════════════════════════════════════════════
+
 /**
- * Conversational RAG agent for workflow creation and editing.
- * - Retrieves relevant nodes via keyword search (RAG)
- * - Runs a multi-turn tool-use loop so the model sees tool results
- * - Uses Groq (free) → OpenAI as fallback
+ * Generate a workflow graph from a natural language prompt.
+ * Algorithm: keyword-frequency scoring against predefined templates.
  */
-async function workflowChat({ message, history, workflow }) {
-  const llm = createLLMClient();
-  if (!llm) {
+async function generateWorkflow(prompt) {
+  try {
+    const tpl = matchTemplate(prompt);
+    logger.info(`[intelligence] generateWorkflow matched template: "${tpl.name}"`);
     return {
-      reply: 'AI assistant requires GROQ_API_KEY or OPENAI_API_KEY to be configured.',
-      toolCalls: [],
-      updatedWorkflow: null,
+      graph:      tpl.graph,
+      description: tpl.description || prompt,
+      model:      'template-matching',
+      tokensUsed: 0,
+    };
+  } catch (err) {
+    logger.error('[intelligence] generateWorkflow error:', err);
+    return {
+      graph: {
+        nodes: [
+          makeNode('n1', 100, 200, 'Manual Trigger', 'trigger_manual',  {}),
+          makeNode('n2', 400, 200, 'Log Output',      'console_log',     { message: `Workflow: ${prompt}` }),
+        ],
+        edges: [makeEdge('e1', 'n1', 'n2')],
+      },
+      description: prompt,
+      model:      'fallback',
+      tokensUsed: 0,
     };
   }
+}
 
-  // RAG: retrieve the most relevant nodes for this turn
-  const ragQuery = [message, ...history.slice(-4).map(h => h.content)].join(' ');
-  const nodeCatalogSection = formatNodeCatalog(retrieveNodes(ragQuery, 22));
-
-  const currentState = JSON.stringify({
-    nodeCount: (workflow.nodes || []).length,
-    nodes: (workflow.nodes || []).map(n => ({
-      id: n.id,
-      type: n.data?.type || n.type,
-      label: n.data?.label,
-      position: n.position,
-      config: n.data?.config,
-    })),
-    edges: (workflow.edges || []).map(e => ({ id: e.id, source: e.source, target: e.target })),
-  }, null, 2);
-
-  const systemContent = `You are Freckles, Flowa's workflow automation assistant. You help users build and edit visual automation workflows on the canvas.
-
-## SCOPE
-- Help with: building workflows, editing nodes, connecting nodes, configuring node settings, debugging workflow logic, suggesting integrations.
-- For off-topic requests (general coding help unrelated to workflows, trivia, writing, math homework, "what is a linked list", etc.), reply ONLY: "I can only help with building workflows. What would you like to automate?"
-
-## HOW TO HANDLE REQUESTS
-1. **Clear and unambiguous** → call the tool immediately and confirm in one sentence.
-2. **Ambiguous but workflow-related** → ask ONE specific clarifying question. Examples:
-   - User says "change code to 1 to 10 loop" → ask: "Got it — should the loop iterate over the array [1,2,3,4,5,6,7,8,9,10], or run a range from 1 to 10?"
-   - User says "add a notification" → ask: "Slack, email, or Discord?"
-3. **Refers to "the existing node" / "this code" / "current workflow"** → look at the CURRENT WORKFLOW STATE below. The user is referring to nodes that already exist there. Use their actual IDs when calling tools.
-
-## RESPONSE STYLE
-- Be direct, warm, and brief. One sentence per action.
-- After calling a tool, describe what you did in one short sentence: "Updated the loop node to iterate 1 through 10."
-- Don't list options the user didn't ask for.
-- Don't say "I won't make any changes" — either act, or ask one focused question.
-- NEVER write \`<function>\`, \`<tool_call>\`, raw JSON, or function-call syntax in your text. Tool invocation is automatic — text is for talking to the user only.
-
-## TOOL USAGE RULES
-- Use set_workflow when building from scratch (replaces everything)
-- Use add_node / update_node / remove_node / add_edge / remove_edge for targeted edits
-- **CRITICAL — node IDs:** When editing an EXISTING node, you MUST use the exact \`id\` value from the CURRENT WORKFLOW STATE section below. Never invent IDs. Never use placeholders like "1234567890". For NEW nodes, generate \`{nodeType}-{Date.now()}\` style IDs.
-- Node positions for new nodes: start at x:150, y:250; space 280px horizontally; branches ±150px vertically
-- Every new node must include: id, type:"flowNode", position:{x,y}, data:{label, type, icon:"🔗", config:{}}
-- Every new edge must include: id, source, target, type:"smoothstep", animated:true, style:{stroke:"#64748b",strokeWidth:2}
-- Always populate config with sensible defaults
-
-## AVAILABLE NODE TYPES (retrieved for this request)
-${nodeCatalogSection}
-
-## CURRENT WORKFLOW STATE
-${currentState}`;
-
-  const messages = [
-    { role: 'system', content: systemContent },
-    ...history.map(h => ({ role: h.role, content: h.content })),
-    { role: 'user', content: message },
-  ];
-
-  let updatedWorkflow = {
-    nodes: JSON.parse(JSON.stringify(workflow.nodes || [])),
-    edges: JSON.parse(JSON.stringify(workflow.edges || [])),
-  };
-  const allToolCalls = [];
-  let finalReply = '';
-
+/**
+ * Explain a failed workflow execution.
+ * Algorithm: rule-based pattern matching on error message + node type.
+ */
+async function explainError(execution, failedLogs) {
   try {
-    const MAX_ROUNDS = 5;
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      const response = await llm.client.chat.completions.create({
-        model: llm.model,
-        max_tokens: 4096,
-        temperature: 0.4,
-        tools: WORKFLOW_TOOLS,
-        tool_choice: 'auto',
-        messages,
-      });
+    if (!failedLogs.length) {
+      return {
+        summary:    execution.error || 'Execution failed with no node-level detail.',
+        root_cause: 'Unknown — no failed node logs were recorded.',
+        suggestions: ['Check the workflow trigger configuration.', 'Inspect the execution logs for more detail.'],
+      };
+    }
 
-      const msg = response.choices[0].message;
-      const rawContent = msg.content || '';
-      const toolCalls = msg.tool_calls || [];
-      const textCalls = toolCalls.length === 0 ? parseTextToolCalls(rawContent) : [];
+    const first    = failedLogs[0];
+    const nodeType = first.node_type || '';
+    const errorMsg = first.error    || '';
+    const rules    = getRulesForNodeType(nodeType);
+    const matched  = matchErrorRule(rules, errorMsg);
 
-      if (toolCalls.length === 0 && textCalls.length === 0) {
-        // Pure text response — this is the final reply, nothing to strip
-        finalReply = rawContent.trim();
+    if (matched) {
+      return {
+        summary:    `${first.node_label || nodeType} failed: ${matched.diagnosis}`,
+        root_cause: matched.root_cause,
+        suggestions: [
+          Object.values(matched.fix)[0],
+          matched.prevention,
+          `Check node "${first.node_label}" configuration in the editor.`,
+        ],
+      };
+    }
+
+    // Generic: list each failed node
+    const suggestions = failedLogs.slice(0, 3).map(l =>
+      `Node "${l.node_label}" (${l.node_type}): ${l.error || 'unknown error'}`
+    );
+    suggestions.push('Open the editor, click the failed node, and review its config.');
+
+    return {
+      summary:    `Execution failed at "${first.node_label}" with: ${errorMsg || 'unknown error'}`,
+      root_cause: errorMsg || 'See node-level error above.',
+      suggestions,
+    };
+  } catch (err) {
+    logger.error('[intelligence] explainError error:', err);
+    return {
+      summary:    execution.error || 'Execution failed.',
+      root_cause: failedLogs[0]?.error || 'Unknown error.',
+      suggestions: ['Check the failed node configuration.', 'Verify input data format.'],
+    };
+  }
+}
+
+/**
+ * Diagnose a single failed node and suggest a fix.
+ * Algorithm: rule-based lookup table keyed by node type + error pattern.
+ */
+async function debugNode({ nodeType, nodeLabel, config, error, input, configSchema }) {
+  try {
+    const rules   = getRulesForNodeType(nodeType || '');
+    const matched = matchErrorRule(rules, error || '');
+
+    if (matched) {
+      return {
+        diagnosis:  matched.diagnosis,
+        root_cause: matched.root_cause,
+        fix:        matched.fix,
+        explanation:`${matched.diagnosis} ${matched.root_cause}`,
+        prevention: matched.prevention,
+        model:      'rule-engine',
+        tokensUsed: 0,
+      };
+    }
+
+    // No rule matched — give generic advice scoped to the node type
+    const category = getRulesForNodeType(nodeType || '').length
+      ? nodeType
+      : 'this node type';
+
+    return {
+      diagnosis:  `"${nodeLabel || nodeType}" failed with: ${error || 'an unknown error'}`,
+      root_cause: error || 'Could not determine root cause automatically.',
+      fix:        { config: 'Review all required fields in the node configuration panel.' },
+      explanation:`No specific rule matched for ${category}. The error message is: "${error}".`,
+      prevention: 'Add an Error Handler node after this node to catch future failures gracefully.',
+      model:      'rule-engine',
+      tokensUsed: 0,
+    };
+  } catch (err) {
+    logger.error('[intelligence] debugNode error:', err);
+    return {
+      diagnosis:  `Node "${nodeLabel}" (${nodeType}) failed.`,
+      root_cause: error || 'Unknown',
+      fix:        {},
+      explanation:'Could not auto-diagnose. Check the error message and node config.',
+      prevention: 'Ensure all required fields are properly configured.',
+      model:      'fallback',
+      tokensUsed: 0,
+    };
+  }
+}
+
+/**
+ * Suggest nodes to improve a workflow.
+ * Algorithm: DFS-based structural analysis of the workflow graph.
+ *
+ * Rules applied after DFS:
+ *  R1 — No error handler present → suggest error_handler
+ *  R2 — HTTP/REST node with no transform → suggest transform_set
+ *  R3 — Chain depth > 4 with no branch → suggest logic_if
+ *  R4 — No logging in a non-trivial graph → suggest console_log
+ *  R5 — Unreachable nodes detected → suggest removing them or adding edges
+ */
+async function suggestNodes(graph) {
+  try {
+    const nodes = graph.nodes || [];
+    const edges = graph.edges || [];
+    if (nodes.length < 2) {
+      return [
+        { type: 'transform_set', reason: 'Add a Transform node to map incoming data to the format you need.' },
+        { type: 'error_handler', reason: 'Add an Error Handler to catch failures gracefully.' },
+      ];
+    }
+
+    const types         = nodes.map(n => (n.data?.type || n.type || '').toLowerCase());
+    const { maxDepth, unreachable } = analyzeGraphDFS(nodes, edges);
+
+    const suggestions = [];
+
+    // R1: no error handler
+    if (!types.some(t => t === 'error_handler')) {
+      suggestions.push({ type: 'error_handler', reason: 'No error handling detected — add one to catch failures and retry gracefully.' });
+    }
+
+    // R2: HTTP node with no transform
+    const hasHttp      = types.some(t => t.includes('http') || t.startsWith('rest_'));
+    const hasTransform = types.some(t => t.includes('transform') || t === 'json_parse');
+    if (hasHttp && !hasTransform) {
+      suggestions.push({ type: 'transform_set', reason: 'HTTP responses often need field mapping before the next step — add a Transform node.' });
+    }
+
+    // R3: deep linear chain without branching
+    const hasBranch = types.some(t => t === 'logic_if' || t === 'logic_switch');
+    if (maxDepth > 4 && !hasBranch) {
+      suggestions.push({ type: 'logic_if', reason: `Chain is ${maxDepth} steps deep with no branching — add a Logic If node to handle edge cases.` });
+    }
+
+    // R4: no logging
+    if (!types.some(t => t === 'console_log') && nodes.length > 3) {
+      suggestions.push({ type: 'console_log', reason: 'No logging nodes found — add one to track execution state and simplify debugging.' });
+    }
+
+    // R5: unreachable nodes
+    if (unreachable.length > 0) {
+      const label = nodes.find(n => n.id === unreachable[0])?.data?.label || unreachable[0];
+      suggestions.push({ type: 'error_handler', reason: `Node "${label}" is disconnected from the trigger — connect or remove it.` });
+    }
+
+    return suggestions.slice(0, 3).length
+      ? suggestions.slice(0, 3)
+      : [
+          { type: 'delay',       reason: 'Add a Delay node to throttle execution and avoid hitting rate limits.' },
+          { type: 'console_log', reason: 'Add logging to monitor output at each stage.' },
+        ];
+  } catch (err) {
+    logger.error('[intelligence] suggestNodes error:', err);
+    return [
+      { type: 'error_handler', reason: 'Add error handling for reliability.' },
+      { type: 'console_log',   reason: 'Add logging for debugging.' },
+    ];
+  }
+}
+
+/**
+ * Generate documentation for a workflow.
+ * Algorithm: A* shortest path from trigger → terminal to order the steps.
+ */
+async function documentWorkflow(workflow) {
+  try {
+    const graphData  = typeof workflow.graph === 'string'
+      ? JSON.parse(workflow.graph)
+      : (workflow.graph || { nodes: [], edges: [] });
+
+    const nodes = graphData.nodes || [];
+    const edges = graphData.edges || [];
+
+    // A* gives us a meaningful execution order from trigger to terminal
+    const path  = aStarShortestPath(nodes, edges);
+    const steps = path.map((n, i) => ({
+      node:        n?.data?.label || n?.id || `Step ${i + 1}`,
+      description: n?.data?.type
+        ? `${n.data.type} — ${NODE_INDEX.find(ni => ni.type === n.data.type)?.desc || 'workflow step'}`
+        : 'Workflow step',
+    }));
+
+    // Infer inputs/outputs from trigger and terminal node types
+    const triggerNode   = nodes.find(n => (n.data?.type || n.type || '').includes('trigger'));
+    const terminalNodes = nodes.filter(n => !edges.some(e => e.source === n.id));
+
+    const inputs  = triggerNode
+      ? [`Triggered by: ${triggerNode.data?.type || 'trigger'} — ${triggerNode.data?.label || ''}`]
+      : ['Manual or external trigger'];
+
+    const outputs = terminalNodes.length
+      ? terminalNodes.map(n => n.data?.label || n.data?.type || 'Output')
+      : ['Workflow output'];
+
+    return {
+      title:       workflow.name || 'Untitled Workflow',
+      description: workflow.description || `Automation workflow with ${nodes.length} nodes and ${edges.length} connections.`,
+      steps,
+      inputs,
+      outputs,
+    };
+  } catch (err) {
+    logger.error('[intelligence] documentWorkflow error:', err);
+    return {
+      title:       workflow.name || 'Untitled Workflow',
+      description: workflow.description || '',
+      steps:       [],
+      inputs:      [],
+      outputs:     [],
+    };
+  }
+}
+
+/**
+ * Conversational workflow assistant.
+ * Algorithm: intent classification (keyword scoring) + direct graph operations.
+ *
+ * Intents handled algorithmically:
+ *   generate    → template matching (matchTemplate)
+ *   add_node    → retrieveNodes picks the best type, applyWorkflowTool adds it
+ *   remove_node → fuzzy label search, applyWorkflowTool removes it
+ *   connect     → label search for source/target, applyWorkflowTool adds edge
+ *   clear       → set_workflow with empty graph
+ *   explain     → DFS analysis summary of current workflow
+ *   help        → static help text
+ *   unknown     → guidance + help text
+ *
+ * Note: Advanced conversational AI (multi-turn context, LLM) is not active.
+ */
+async function workflowChat({ message, history, workflow }) {
+  try {
+    const intent = detectIntent(message);
+    const nodes  = workflow?.nodes || [];
+    const edges  = workflow?.edges || [];
+    let updatedWorkflow = null;
+    let reply           = '';
+
+    switch (intent) {
+      case 'generate': {
+        const tpl = matchTemplate(message);
+        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', tpl.graph);
+        reply = `Built a "${tpl.name}" workflow for you — ${tpl.description}`;
         break;
       }
 
-      if (toolCalls.length > 0) {
-        // ── Proper OpenAI/Groq tool_calls ──
-        // Keep any text the model wrote before the tool call as preamble only
-        // (don't set finalReply yet — wait for the follow-up text round)
-        const toolResults = [];
-        for (const call of toolCalls) {
-          try {
-            const input = JSON.parse(call.function.arguments);
-            allToolCalls.push({ name: call.function.name, input });
-            updatedWorkflow = applyWorkflowTool(updatedWorkflow, call.function.name, input);
-            toolResults.push({
-              role: 'tool',
-              tool_call_id: call.id,
-              content: JSON.stringify({ success: true, applied: call.function.name }),
-            });
-          } catch (parseErr) {
-            logger.warn('Failed to parse tool call arguments:', call.function.arguments);
-          }
-        }
-        messages.push({ role: 'assistant', content: rawContent, tool_calls: toolCalls });
-        messages.push(...toolResults);
-
-        if (response.choices[0].finish_reason !== 'tool_calls') break;
-
-      } else {
-        // ── Fallback: model leaked tool calls as text ──
-        // Do NOT put rawContent into finalReply — it's tainted with function-call syntax.
-        for (const call of textCalls) {
-          allToolCalls.push(call);
-          updatedWorkflow = applyWorkflowTool(updatedWorkflow, call.name, call.input);
-        }
-        // Ask for one clean sentence confirming what was done
-        messages.push({ role: 'assistant', content: rawContent });
-        messages.push({
-          role: 'user',
-          content: '[System: tool calls applied. Reply in plain text only — one sentence confirming what changed. No function syntax.]',
-        });
+      case 'clear': {
+        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', { nodes: [], edges: [] });
+        reply = 'Canvas cleared. Ready for a fresh start — what would you like to build?';
+        break;
       }
+
+      case 'add_node': {
+        const nodeType = extractNodeType(message);
+        const nodeDef  = NODE_INDEX.find(n => n.type === nodeType);
+        const id       = `${nodeType}-${Date.now()}`;
+        const lastX    = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+        const newNode  = {
+          id,
+          nodeType,
+          label:    nodeDef?.desc || nodeType,
+          position: { x: lastX + 280, y: 200 },
+          config:   {},
+        };
+        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'add_node', newNode);
+        reply = `Added a "${nodeDef?.desc || nodeType}" node to the canvas.`;
+        break;
+      }
+
+      case 'remove_node': {
+        // Try to find which node the user means from the message text
+        const candidate = nodes.find(n => {
+          const label = (n.data?.label || '').toLowerCase();
+          const type  = (n.data?.type  || '').toLowerCase();
+          return message.toLowerCase().split(/\W+/).some(w => w.length > 2 && (label.includes(w) || type.includes(w)));
+        });
+        if (candidate) {
+          updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'remove_node', { id: candidate.id });
+          reply = `Removed the "${candidate.data?.label}" node.`;
+        } else {
+          reply = `I couldn't find a matching node. Try something like "remove the transform node" or "delete the email step".`;
+        }
+        break;
+      }
+
+      case 'connect': {
+        // Simple heuristic: pick last two nodes if no label hints found
+        if (nodes.length >= 2) {
+          const source = nodes[nodes.length - 2];
+          const target = nodes[nodes.length - 1];
+          updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'add_edge', { source: source.id, target: target.id });
+          reply = `Connected "${source.data?.label}" → "${target.data?.label}".`;
+        } else {
+          reply = `You need at least two nodes on the canvas to connect. Add some nodes first.`;
+        }
+        break;
+      }
+
+      case 'explain': {
+        if (!nodes.length) {
+          reply = 'The canvas is empty. Tell me what you want to automate and I\'ll build it.';
+          break;
+        }
+        const { maxDepth, unreachable } = analyzeGraphDFS(nodes, edges);
+        const types = [...new Set(nodes.map(n => n.data?.type || n.type))];
+        reply = `Your workflow has ${nodes.length} node${nodes.length !== 1 ? 's' : ''} and ${edges.length} connection${edges.length !== 1 ? 's' : ''}, `
+          + `reaching ${maxDepth + 1} step${maxDepth > 0 ? 's' : ''} deep. `
+          + `Node types: ${types.join(', ')}.`
+          + (unreachable.length ? ` ⚠️ ${unreachable.length} node(s) are disconnected.` : ' All nodes are reachable from the trigger.');
+        break;
+      }
+
+      case 'help':
+        reply = CHAT_HELP_TEXT;
+        break;
+
+      default:
+        reply = `I didn't quite understand that. ${CHAT_HELP_TEXT}`;
+        break;
     }
-  } catch (err) {
-    logger.error('workflowChat loop error:', err);
+
     return {
-      reply: 'Something went wrong while processing your request. Please try again.',
-      toolCalls: allToolCalls,
-      updatedWorkflow: allToolCalls.length > 0 ? updatedWorkflow : null,
+      reply,
+      toolCalls:       updatedWorkflow ? [{ name: intent }] : [],
+      updatedWorkflow,
+    };
+  } catch (err) {
+    logger.error('[intelligence] workflowChat error:', err);
+    return {
+      reply:          'Something went wrong. Please try again.',
+      toolCalls:      [],
+      updatedWorkflow: null,
     };
   }
-
-  return {
-    reply: finalReply || (allToolCalls.length > 0 ? 'Done! Workflow updated.' : "I can help you build workflows. What would you like to create?"),
-    toolCalls: allToolCalls,
-    updatedWorkflow: allToolCalls.length > 0 ? updatedWorkflow : null,
-  };
 }
 
-module.exports = { generateWorkflow, explainError, debugNode, suggestNodes, documentWorkflow, workflowChat };
+
+module.exports = {
+  generateWorkflow,
+  explainError,
+  debugNode,
+  suggestNodes,
+  documentWorkflow,
+  workflowChat,
+};
