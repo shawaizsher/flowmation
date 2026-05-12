@@ -8,6 +8,8 @@ export default {
   theme: {
     extend: {
       colors: {
+        /* bg-base / text-base shorthand — resolves to the page background surface */
+        base: 'var(--surface-base)',
         brand: {
           50:  'rgb(var(--brand-50-rgb) / <alpha-value>)',
           100: 'rgb(var(--brand-100-rgb) / <alpha-value>)',
