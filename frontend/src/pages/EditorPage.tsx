@@ -812,7 +812,7 @@ function EditorCanvas() {
   const totalNodeCount = allNodes.length;
 
   return (
-    <div className="flex h-screen flex-col bg-base">
+    <div className="flex h-screen flex-col bg-surface-base">
       {/* ── Editor Header ── */}
       <header className="flex h-14 items-center justify-between border-b border-surface-border bg-surface-card px-4">
         <div className="flex items-center gap-3">
@@ -929,7 +929,7 @@ function EditorCanvas() {
                   value={publishLabel}
                   onChange={(e) => setPublishLabel(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handlePublish()}
-                  className="mb-3 w-full rounded-lg border border-surface-border bg-base px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50"
+                  className="mb-3 w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50"
                   autoFocus
                 />
                 <div className="flex items-center justify-end gap-2">
@@ -981,7 +981,7 @@ function EditorCanvas() {
                   placeholder="Search nodes…"
                   value={nodeSearch}
                   onChange={(e) => setNodeSearch(e.target.value)}
-                  className="w-full rounded-lg border border-surface-border bg-base py-2 pl-8 pr-8 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal"
+                  className="w-full rounded-lg border border-surface-border bg-surface-input py-2 pl-8 pr-8 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal"
                 />
                 {nodeSearch && (
                   <button onClick={() => setNodeSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
@@ -1000,7 +1000,7 @@ function EditorCanvas() {
                   <div key={category} className="mb-0.5">
                     <button
                       onClick={() => toggleCategory(category)}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-base/60"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-surface-hover"
                     >
                       <span className="text-sm">{meta.icon}</span>
                       <span className={`flex-1 text-xs font-bold uppercase tracking-widest ${meta.color}`}>{meta.label}</span>
@@ -1013,7 +1013,7 @@ function EditorCanvas() {
                           <button
                             key={def.type}
                             onClick={() => handleAddNode(def)}
-                            className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition hover:bg-base group/node"
+                            className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition hover:bg-surface-hover group/node"
                           >
                             <NodeIcon nodeType={def.type} size="sm" />
                             <div className="min-w-0 flex-1">
@@ -1053,7 +1053,7 @@ function EditorCanvas() {
             nodeTypes={nodeTypes}
             fitView
             nodesConnectable
-            className="bg-base"
+            className="bg-surface-base"
             deleteKeyCode={['Backspace', 'Delete']}
             connectionLineStyle={{ stroke: '#64748b', strokeWidth: 2 }}
             defaultEdgeOptions={{
@@ -1170,7 +1170,7 @@ function EditorCanvas() {
                                     <select
                                       value={String(value ?? '')}
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                                      className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
+                                      className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
                                     >
                                       {key === 'method' && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(m => (
                                         <option key={m} value={m}>{m}</option>
@@ -1189,7 +1189,7 @@ function EditorCanvas() {
                                     <textarea
                                       value={String(value ?? '')}
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                                      className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
+                                      className="w-full rounded-lg border border-surface-border bg-surface-input p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
                                       rows={key === 'body' ? 5 : 3}
                                       placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
                                     />
@@ -1198,7 +1198,7 @@ function EditorCanvas() {
                                       type={key.includes('Password') || key.includes('Token') || key.includes('Key') ? 'password' : 'text'}
                                       value={String(value ?? '')}
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                                      className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
+                                      className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
                                       placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
                                     />
                                   )}
@@ -1227,7 +1227,7 @@ function EditorCanvas() {
                           <textarea
                             value={String(value ?? '')}
                             onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                            className="w-full rounded-lg border border-surface-border bg-base p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
+                            className="w-full rounded-lg border border-surface-border bg-surface-input p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
                             rows={4}
                           />
                         ) : (
@@ -1235,7 +1235,7 @@ function EditorCanvas() {
                             type="text"
                             value={String(value ?? '')}
                             onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
-                            className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
+                            className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
                             placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
                           />
                         )}
@@ -1288,7 +1288,7 @@ function EditorCanvas() {
                             onChange={(e) => {
                               if (e.target.value) handleUpdateNodeConfig('credentialId', e.target.value as any);
                             }}
-                            className="w-full rounded-lg border border-surface-border bg-base px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
+                            className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
                             defaultValue=""
                           >
                             <option value="" disabled>Select a credential…</option>
@@ -1306,7 +1306,7 @@ function EditorCanvas() {
                       ) : (
                         <button
                           onClick={() => { setCredPreselectedService(service.serviceId); setCredModalOpen(true); }}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-surface-border bg-base py-3 text-sm text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 transition"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-surface-border bg-surface-input py-3 text-sm text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 transition"
                         >
                           <Key size={15} /> Connect {service.label} Account
                         </button>
@@ -1336,7 +1336,7 @@ function EditorCanvas() {
                 ) : (
                   <div className="space-y-2">
                     {nodeLogs.map((log, i) => (
-                      <div key={i} className="rounded-lg border border-surface-border bg-base p-3">
+                      <div key={i} className="rounded-lg border border-surface-border bg-surface-input p-3">
                         <div className="mb-1.5 flex items-center justify-between">
                           <span className="text-sm font-bold text-foreground truncate max-w-[160px]">{log.nodeId}</span>
                           <span className={`flex items-center gap-1 text-xs font-bold ${
@@ -1382,7 +1382,7 @@ function EditorCanvas() {
 
                 {/* Create checkpoint */}
                 {showCheckpoint ? (
-                  <div className="mb-4 rounded-lg border border-surface-border bg-base p-3">
+                  <div className="mb-4 rounded-lg border border-surface-border bg-surface-input p-3">
                     <input
                       type="text"
                       placeholder="Checkpoint label…"
@@ -1420,7 +1420,7 @@ function EditorCanvas() {
                 {/* Past versions */}
                 <div className="space-y-2">
                   {versions.map((v) => (
-                    <div key={v.id} className="rounded-lg border border-surface-border bg-base p-3">
+                    <div key={v.id} className="rounded-lg border border-surface-border bg-surface-input p-3">
                       <div className="mb-1 flex items-center justify-between">
                         <span className="flex items-center gap-1 text-sm font-medium text-foreground">
                           {v.is_named && <Tag size={12} className="text-brand-400" />}
@@ -1540,7 +1540,7 @@ function EditorCanvas() {
                   Click on any node in the canvas to view and edit its configuration here.
                 </p>
                 <div className="w-full space-y-2">
-                  <div className="rounded-lg border border-surface-border bg-base p-3 text-left">
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3 text-left">
                     <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-1">Quick Actions</p>
                     <button onClick={() => setRightPanel('logs')} className="flex w-full items-center gap-2 rounded py-1.5 px-2 text-sm text-foreground hover:bg-surface-border transition">
                       <PanelRightOpen size={15} className="text-foreground-muted" /> View Execution Logs
@@ -1549,7 +1549,7 @@ function EditorCanvas() {
                       <History size={15} className="text-foreground-muted" /> Version History
                     </button>
                   </div>
-                  <div className="rounded-lg border border-surface-border bg-base p-3 text-left">
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3 text-left">
                     <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-1">Workflow Stats</p>
                     <div className="flex items-center justify-between py-1 text-sm">
                       <span className="text-foreground-muted">Nodes</span>
