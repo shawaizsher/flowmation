@@ -1344,25 +1344,61 @@ function matchErrorRule(rules, errorMsg) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
-//  CHAT INTENT SYSTEM  (used by workflowChat)
+//  ENHANCED CHAT INTENT SYSTEM
 // ════════════════════════════════════════════════════════════════════════════
 
-const CHAT_INTENTS = [
-  { name: 'generate',    weight: 3, keywords: ['build', 'create', 'make', 'generate', 'set up', 'start', 'automate', 'workflow for', 'new workflow'] },
-  { name: 'add_node',    weight: 2, keywords: ['add', 'insert', 'put', 'place', 'new node', 'append'] },
-  { name: 'remove_node', weight: 2, keywords: ['remove', 'delete', 'drop', 'get rid', 'eliminate'] },
-  { name: 'connect',     weight: 2, keywords: ['connect', 'link', 'wire', 'join', 'attach', 'edge between'] },
-  { name: 'explain',     weight: 1, keywords: ['what is', 'what does', 'explain', 'how does', 'describe', 'tell me'] },
-  { name: 'help',        weight: 1, keywords: ['help', 'what can you', 'capabilities', 'commands', 'how to'] },
-  { name: 'clear',       weight: 3, keywords: ['clear', 'reset', 'start over', 'empty', 'wipe', 'start fresh'] },
+const ENHANCED_CHAT_INTENTS = [
+  { name: 'generate', weight: 3, keywords: [
+    'build', 'create', 'make', 'generate', 'set up', 'automate', 'workflow for',
+    'new workflow', 'i want to', 'help me build', 'help me create', 'i need a workflow',
+  ]},
+  { name: 'edit', weight: 4, keywords: [
+    'add a', 'add an', 'add delay', 'add slack', 'add email', 'add error', 'add logging',
+    'add ai', 'add notification', 'add retry', 'add filter', 'add condition',
+    'insert', 'replace', 'swap', 'change it to', 'change trigger', 'remove the', 'delete the',
+    'add error handling', 'add retry logic', 'add a node', 'put a', 'insert a',
+  ]},
+  { name: 'config', weight: 4, keywords: [
+    'set delay', 'change delay', 'change email subject', 'set email subject',
+    'change channel', 'set channel', 'rename node', 'rename it', 'change subject',
+    'set schedule', 'change schedule', 'configure', 'set to', 'change the',
+    'update config', 'set recipient', 'change recipient', 'set message',
+  ]},
+  { name: 'debug', weight: 3, keywords: [
+    'fix', 'debug', 'issue', 'problem', 'error', 'broken', 'not working', 'failing',
+    'check for issues', 'what is wrong', 'find issues', 'diagnose', 'why is',
+    'find problems', 'detect issues',
+  ]},
+  { name: 'health', weight: 3, keywords: [
+    'health', 'score', 'analyze', 'audit', 'review workflow', 'how good', 'quality',
+    'reliability', 'workflow score', 'rate my workflow', 'workflow analysis',
+  ]},
+  { name: 'simulate', weight: 3, keywords: [
+    'simulate', 'preview', 'show flow', 'trace', 'execution flow',
+    'what happens when', 'run preview', 'show execution', 'walk through',
+    'show me the steps', 'execution path',
+  ]},
+  { name: 'explain', weight: 2, keywords: [
+    'explain', 'what does', 'how does', 'describe', 'what is this', 'tell me about',
+    'walk me through', 'show me how', 'what is my workflow', 'summarize workflow',
+  ]},
+  { name: 'improve', weight: 2, keywords: [
+    'improve', 'optimize', 'better', 'suggestion', 'recommend', 'enhance',
+    'how can i improve', 'what should i add', 'make it better', 'best practices',
+  ]},
+  { name: 'clear', weight: 3, keywords: [
+    'clear', 'reset', 'start over', 'empty canvas', 'wipe', 'start fresh', 'delete all',
+  ]},
+  { name: 'help', weight: 1, keywords: [
+    'help', 'what can you do', 'capabilities', 'commands', 'how to use', 'what are you',
+  ]},
 ];
 
-// Renamed from detectIntent to avoid collision with detectWorkflowIntent
 function detectChatIntent(message) {
   const lower = message.toLowerCase();
   let best = null;
   let bestScore = 0;
-  for (const intent of CHAT_INTENTS) {
+  for (const intent of ENHANCED_CHAT_INTENTS) {
     const hits  = intent.keywords.filter(k => lower.includes(k)).length;
     const score = hits * intent.weight;
     if (score > bestScore) { bestScore = score; best = intent.name; }
@@ -1375,14 +1411,423 @@ function extractNodeType(message) {
   return top.length ? top[0].type : 'console_log';
 }
 
-const CHAT_HELP_TEXT =
-  'I can help you build and modify workflow automations. Try:\n' +
-  '• "When a webhook is received, send a Slack message"\n' +
-  '• "Every day generate a sales report and email it"\n' +
-  '• "Add an email node"\n' +
-  '• "Remove the transform node"\n' +
-  '• "Clear the canvas"\n\n' +
-  'Be specific about what triggers the workflow and what it should do.';
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NODE TYPE RESOLUTION
+// ════════════════════════════════════════════════════════════════════════════
+
+const NODE_TYPE_MAP = {
+  // Triggers
+  webhook: 'trigger_webhook', 'http trigger': 'trigger_webhook', 'api trigger': 'trigger_webhook',
+  schedule: 'trigger_cron', cron: 'trigger_cron', daily: 'trigger_cron', weekly: 'trigger_cron',
+  'email trigger': 'trigger_email', 'new email': 'trigger_email',
+  manual: 'trigger_manual',
+  // Messaging
+  slack: 'slack_send', discord: 'discord_send', telegram: 'telegram_send',
+  sms: 'twilio_sms', twilio: 'twilio_sms',
+  email: 'email_send', mail: 'email_send', smtp: 'email_send',
+  gmail: 'google_gmail_send',
+  // Databases
+  database: 'postgres_insert', db: 'postgres_insert', postgres: 'postgres_insert', sql: 'postgres_query',
+  mongodb: 'mongodb_insert', mongo: 'mongodb_insert', redis: 'redis_set',
+  // Google
+  sheets: 'google_sheets_write', spreadsheet: 'google_sheets_write',
+  'google sheets': 'google_sheets_write', drive: 'google_drive_upload',
+  // Logic
+  delay: 'delay', wait: 'delay', pause: 'delay',
+  condition: 'logic_if', 'if condition': 'logic_if', branch: 'logic_if', filter: 'transform_filter',
+  'error handler': 'error_handler', 'error handling': 'error_handler', retry: 'error_handler',
+  loop: 'loop_for_each', foreach: 'loop_for_each',
+  // Transform
+  transform: 'transform_set', map: 'transform_set', merge: 'transform_merge',
+  json: 'json_parse', parse: 'json_parse',
+  // AI
+  summarize: 'ai_summarize', summary: 'ai_summarize', 'ai summary': 'ai_summarize',
+  classify: 'ai_classify', sentiment: 'ai_classify',
+  openai: 'openai_chat', 'gpt': 'openai_chat', claude: 'anthropic_chat',
+  // CRM
+  hubspot: 'hubspot_contact', crm: 'hubspot_contact', lead: 'hubspot_contact',
+  notion: 'notion_page',
+  jira: 'jira_create', ticket: 'jira_create',
+  // HTTP
+  http: 'http_request', api: 'http_request', rest: 'rest_get',
+  // Files
+  csv: 'csv_parse', pdf: 'pdf_extract',
+  // Cloud
+  s3: 'aws_s3_upload', aws: 'aws_s3_upload',
+  github: 'github_create_pr',
+  // Payments
+  stripe: 'stripe_payment_intent', payment: 'stripe_payment_intent',
+  // Utilities
+  log: 'console_log', logging: 'console_log', debug: 'console_log',
+  approval: 'wait_approval', approve: 'wait_approval',
+  code: 'code_execute', script: 'code_execute',
+};
+
+function inferNodeTypeFromText(text) {
+  const t = text.toLowerCase().trim();
+  for (const [key, type] of Object.entries(NODE_TYPE_MAP)) {
+    if (t.includes(key)) return type;
+  }
+  const top = retrieveNodes(text, 3).filter(n => !n.cat.includes('TRIGGERS'));
+  return top[0]?.type || 'transform_set';
+}
+
+function getLabelForNodeType(type) {
+  const node = NODE_INDEX.find(n => n.type === type);
+  if (node) return node.desc;
+  return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function findNodeByHint(nodes, hint) {
+  if (!hint) return null;
+  const h = hint.toLowerCase().replace(/\s+node\s*$/, '').trim();
+  return nodes.find(n => {
+    const label = (n.data?.label || '').toLowerCase();
+    const type  = (n.data?.type  || '').toLowerCase();
+    return label.includes(h) || type.includes(h) ||
+      h.split(' ').some(word => word.length > 2 && (label.includes(word) || type.includes(word)));
+  }) || null;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  WORKFLOW HEALTH ANALYSIS
+// ════════════════════════════════════════════════════════════════════════════
+
+function analyzeWorkflowHealth(nodes, edges) {
+  if (!nodes.length) {
+    return { score: 0, grade: 'F', issues: [{ type: 'error', msg: 'Workflow is empty — add nodes to get started' }], tips: [] };
+  }
+
+  let score = 100;
+  const issues = [];
+  const tips   = [];
+  const types  = nodes.map(n => (n.data?.type || '').toLowerCase());
+  const { unreachable, maxDepth } = analyzeGraphDFS(nodes, edges);
+
+  // No trigger
+  if (!types.some(t => t.includes('trigger'))) {
+    score -= 25;
+    issues.push({ type: 'error', msg: 'No trigger node — the workflow cannot start automatically' });
+  }
+
+  // Only one node
+  if (nodes.length === 1) {
+    score -= 15;
+    issues.push({ type: 'warning', msg: 'Only one node — no action is connected after the trigger' });
+  }
+
+  // Disconnected nodes
+  if (unreachable.length > 0) {
+    score -= unreachable.length * 12;
+    const label = nodes.find(n => n.id === unreachable[0])?.data?.label || unreachable[0];
+    issues.push({ type: 'error', msg: `${unreachable.length} disconnected node(s) — starting with "${label}"` });
+  }
+
+  // No error handling
+  if (!types.some(t => t === 'error_handler') && nodes.length > 2) {
+    score -= 10;
+    tips.push('Add an Error Handler node to catch and retry failed steps');
+  }
+
+  // No logging
+  if (!types.some(t => t === 'console_log') && nodes.length > 3) {
+    score -= 5;
+    tips.push('Add a Log node to monitor execution state for debugging');
+  }
+
+  // HTTP without transform
+  const hasHttp = types.some(t => t.includes('http') || t.startsWith('rest_'));
+  const hasTransform = types.some(t => t.includes('transform') || t === 'json_parse');
+  if (hasHttp && !hasTransform) {
+    score -= 5;
+    tips.push('HTTP responses need a Transform node to map fields before next steps');
+  }
+
+  // Deep chain without branching
+  if (maxDepth > 5 && !types.some(t => t === 'logic_if' || t === 'logic_switch')) {
+    score -= 5;
+    tips.push('Long linear chains benefit from a Logic If node to handle edge cases');
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F';
+
+  return { score, grade, issues, tips };
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  WORKFLOW SIMULATION
+// ════════════════════════════════════════════════════════════════════════════
+
+function simulateWorkflowExecution(nodes, edges) {
+  if (!nodes.length) return ['No nodes in workflow — add nodes to simulate'];
+  const path = aStarShortestPath(nodes, edges);
+  if (!path.length) return ['No executable path found'];
+  return path.map((node, i) => {
+    const label = node.data?.label || node.data?.type || `Step ${i + 1}`;
+    return i === 0 ? `▶ ${label}` : `  ↓ ${label}`;
+  });
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  WORKFLOW EDITOR (natural language → graph mutations)
+// ════════════════════════════════════════════════════════════════════════════
+
+function editWorkflowByInstruction(message, nodes, edges) {
+  const lower = message.toLowerCase();
+  let newNodes = [...nodes];
+  let newEdges = [...edges];
+  const changes = [];
+
+  const ts = () => Date.now() + Math.random();
+
+  // ── ADD AT END ───────────────────────────────────────────────────────────
+  const atEndMatch = lower.match(/add\s+(?:a\s+|an\s+)?(.+?)\s+(?:node\s+)?(?:at the end|to the end|at the bottom|to the workflow)\s*$/);
+  if (atEndMatch) {
+    const nodeType = inferNodeTypeFromText(atEndMatch[1]);
+    const label    = getLabelForNodeType(nodeType);
+    const id       = `${nodeType}-${ts()}`;
+    const lastX    = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+    const terminal = nodes.find(n => !edges.some(e => e.source === n.id));
+    newNodes = [...newNodes, makeNode(id, lastX + 290, 220, label, nodeType, {})];
+    if (terminal) newEdges = [...newEdges, makeEdge(`e-${id}`, terminal.id, id)];
+    changes.push(`Added "${label}" at the end`);
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── ADD AFTER ────────────────────────────────────────────────────────────
+  const addAfterMatch = lower.match(/add\s+(?:a\s+|an\s+)?(.+?)\s+(?:node\s+)?after\s+(?:the\s+)?(.+?)(?:\s+node)?\s*$/);
+  if (addAfterMatch) {
+    const nodeType   = inferNodeTypeFromText(addAfterMatch[1]);
+    const label      = getLabelForNodeType(nodeType);
+    const id         = `${nodeType}-${ts()}`;
+    const targetNode = findNodeByHint(nodes, addAfterMatch[2]);
+    if (targetNode) {
+      const fromTarget = newEdges.filter(e => e.source === targetNode.id);
+      newNodes = [...newNodes, makeNode(id, targetNode.position.x + 290, targetNode.position.y, label, nodeType, {})];
+      newEdges = [
+        ...newEdges.filter(e => e.source !== targetNode.id),
+        makeEdge(`e-${id}-in`, targetNode.id, id),
+        ...fromTarget.map(e => makeEdge(`e-${id}-out-${e.target}`, id, e.target)),
+      ];
+      changes.push(`Inserted "${label}" after "${targetNode.data?.label}"`);
+    } else {
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      newNodes = [...newNodes, makeNode(id, lastX + 290, 220, label, nodeType, {})];
+      changes.push(`Added "${label}" to the workflow`);
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── ADD BEFORE ───────────────────────────────────────────────────────────
+  const addBeforeMatch = lower.match(/add\s+(?:a\s+|an\s+)?(.+?)\s+(?:node\s+)?before\s+(?:the\s+)?(.+?)(?:\s+node)?\s*$/);
+  if (addBeforeMatch) {
+    const nodeType   = inferNodeTypeFromText(addBeforeMatch[1]);
+    const label      = getLabelForNodeType(nodeType);
+    const id         = `${nodeType}-${ts()}`;
+    const targetNode = findNodeByHint(nodes, addBeforeMatch[2]);
+    if (targetNode) {
+      const toTarget = newEdges.filter(e => e.target === targetNode.id);
+      newNodes = [...newNodes, makeNode(id, targetNode.position.x - 290, targetNode.position.y, label, nodeType, {})];
+      newEdges = [
+        ...newEdges.filter(e => e.target !== targetNode.id),
+        makeEdge(`e-${id}-out`, id, targetNode.id),
+        ...toTarget.map(e => makeEdge(`e-${id}-in-${e.source}`, e.source, id)),
+      ];
+      changes.push(`Inserted "${label}" before "${targetNode.data?.label}"`);
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── REPLACE ──────────────────────────────────────────────────────────────
+  const replaceMatch = lower.match(/replace\s+(?:the\s+)?(.+?)\s+(?:node\s+)?with\s+(?:a\s+|an\s+)?(.+?)(?:\s+node)?\s*$/);
+  if (replaceMatch) {
+    const targetNode = findNodeByHint(nodes, replaceMatch[1]);
+    const nodeType   = inferNodeTypeFromText(replaceMatch[2]);
+    const label      = getLabelForNodeType(nodeType);
+    if (targetNode) {
+      newNodes = newNodes.map(n =>
+        n.id === targetNode.id ? { ...n, data: { ...n.data, label, type: nodeType, config: {} } } : n
+      );
+      changes.push(`Replaced "${targetNode.data?.label}" with "${label}"`);
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── ADD ERROR HANDLING ───────────────────────────────────────────────────
+  if (/add\s+error\s+(?:handling|handler)|add\s+retry(?:\s+logic)?/.test(lower)) {
+    if (!nodes.some(n => n.data?.type === 'error_handler')) {
+      const id      = `error_handler-${ts()}`;
+      const lastX   = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      const lastY   = 420;
+      const terminal = nodes.find(n => !edges.some(e => e.source === n.id));
+      newNodes = [...newNodes, makeNode(id, lastX, lastY, 'Error Handler', 'error_handler', { retries: 2 })];
+      if (terminal) newEdges = [...newEdges, makeEdge(`e-${id}`, terminal.id, id)];
+      changes.push('Added Error Handler node with auto-retry');
+    } else {
+      changes.push('Error Handler already exists in the workflow');
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── ADD AI SUMMARY ───────────────────────────────────────────────────────
+  if (/add\s+(?:ai\s+)?summar(?:y|ize|ization)|add\s+ai\s+step/.test(lower)) {
+    const id     = `ai_summarize-${ts()}`;
+    const msgNode = nodes.find(n => ['slack_send', 'email_send', 'discord_send', 'google_gmail_send'].includes(n.data?.type));
+    if (msgNode) {
+      const toMsg = newEdges.filter(e => e.target === msgNode.id);
+      newNodes = [...newNodes, makeNode(id, msgNode.position.x - 290, msgNode.position.y, 'Summarize with AI', 'ai_summarize', { input: '{{input}}' })];
+      newEdges = [
+        ...newEdges.filter(e => e.target !== msgNode.id),
+        makeEdge(`e-${id}-out`, id, msgNode.id),
+        ...toMsg.map(e => makeEdge(`e-${id}-in-${e.source}`, e.source, id)),
+      ];
+      changes.push('Inserted AI Summarize before the notification step');
+    } else {
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      newNodes = [...newNodes, makeNode(id, lastX + 290, 220, 'Summarize with AI', 'ai_summarize', { input: '{{input}}' })];
+      changes.push('Added AI Summarize node');
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── CHANGE TRIGGER FREQUENCY ─────────────────────────────────────────────
+  const freqMatch = lower.match(/change\s+(?:it\s+|trigger\s+)?to\s+(daily|weekly|hourly|monthly)/);
+  if (freqMatch) {
+    const freq  = freqMatch[1];
+    const exprs = { daily: '0 9 * * *', weekly: '0 9 * * 1', hourly: '0 * * * *', monthly: '0 9 1 * *' };
+    const trig  = nodes.find(n => n.data?.type?.includes('trigger'));
+    if (trig) {
+      newNodes = newNodes.map(n =>
+        n.id === trig.id
+          ? { ...n, data: { ...n.data, label: `${freq.charAt(0).toUpperCase() + freq.slice(1)} Schedule`, type: 'trigger_cron', config: { expression: exprs[freq] } } }
+          : n
+      );
+      changes.push(`Changed trigger to ${freq} schedule (${exprs[freq]})`);
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  // ── REMOVE / DELETE node ─────────────────────────────────────────────────
+  const removeMatch = lower.match(/(?:remove|delete)\s+(?:the\s+)?(.+?)(?:\s+node)?\s*$/);
+  if (removeMatch) {
+    const targetNode = findNodeByHint(nodes, removeMatch[1]);
+    if (targetNode) {
+      newNodes = newNodes.filter(n => n.id !== targetNode.id);
+      newEdges = newEdges.filter(e => e.source !== targetNode.id && e.target !== targetNode.id);
+      changes.push(`Removed "${targetNode.data?.label}"`);
+    }
+    return { nodes: newNodes, edges: newEdges, changes };
+  }
+
+  return { nodes: newNodes, edges: newEdges, changes };
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NODE CONFIG UPDATER (natural language → config patches)
+// ════════════════════════════════════════════════════════════════════════════
+
+function updateNodeByInstruction(message, nodes, edges) {
+  const lower = message.toLowerCase();
+  let newNodes = [...nodes];
+  const changes = [];
+
+  const findByType = (...typeHints) => nodes.find(n =>
+    typeHints.some(h => (n.data?.type || '').includes(h) || (n.data?.label || '').toLowerCase().includes(h))
+  ) || null;
+
+  // Delay
+  const delayMatch = lower.match(/(?:change|set)\s+delay\s+to\s+(\d+)\s*(second|minute|hour|day)s?/);
+  if (delayMatch) {
+    const node = findByType('delay');
+    if (node) {
+      const duration = `${delayMatch[1]} ${delayMatch[2]}${parseInt(delayMatch[1]) > 1 ? 's' : ''}`;
+      newNodes = newNodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: { ...n.data.config, duration } } } : n);
+      changes.push(`Set delay to ${duration}`);
+    }
+  }
+
+  // Email subject
+  const subjectMatch = lower.match(/(?:change|set)\s+(?:email\s+)?subject\s+to\s+["']?(.+?)["']?$/);
+  if (subjectMatch) {
+    const node = findByType('email', 'gmail');
+    if (node) {
+      newNodes = newNodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: { ...n.data.config, subject: subjectMatch[1] } } } : n);
+      changes.push(`Updated email subject to "${subjectMatch[1]}"`);
+    }
+  }
+
+  // Slack channel
+  const channelMatch = lower.match(/(?:change|set)\s+(?:slack\s+)?channel\s+to\s+([#\w-]+)/);
+  if (channelMatch) {
+    const node = findByType('slack');
+    if (node) {
+      const channel = channelMatch[1].startsWith('#') ? channelMatch[1] : `#${channelMatch[1]}`;
+      newNodes = newNodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: { ...n.data.config, channel } } } : n);
+      changes.push(`Updated Slack channel to ${channel}`);
+    }
+  }
+
+  // Schedule expression
+  const schedMatch = lower.match(/(?:change|set)\s+schedule\s+to\s+(daily|weekly|hourly|monthly)/);
+  if (schedMatch) {
+    const node = nodes.find(n => n.data?.type === 'trigger_cron');
+    if (node) {
+      const exprs = { daily: '0 9 * * *', weekly: '0 9 * * 1', hourly: '0 * * * *', monthly: '0 9 1 * *' };
+      newNodes = newNodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: { ...n.data.config, expression: exprs[schedMatch[1]] } } } : n);
+      changes.push(`Updated schedule to ${schedMatch[1]}`);
+    }
+  }
+
+  // Rename
+  const renameMatch = lower.match(/rename\s+(?:it|the\s+\w+\s+node|node)\s+to\s+["']?(.+?)["']?$/);
+  if (renameMatch) {
+    const last = nodes[nodes.length - 1];
+    if (last) {
+      newNodes = newNodes.map(n => n.id === last.id ? { ...n, data: { ...n.data, label: renameMatch[1] } } : n);
+      changes.push(`Renamed node to "${renameMatch[1]}"`);
+    }
+  }
+
+  return { nodes: newNodes, edges, changes };
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CONTEXTUAL SUGGESTIONS
+// ════════════════════════════════════════════════════════════════════════════
+
+function getContextualSuggestions(intent, nodes) {
+  const types = nodes.map(n => (n.data?.type || '').toLowerCase());
+
+  if (!nodes.length) {
+    return [
+      'When email arrives, send a Slack notification',
+      'Daily sales report emailed to the team',
+      'When form is submitted, create a HubSpot lead',
+      'When Stripe payment received, send invoice email',
+    ];
+  }
+
+  const base = [];
+  if (!types.some(t => t === 'error_handler'))                  base.push('Add error handling');
+  if (!types.some(t => t === 'console_log') && nodes.length > 2) base.push('Add logging');
+  if (!types.some(t => t.includes('ai_')))                      base.push('Add AI summary step');
+  base.push('Show workflow health');
+  base.push('Simulate execution');
+
+  if (intent === 'health')    return ['Fix issues automatically', 'Add error handling', 'Simulate execution', 'Suggest improvements'];
+  if (intent === 'debug')     return ['Add error handler', 'Simulate execution', 'Show health score', 'Fix issues'];
+  if (intent === 'simulate')  return ['Analyze workflow health', 'Add error handling', 'Suggest improvements'];
+  if (intent === 'improve')   return ['Add error handling', 'Add logging', 'Add AI summary', 'Show health score'];
+
+  return base.slice(0, 4);
+}
 
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1783,10 +2228,12 @@ async function documentWorkflow(workflow) {
 }
 
 /**
- * workflowChat — conversational AI assistant with intent classification.
+ * workflowChat — Freckles AI copilot.
  *
- * Intent: generate → validates prompt first, then builds or asks clarification
- * Intent: add_node / remove_node / connect / clear / explain / help → direct graph ops
+ * Supports: generate, edit, config, debug, health, simulate, explain,
+ *           improve, clear, help, and natural-language graph edits.
+ *
+ * Returns: { reply, toolCalls, updatedWorkflow, suggestions, messageType, metadata }
  */
 async function workflowChat({ message, history, workflow }) {
   try {
@@ -1796,137 +2243,311 @@ async function workflowChat({ message, history, workflow }) {
     let updatedWorkflow = null;
     let reply           = '';
 
+    let updatedWorkflow = null;
+    let reply           = '';
+    let messageType     = 'message';
+    let suggestions     = [];
+    let metadata        = {};
+
     switch (intent) {
-      // ── GENERATE ───────────────────────────────────────────────────────
+
+      // ══════════════════════════════════════════════════════════════════
+      // GENERATE — build a new workflow from a natural language description
+      // ══════════════════════════════════════════════════════════════════
       case 'generate': {
         const validation = validateWorkflowPrompt(message);
 
-        // Safety / truly meaningless → reject only
         if (!validation.valid) {
           if (validation.reason.includes('unsafe')) {
-            reply = 'I cannot help with that — it involves potentially harmful operations.';
+            reply = "I can't help with that — it involves potentially harmful operations.";
           } else {
             const examples = (validation.suggestedClarification || []).slice(0, 3);
-            reply = [
-              'I need a clearer description of what you want to automate. Here are some examples:',
-              ...examples.map(e => `  • ${e}`),
-            ].join('\n');
+            reply = "I need a clearer description of what to automate. Here are some ideas:\n"
+              + examples.map(e => `  • ${e}`).join('\n');
           }
+          suggestions = getContextualSuggestions('generate', nodes);
           break;
         }
 
-        // MEDIUM or HIGH — always build a workflow
         let tpl;
-        try {
-          tpl = buildAutomationWorkflow(message);
-        } catch {
-          tpl = matchTemplate(message);
-        }
+        try { tpl = buildAutomationWorkflow(message); }
+        catch { tpl = matchTemplate(message); }
 
         const optimized = optimizeWorkflowGraph(tpl.graph.nodes, tpl.graph.edges);
         updatedWorkflow  = applyWorkflowTool({ nodes, edges }, 'set_workflow', optimized);
         const summary    = buildWorkflowSummary(message, optimized.nodes);
+        const explanation = buildWorkflowExplanation(optimized.nodes);
+
+        messageType = 'workflow_built';
+        metadata    = { summary, explanation, confidence: validation.confidence };
 
         if (validation.needsClarification) {
-          // MEDIUM: build + suggest refinements
-          const sampleSuggestions = (validation.suggestions || []).slice(0, 3);
-          reply = [
-            `Here's a best-guess workflow: ${summary}`,
-            '',
-            validation.clarification,
-            '',
-            'Or try one of these refined versions:',
-            ...sampleSuggestions.map((s, i) => `  ${i + 1}. ${s}`),
-          ].join('\n');
+          reply = `I built a best-guess workflow for you: ${summary}\n\n`
+            + `${validation.clarification}\n\n`
+            + `You can ask me to refine it, or try one of the suggestions below.`;
         } else {
-          // HIGH: clean build
-          reply = `Workflow created: ${summary}\n\nI built "${tpl.name}" with ${optimized.nodes.length} nodes. Click any node on the canvas to configure it.`;
+          reply = `Done! Here's what I built:\n\n${explanation.map(s => `  • ${s}`).join('\n')}\n\nClick any node to configure it.`;
         }
+        suggestions = getContextualSuggestions('generate', optimized.nodes);
         break;
       }
 
-      // ── CLEAR ──────────────────────────────────────────────────────────
-      case 'clear': {
-        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', { nodes: [], edges: [] });
-        reply = 'Canvas cleared. Ready for a fresh start — what would you like to build?';
-        break;
-      }
-
-      // ── ADD NODE ───────────────────────────────────────────────────────
-      case 'add_node': {
-        const nodeType = extractNodeType(message);
-        const nodeDef  = NODE_INDEX.find(n => n.type === nodeType);
-        const id       = `${nodeType}-${Date.now()}`;
-        const lastX    = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
-        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'add_node', {
-          id,
-          nodeType,
-          label:    nodeDef?.desc || nodeType,
-          position: { x: lastX + 280, y: 200 },
-          config:   {},
-        });
-        reply = `Added a "${nodeDef?.desc || nodeType}" node to the canvas.`;
-        break;
-      }
-
-      // ── REMOVE NODE ────────────────────────────────────────────────────
-      case 'remove_node': {
-        const candidate = nodes.find(n => {
-          const label = (n.data?.label || '').toLowerCase();
-          const type  = (n.data?.type  || '').toLowerCase();
-          return message.toLowerCase().split(/\W+/).some(w => w.length > 2 && (label.includes(w) || type.includes(w)));
-        });
-        if (candidate) {
-          updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'remove_node', { id: candidate.id });
-          reply = `Removed the "${candidate.data?.label}" node.`;
-        } else {
-          reply = `I couldn't find a matching node. Try something like "remove the transform node" or "delete the email step".`;
-        }
-        break;
-      }
-
-      // ── CONNECT ────────────────────────────────────────────────────────
-      case 'connect': {
-        if (nodes.length >= 2) {
-          const source = nodes[nodes.length - 2];
-          const target = nodes[nodes.length - 1];
-          updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'add_edge', { source: source.id, target: target.id });
-          reply = `Connected "${source.data?.label}" → "${target.data?.label}".`;
-        } else {
-          reply = `You need at least two nodes on the canvas to connect. Add some nodes first.`;
-        }
-        break;
-      }
-
-      // ── EXPLAIN ────────────────────────────────────────────────────────
-      case 'explain': {
+      // ══════════════════════════════════════════════════════════════════
+      // EDIT — natural-language graph mutations
+      // ══════════════════════════════════════════════════════════════════
+      case 'edit': {
         if (!nodes.length) {
-          reply = 'The canvas is empty. Describe what you want to automate and I\'ll build it.';
+          reply = "There's no workflow on the canvas yet. Describe what you want to automate and I'll build it first.";
+          suggestions = getContextualSuggestions('generate', nodes);
           break;
         }
-        const { maxDepth, unreachable } = analyzeGraphDFS(nodes, edges);
-        const types = [...new Set(nodes.map(n => n.data?.type || n.type))];
-        reply = `Your workflow has ${nodes.length} node${nodes.length !== 1 ? 's' : ''} and ${edges.length} connection${edges.length !== 1 ? 's' : ''}, `
-          + `spanning ${maxDepth + 1} step${maxDepth > 0 ? 's' : ''}. `
-          + `Node types: ${types.join(', ')}.`
-          + (unreachable.length ? ` ⚠️ ${unreachable.length} node(s) are disconnected.` : ' All nodes are connected.');
+
+        const { nodes: editedNodes, edges: editedEdges, changes } = editWorkflowByInstruction(message, nodes, edges);
+
+        if (changes.length) {
+          updatedWorkflow = applyWorkflowTool({ nodes: [], edges: [] }, 'set_workflow', {
+            nodes: editedNodes, edges: editedEdges,
+          });
+          messageType = 'workflow_edited';
+          metadata    = { changes };
+          reply = `Done! Here's what I changed:\n${changes.map(c => `  ✓ ${c}`).join('\n')}`;
+        } else {
+          reply = "I understood you want to edit the workflow, but I couldn't identify the exact change. Try:\n"
+            + "  • \"Add a delay after the slack node\"\n"
+            + "  • \"Replace gmail with outlook\"\n"
+            + "  • \"Add error handling\"\n"
+            + "  • \"Change trigger to daily\"";
+        }
+        suggestions = getContextualSuggestions('edit', editedNodes);
         break;
       }
 
-      // ── HELP ───────────────────────────────────────────────────────────
-      case 'help':
-        reply = CHAT_HELP_TEXT;
-        break;
+      // ══════════════════════════════════════════════════════════════════
+      // CONFIG — update individual node settings in plain English
+      // ══════════════════════════════════════════════════════════════════
+      case 'config': {
+        if (!nodes.length) {
+          reply = "No workflow to configure yet. Build one first and I'll help you tweak any node.";
+          break;
+        }
 
-      default:
-        reply = `I didn't quite understand that. ${CHAT_HELP_TEXT}`;
+        const { nodes: configNodes, changes: configChanges } = updateNodeByInstruction(message, nodes, edges);
+
+        if (configChanges.length) {
+          updatedWorkflow = applyWorkflowTool({ nodes: [], edges: [] }, 'set_workflow', {
+            nodes: configNodes, edges,
+          });
+          messageType = 'workflow_edited';
+          metadata    = { changes: configChanges };
+          reply = `Updated!\n${configChanges.map(c => `  ✓ ${c}`).join('\n')}`;
+        } else {
+          reply = "I understand you want to configure a node, but I need more detail. Try:\n"
+            + "  • \"Set delay to 5 minutes\"\n"
+            + "  • \"Change email subject to 'Order confirmed'\"\n"
+            + "  • \"Change Slack channel to #alerts\"\n"
+            + "  • \"Rename node to 'Daily Digest'\"";
+        }
+        suggestions = getContextualSuggestions('edit', nodes);
         break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // DEBUG — find workflow issues and suggest fixes
+      // ══════════════════════════════════════════════════════════════════
+      case 'debug': {
+        if (!nodes.length) {
+          reply = "The canvas is empty — nothing to debug. Build a workflow first and I'll check it for issues.";
+          break;
+        }
+
+        const health = analyzeWorkflowHealth(nodes, edges);
+        messageType  = 'debug';
+        metadata     = { health, issues: health.issues };
+
+        if (!health.issues.length) {
+          reply = `No critical issues found! Your workflow scored ${health.score}/100 (Grade: ${health.grade}).\n\n`
+            + (health.tips.length
+              ? `Improvement tips:\n${health.tips.map(t => `  💡 ${t}`).join('\n')}`
+              : 'Looks solid — great work!');
+        } else {
+          reply = `I found ${health.issues.length} issue${health.issues.length > 1 ? 's' : ''} in your workflow:\n\n`
+            + health.issues.map((iss, i) => `  ${i + 1}. ${iss.type === 'error' ? '🔴' : '🟡'} ${iss.msg}`).join('\n');
+          if (health.tips.length) {
+            reply += `\n\nAlso worth noting:\n${health.tips.map(t => `  💡 ${t}`).join('\n')}`;
+          }
+        }
+        suggestions = getContextualSuggestions('debug', nodes);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // HEALTH — workflow quality score
+      // ══════════════════════════════════════════════════════════════════
+      case 'health': {
+        if (!nodes.length) {
+          reply = "The canvas is empty — build a workflow first and I'll score it.";
+          break;
+        }
+
+        const health = analyzeWorkflowHealth(nodes, edges);
+        messageType  = 'health';
+        metadata     = { health };
+
+        const bar = '█'.repeat(Math.floor(health.score / 10)) + '░'.repeat(10 - Math.floor(health.score / 10));
+        reply = `Workflow Health: ${health.score}/100  [${bar}]  Grade: ${health.grade}\n\n`;
+
+        if (health.issues.length) {
+          reply += `Issues found:\n${health.issues.map(i => `  ${i.type === 'error' ? '🔴' : '🟡'} ${i.msg}`).join('\n')}\n\n`;
+        }
+        if (health.tips.length) {
+          reply += `Suggestions:\n${health.tips.map(t => `  💡 ${t}`).join('\n')}`;
+        }
+        if (!health.issues.length && !health.tips.length) {
+          reply += 'Excellent! No issues detected.';
+        }
+        suggestions = getContextualSuggestions('health', nodes);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // SIMULATE — trace the execution path step-by-step
+      // ══════════════════════════════════════════════════════════════════
+      case 'simulate': {
+        if (!nodes.length) {
+          reply = "Nothing to simulate — build a workflow first.";
+          break;
+        }
+
+        const steps = simulateWorkflowExecution(nodes, edges);
+        messageType = 'simulation';
+        metadata    = { simulation: steps };
+        reply = `Execution preview:\n\n${steps.join('\n')}`;
+        suggestions = getContextualSuggestions('simulate', nodes);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // EXPLAIN — describe what the current workflow does
+      // ══════════════════════════════════════════════════════════════════
+      case 'explain': {
+        if (!nodes.length) {
+          reply = "The canvas is empty. Tell me what you want to automate and I'll build and explain it.";
+          break;
+        }
+
+        const explanation = buildWorkflowExplanation(nodes);
+        const { maxDepth, unreachable } = analyzeGraphDFS(nodes, edges);
+        const trigger = nodes.find(n => (n.data?.type || '').includes('trigger'));
+
+        reply = `Your workflow has ${nodes.length} node${nodes.length !== 1 ? 's' : ''} across ${maxDepth + 1} step${maxDepth !== 0 ? 's' : ''}:\n\n`
+          + explanation.map(s => `  • ${s}`).join('\n');
+
+        if (trigger) reply += `\n\nIt starts when: ${trigger.data?.label || trigger.data?.type}`;
+        if (unreachable.length) reply += `\n\n⚠️ ${unreachable.length} node(s) are disconnected — connect or remove them.`;
+
+        suggestions = getContextualSuggestions('explain', nodes);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // IMPROVE — smart suggestions for a better workflow
+      // ══════════════════════════════════════════════════════════════════
+      case 'improve': {
+        if (!nodes.length) {
+          reply = "Build a workflow first and I'll suggest how to improve it.";
+          break;
+        }
+
+        const health = analyzeWorkflowHealth(nodes, edges);
+        const allTips = [...health.tips];
+        const types = nodes.map(n => (n.data?.type || '').toLowerCase());
+
+        if (!types.some(t => t === 'error_handler'))   allTips.push('Add an Error Handler node to catch failures');
+        if (!types.some(t => t.includes('ai_')))       allTips.push('Add an AI Summarize step before notifications');
+        if (!types.some(t => t === 'console_log'))     allTips.push('Add logging nodes to monitor execution');
+        if (!types.some(t => t === 'delay'))           allTips.push('Add a Delay node to avoid rate-limit issues');
+        if (!types.some(t => t === 'logic_if'))        allTips.push('Add a condition branch for smarter routing');
+
+        if (allTips.length) {
+          reply = `Here are my suggestions to improve your workflow:\n\n`
+            + allTips.slice(0, 5).map((t, i) => `  ${i + 1}. 💡 ${t}`).join('\n')
+            + '\n\nJust tell me which one to apply and I\'ll do it!';
+        } else {
+          reply = 'Your workflow is already well-structured! No critical improvements needed.';
+        }
+        suggestions = allTips.slice(0, 4);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // CLEAR
+      // ══════════════════════════════════════════════════════════════════
+      case 'clear': {
+        updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', { nodes: [], edges: [] });
+        reply = "Canvas cleared! What would you like to build? I can help you create any automation workflow.";
+        messageType = 'message';
+        suggestions = getContextualSuggestions('generate', []);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // HELP
+      // ══════════════════════════════════════════════════════════════════
+      case 'help': {
+        reply = [
+          "I'm Freckles, your AI workflow copilot. Here's what I can do:\n",
+          "  🏗  Build workflows   — \"When a form is submitted, create a HubSpot lead\"",
+          "  ✏️  Edit workflows    — \"Add a delay after the Slack node\"",
+          "  🔧  Configure nodes  — \"Set delay to 5 minutes\" / \"Change channel to #alerts\"",
+          "  🔍  Debug issues     — \"Check for issues\" / \"Fix my workflow\"",
+          "  📊  Health score     — \"Analyze workflow health\" / \"Rate my workflow\"",
+          "  ▶️  Simulate         — \"Show me the execution flow\"",
+          "  💡  Suggest ideas    — \"How can I improve this workflow?\"",
+          "  📖  Explain          — \"What does my workflow do?\"",
+          "\nJust describe what you need in plain English!",
+        ].join('\n');
+        suggestions = getContextualSuggestions('generate', nodes);
+        break;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // UNKNOWN — try to be helpful rather than give up
+      // ══════════════════════════════════════════════════════════════════
+      default: {
+        // Last resort: check if it looks like a workflow description
+        const validation = validateWorkflowPrompt(message);
+        if (validation.valid) {
+          // Treat as generate
+          let tpl;
+          try { tpl = buildAutomationWorkflow(message); }
+          catch { tpl = matchTemplate(message); }
+          const optimized = optimizeWorkflowGraph(tpl.graph.nodes, tpl.graph.edges);
+          updatedWorkflow  = applyWorkflowTool({ nodes, edges }, 'set_workflow', optimized);
+          const summary    = buildWorkflowSummary(message, optimized.nodes);
+          messageType = 'workflow_built';
+          reply = `I detected a workflow request. Here's what I built: ${summary}`;
+          metadata    = { summary };
+        } else {
+          reply = "I didn't quite catch that. I can help you:\n"
+            + "  • Build a workflow — describe what to automate\n"
+            + "  • Edit nodes — \"add a delay after slack\"\n"
+            + "  • Debug issues — \"check for problems\"\n"
+            + "  • Analyze health — \"show workflow score\"\n"
+            + "  • Simulate — \"show execution steps\"\n\n"
+            + "Type \"help\" to see all commands.";
+        }
+        suggestions = getContextualSuggestions(intent, nodes);
+        break;
+      }
     }
 
     return {
       reply,
       toolCalls:       updatedWorkflow ? [{ name: intent }] : [],
       updatedWorkflow,
+      messageType,
+      suggestions,
+      metadata,
     };
   } catch (err) {
     logger.error('[intelligence] workflowChat error:', err);
@@ -1934,6 +2555,9 @@ async function workflowChat({ message, history, workflow }) {
       reply:           'Something went wrong. Please try again.',
       toolCalls:       [],
       updatedWorkflow: null,
+      messageType:     'message',
+      suggestions:     [],
+      metadata:        {},
     };
   }
 }
@@ -1947,4 +2571,6 @@ module.exports = {
   documentWorkflow,
   workflowChat,
   validateWorkflowPrompt,
+  analyzeWorkflowHealth,
+  simulateWorkflowExecution,
 };
