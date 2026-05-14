@@ -13,7 +13,7 @@ services:
       - sqldata:/var/opt/mssql
       - ./backend/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Flowa_Secret_2026! -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Flowa_Secret_2026! -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -95,6 +95,8 @@ services:
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
       VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:4000/ws}
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:4000}
+      VITE_WS_PROXY_TARGET: ${VITE_WS_PROXY_TARGET:-ws://backend:4000}
     depends_on:
       - backend
     volumes:
