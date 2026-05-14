@@ -1,352 +1,674 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import {
-  User,
-  Lock,
-  Bell,
-  Palette,
-  Eye,
-  EyeOff,
-  Save,
-  Shield,
-  Mail,
-  Sun,
-  Moon,
-  Monitor,
+  User, Lock, Bell, Palette, Eye, EyeOff, Save, Shield,
+  Mail, Sun, Moon, Monitor, CheckCircle2, AlertCircle,
+  AlertTriangle, Loader2, Info, Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../store';
 import { useTheme, useAccentTheme, type Theme } from '../hooks/useTheme';
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
 type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
 
-const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'security', label: 'Security', icon: Lock },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
+const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: string }[] = [
+  { id: 'profile',       label: 'Profile',       icon: User },
+  { id: 'security',      label: 'Security',       icon: Lock },
+  { id: 'notifications', label: 'Notifications',  icon: Bell },
+  { id: 'appearance',    label: 'Appearance',     icon: Palette },
 ];
+
+// ── Password strength ──────────────────────────────────────────────────────
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string; bg: string } {
+  if (!pw) return { score: 0, label: '', color: '', bg: '' };
+  let score = 0;
+  if (pw.length >= 8)               score++;
+  if (pw.length >= 12)              score++;
+  if (/[A-Z]/.test(pw))             score++;
+  if (/[0-9]/.test(pw))             score++;
+  if (/[^A-Za-z0-9]/.test(pw))     score++;
+  const levels = [
+    { label: 'Very weak',   color: 'text-red-400',    bg: 'bg-red-500' },
+    { label: 'Weak',        color: 'text-orange-400', bg: 'bg-orange-500' },
+    { label: 'Fair',        color: 'text-yellow-400', bg: 'bg-yellow-400' },
+    { label: 'Strong',      color: 'text-green-400',  bg: 'bg-green-500' },
+    { label: 'Very strong', color: 'text-emerald-400',bg: 'bg-emerald-500' },
+  ];
+  return { score, ...levels[Math.min(score, 4)] };
+}
+
+// ── Field error helper ─────────────────────────────────────────────────────
+
+function FieldError({ msg }: { msg: string }) {
+  if (!msg) return null;
+  return (
+    <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-400">
+      <AlertCircle size={12} /> {msg}
+    </p>
+  );
+}
+
+// ── Inline saved indicator ─────────────────────────────────────────────────
+
+function SavedBadge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-400 animate-fade-in">
+      <CheckCircle2 size={12} /> Saved
+    </span>
+  );
+}
+
+// ── Info box ───────────────────────────────────────────────────────────────
+
+function InfoBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3.5 py-3 text-xs text-blue-300">
+      <Info size={14} className="shrink-0 mt-0.5" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+// ── Section divider ────────────────────────────────────────────────────────
+
+function SectionDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="text-xs font-bold uppercase tracking-widest text-foreground-muted/60">{label}</span>
+      <div className="flex-1 h-px bg-surface-border" />
+    </div>
+  );
+}
+
+// ── Toggle item ────────────────────────────────────────────────────────────
+
+function ToggleItem({
+  label, description, checked, onChange, disabled,
+}: {
+  label: string; description: string; checked: boolean;
+  onChange: (v: boolean) => void; disabled?: boolean;
+}) {
+  return (
+    <div className={`flex items-start justify-between gap-4 py-1 ${disabled ? 'opacity-50' : ''}`}>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-foreground-muted mt-0.5 leading-relaxed">{description}</p>
+      </div>
+      <button
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card ${
+          checked ? 'bg-brand-500' : 'bg-surface-border'
+        } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`} />
+      </button>
+    </div>
+  );
+}
+
+// ── Avatar ─────────────────────────────────────────────────────────────────
+
+function Avatar({ name, size = 16 }: { name: string; size?: number }) {
+  const hue = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+  return (
+    <div
+      className="flex items-center justify-center rounded-full text-white font-bold uppercase select-none shadow-lg"
+      style={{
+        width: size, height: size, fontSize: size * 0.38,
+        background: `linear-gradient(135deg, hsl(${hue},70%,55%), hsl(${(hue + 40) % 360},70%,45%))`,
+      }}
+    >
+      {name.trim().charAt(0) || 'U'}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  SETTINGS PAGE
+// ══════════════════════════════════════════════════════════════════════════
 
 export default function SettingsPage() {
   const { user } = useStore();
-  const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const [activeTab, setActiveTab]   = useState<Tab>('profile');
 
-  // Profile form
-  const [name, setName] = useState(user?.name || '');
-  const [email] = useState(user?.email || '');
+  // ── Profile ─────────────────────────────────────────────────────────────
+  const [name, setName]             = useState(user?.name || '');
+  const [email]                     = useState(user?.email || '');
+  const [nameError, setNameError]   = useState('');
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved]   = useState(false);
 
-  // Security form
-  const [currentPw, setCurrentPw] = useState('');
-  const [newPw, setNewPw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
-  const [showCurrentPw, setShowCurrentPw] = useState(false);
-  const [showNewPw, setShowNewPw] = useState(false);
+  useEffect(() => {
+    setProfileDirty(name !== (user?.name || ''));
+    setProfileSaved(false);
+  }, [name, user?.name]);
 
-  // Notification prefs
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [failureAlerts, setFailureAlerts] = useState(true);
-  const [weeklyDigest, setWeeklyDigest] = useState(false);
-
-  // Appearance
-  const { theme, setTheme } = useTheme();
-  const { accentTheme, setAccentTheme, accentPalettes } = useAccentTheme();
-
-  const handleProfileSave = (e: FormEvent) => {
+  const handleProfileSave = async (e: FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) { setNameError('Name cannot be empty'); return; }
+    if (name.trim().length < 2) { setNameError('Name must be at least 2 characters'); return; }
+    setNameError('');
+    setProfileSaving(true);
+    await new Promise(r => setTimeout(r, 600)); // Simulate API
+    setProfileSaving(false);
+    setProfileSaved(true);
+    setProfileDirty(false);
     toast.success('Profile updated');
   };
 
-  const handlePasswordChange = (e: FormEvent) => {
-    e.preventDefault();
-    if (!currentPw || !newPw) return toast.error('Fill in all fields');
-    if (newPw.length < 6) return toast.error('Password must be at least 6 characters');
-    if (newPw !== confirmPw) return toast.error('Passwords do not match');
-    toast.success('Password changed');
-    setCurrentPw('');
-    setNewPw('');
-    setConfirmPw('');
+  // ── Security ─────────────────────────────────────────────────────────────
+  const [currentPw, setCurrentPw]     = useState('');
+  const [newPw, setNewPw]             = useState('');
+  const [confirmPw, setConfirmPw]     = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw]         = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [pwErrors, setPwErrors]           = useState({ current: '', newPw: '', confirm: '' });
+  const [pwSaving, setPwSaving]           = useState(false);
+  const [pwSaved, setPwSaved]             = useState(false);
+  const strength                          = getPasswordStrength(newPw);
+
+  const validatePwForm = () => {
+    const errs = { current: '', newPw: '', confirm: '' };
+    if (!currentPw) errs.current = 'Current password is required';
+    if (!newPw) errs.newPw = 'New password is required';
+    else if (newPw.length < 8) errs.newPw = 'Password must be at least 8 characters';
+    else if (strength.score < 2) errs.newPw = 'Password is too weak — add uppercase, numbers or symbols';
+    if (!confirmPw) errs.confirm = 'Please confirm your new password';
+    else if (newPw !== confirmPw) errs.confirm = 'Passwords do not match';
+    return errs;
   };
 
-  const handleNotifSave = () => {
+  const handlePasswordChange = async (e: FormEvent) => {
+    e.preventDefault();
+    const errs = validatePwForm();
+    setPwErrors(errs);
+    if (Object.values(errs).some(Boolean)) return;
+    setPwSaving(true);
+    await new Promise(r => setTimeout(r, 700));
+    setPwSaving(false);
+    setPwSaved(true);
+    setCurrentPw(''); setNewPw(''); setConfirmPw('');
+    setTimeout(() => setPwSaved(false), 3000);
+    toast.success('Password changed successfully');
+  };
+
+  // Clear individual errors on input
+  const handlePwInput = (field: keyof typeof pwErrors, val: string) => {
+    setPwErrors(prev => ({ ...prev, [field]: '' }));
+    if (field === 'current') setCurrentPw(val);
+    if (field === 'newPw')   { setNewPw(val); setPwSaved(false); }
+    if (field === 'confirm') setConfirmPw(val);
+  };
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  const [emailNotif, setEmailNotif]       = useState(true);
+  const [failureAlerts, setFailureAlerts] = useState(true);
+  const [weeklyDigest, setWeeklyDigest]   = useState(false);
+  const [notifSaved, setNotifSaved]       = useState(false);
+  const [notifSaving, setNotifSaving]     = useState(false);
+
+  const handleNotifSave = async () => {
+    setNotifSaving(true);
+    await new Promise(r => setTimeout(r, 500));
+    setNotifSaving(false);
+    setNotifSaved(true);
+    setTimeout(() => setNotifSaved(false), 3000);
     toast.success('Notification preferences saved');
+  };
+
+  // ── Appearance ────────────────────────────────────────────────────────────
+  const { theme, setTheme }                               = useTheme();
+  const { accentTheme, setAccentTheme, accentPalettes }   = useAccentTheme();
+  const [appearanceSaved, setAppearanceSaved]             = useState(false);
+
+  const handleAppearanceChange = (fn: () => void) => {
+    fn();
+    setAppearanceSaved(true);
+    setTimeout(() => setAppearanceSaved(false), 2000);
   };
 
   return (
     <div className="min-h-screen">
+
+      {/* ── Header ── */}
       <header className="border-b border-surface-border px-8 py-6">
-        <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-foreground-muted mt-1">Manage your account and preferences</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
+            <p className="text-sm text-foreground-muted mt-0.5">Manage your account, security, and preferences</p>
+          </div>
+          {/* Unsaved changes badge */}
+          {profileDirty && (
+            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-1.5 text-xs font-semibold text-yellow-400 animate-fade-in">
+              <AlertTriangle size={13} /> Unsaved changes
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="flex max-w-5xl mx-auto px-8 py-8 gap-8">
-        <nav className="w-52 shrink-0 space-y-1">
+
+        {/* ── Sidebar nav ── */}
+        <nav className="w-52 shrink-0 space-y-0.5">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              className={`flex items-center gap-3 w-full px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 activeTab === tab.id
-                  ? 'bg-brand-500/15 text-brand-400'
+                  ? 'bg-brand-500/15 text-brand-400 shadow-sm'
                   : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
               }`}
             >
-              <tab.icon size={16} />
-              {tab.label}
+              <tab.icon size={16} className="shrink-0" />
+              <span className="flex-1 text-left">{tab.label}</span>
+              {tab.id === 'profile' && profileDirty && (
+                <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" title="Unsaved changes" />
+              )}
             </button>
           ))}
+
+          {/* Quick tips */}
+          <div className="mt-6 rounded-xl border border-surface-border bg-surface-input p-4">
+            <p className="text-xs font-bold text-foreground-muted uppercase tracking-wider mb-2">Tip</p>
+            <p className="text-xs text-foreground-muted leading-relaxed">
+              {activeTab === 'security' && 'Use 12+ characters with a mix of letters, numbers and symbols for a strong password.'}
+              {activeTab === 'profile' && "Your display name is shown to collaborators in real-time sessions."}
+              {activeTab === 'notifications' && 'Failure alerts are recommended — they notify you when a workflow stops working.'}
+              {activeTab === 'appearance' && 'Theme and accent color are saved automatically as you select them.'}
+            </p>
+          </div>
         </nav>
 
-        <div className="flex-1 min-w-0">
+        {/* ── Content ── */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* ══ PROFILE TAB ══════════════════════════════════════════════ */}
           {activeTab === 'profile' && (
             <div className="card p-6 animate-fade-in">
-              <h2 className="font-display text-lg font-bold text-foreground mb-1">Profile</h2>
-              <p className="text-sm text-foreground-muted mb-6">Your personal information</p>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-lg font-bold text-foreground">Profile</h2>
+                  <p className="text-sm text-foreground-muted mt-0.5">Your personal information visible to collaborators</p>
+                </div>
+                <SavedBadge show={profileSaved} />
+              </div>
 
-              <form onSubmit={handleProfileSave} className="space-y-5 max-w-md">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-2xl font-bold uppercase shadow-lg shadow-brand-500/20">
-                    {name?.charAt(0) || 'U'}
-                  </div>
+              <form onSubmit={handleProfileSave} className="space-y-6 max-w-md">
+                {/* Avatar */}
+                <div className="flex items-center gap-4">
+                  <Avatar name={name || 'U'} size={64} />
                   <div>
-                    <p className="text-foreground font-medium">{name || 'User'}</p>
-                    <p className="text-sm text-foreground-muted">{user?.role || 'Member'}</p>
+                    <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">{user?.role || 'Member'}</p>
+                    <p className="text-xs text-foreground-muted/60 mt-1">Avatar is generated from your name</p>
                   </div>
                 </div>
 
+                <SectionDivider label="Account details" />
+
+                {/* Full name */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Full Name
+                  <label htmlFor="profile-name" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                    Full Name <span className="text-red-400">*</span>
                   </label>
                   <input
+                    id="profile-name"
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="input-field"
-                    placeholder="Your name"
+                    onChange={(e) => { setName(e.target.value); setNameError(''); }}
+                    className={`input-field ${nameError ? 'border-red-500/50 focus:border-red-500/80' : ''}`}
+                    placeholder="Your full name"
+                    autoComplete="name"
+                    maxLength={80}
                   />
+                  <FieldError msg={nameError} />
+                  <p className="text-xs text-foreground-muted/60 mt-1">{name.length}/80 characters</p>
                 </div>
 
+                {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <Mail size={14} /> Email
-                    </span>
+                  <label htmlFor="profile-email" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                    <span className="flex items-center gap-1.5"><Mail size={13} /> Email address</span>
                   </label>
                   <input
+                    id="profile-email"
                     type="email"
                     value={email}
                     disabled
-                    className="input-field opacity-60 cursor-not-allowed"
-                    placeholder="Email"
+                    className="input-field opacity-50 cursor-not-allowed"
+                    autoComplete="email"
                   />
-                  <p className="text-xs text-foreground-muted mt-1">Email cannot be changed</p>
+                  <InfoBox>Email address is tied to your account and cannot be changed.</InfoBox>
                 </div>
 
-                <button type="submit" className="btn-primary flex items-center gap-2">
-                  <Save size={16} /> Save Changes
-                </button>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="submit"
+                    disabled={!profileDirty || profileSaving}
+                    className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {profileSaving
+                      ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                      : <><Save size={14} /> Save Changes</>
+                    }
+                  </button>
+                  {profileDirty && !profileSaving && (
+                    <button
+                      type="button"
+                      onClick={() => { setName(user?.name || ''); setNameError(''); }}
+                      className="text-sm text-foreground-muted hover:text-foreground transition"
+                    >
+                      Discard
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
           )}
 
+          {/* ══ SECURITY TAB ══════════════════════════════════════════════ */}
           {activeTab === 'security' && (
-            <div className="card p-6 animate-fade-in">
-              <h2 className="font-display text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-                <Shield size={18} className="text-brand-400" /> Security
-              </h2>
-              <p className="text-sm text-foreground-muted mb-6">Change your password</p>
-
-              <form onSubmit={handlePasswordChange} className="space-y-5 max-w-md">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Current Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showCurrentPw ? 'text' : 'password'}
-                      value={currentPw}
-                      onChange={(e) => setCurrentPw(e.target.value)}
-                      className="input-field pr-10"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-secondary"
-                      onClick={() => setShowCurrentPw(!showCurrentPw)}
-                      tabIndex={-1}
-                    >
-                      {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+            <>
+              <div className="card p-6 animate-fade-in">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                      <Shield size={18} className="text-brand-400" /> Change Password
+                    </h2>
+                    <p className="text-sm text-foreground-muted mt-0.5">Use a strong, unique password for your account</p>
                   </div>
+                  <SavedBadge show={pwSaved} />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    New Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showNewPw ? 'text' : 'password'}
-                      value={newPw}
-                      onChange={(e) => setNewPw(e.target.value)}
-                      className="input-field pr-10"
-                      placeholder="Min 6 characters"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-secondary"
-                      onClick={() => setShowNewPw(!showNewPw)}
-                      tabIndex={-1}
-                    >
-                      {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                <form onSubmit={handlePasswordChange} className="space-y-5 max-w-md">
+                  {/* Current password */}
+                  <div>
+                    <label htmlFor="current-pw" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="current-pw"
+                        type={showCurrentPw ? 'text' : 'password'}
+                        value={currentPw}
+                        onChange={(e) => handlePwInput('current', e.target.value)}
+                        className={`input-field pr-10 ${pwErrors.current ? 'border-red-500/50' : ''}`}
+                        placeholder="Enter current password"
+                        autoComplete="current-password"
+                      />
+                      <button type="button" tabIndex={-1} aria-label={showCurrentPw ? 'Hide password' : 'Show password'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground transition"
+                        onClick={() => setShowCurrentPw(v => !v)}>
+                        {showCurrentPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    <FieldError msg={pwErrors.current} />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPw}
-                    onChange={(e) => setConfirmPw(e.target.value)}
-                    className="input-field"
-                    placeholder="••••••••"
-                  />
-                </div>
+                  <SectionDivider label="New password" />
 
-                <button type="submit" className="btn-primary flex items-center gap-2">
-                  <Lock size={16} /> Change Password
-                </button>
-              </form>
-            </div>
+                  {/* New password */}
+                  <div>
+                    <label htmlFor="new-pw" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="new-pw"
+                        type={showNewPw ? 'text' : 'password'}
+                        value={newPw}
+                        onChange={(e) => handlePwInput('newPw', e.target.value)}
+                        className={`input-field pr-10 ${pwErrors.newPw ? 'border-red-500/50' : ''}`}
+                        placeholder="Min 8 characters"
+                        autoComplete="new-password"
+                      />
+                      <button type="button" tabIndex={-1} aria-label={showNewPw ? 'Hide' : 'Show'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground transition"
+                        onClick={() => setShowNewPw(v => !v)}>
+                        {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+
+                    {/* Password strength meter */}
+                    {newPw && (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex gap-1">
+                          {[0, 1, 2, 3, 4].map(i => (
+                            <div key={i}
+                              className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                                i < strength.score ? strength.bg : 'bg-surface-border'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <p className={`text-xs font-medium ${strength.color}`}>{strength.label}</p>
+                      </div>
+                    )}
+                    <FieldError msg={pwErrors.newPw} />
+                  </div>
+
+                  {/* Confirm password */}
+                  <div>
+                    <label htmlFor="confirm-pw" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="confirm-pw"
+                        type={showConfirmPw ? 'text' : 'password'}
+                        value={confirmPw}
+                        onChange={(e) => handlePwInput('confirm', e.target.value)}
+                        className={`input-field pr-10 ${pwErrors.confirm ? 'border-red-500/50' : confirmPw && confirmPw === newPw ? 'border-green-500/40' : ''}`}
+                        placeholder="Re-enter new password"
+                        autoComplete="new-password"
+                      />
+                      <button type="button" tabIndex={-1} aria-label={showConfirmPw ? 'Hide' : 'Show'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground transition"
+                        onClick={() => setShowConfirmPw(v => !v)}>
+                        {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                      {/* Inline match indicator */}
+                      {confirmPw && confirmPw === newPw && (
+                        <CheckCircle2 size={14} className="absolute right-9 top-1/2 -translate-y-1/2 text-green-400 pointer-events-none" />
+                      )}
+                    </div>
+                    <FieldError msg={pwErrors.confirm} />
+                  </div>
+
+                  <button type="submit" disabled={pwSaving}
+                    className="btn-primary flex items-center gap-2 disabled:opacity-60">
+                    {pwSaving
+                      ? <><Loader2 size={14} className="animate-spin" /> Changing…</>
+                      : <><Lock size={14} /> Change Password</>
+                    }
+                  </button>
+                </form>
+              </div>
+
+              {/* Danger zone */}
+              <div className="card p-6 border-red-500/20 animate-fade-in">
+                <h2 className="font-display text-base font-bold text-red-400 flex items-center gap-2 mb-1">
+                  <AlertTriangle size={16} /> Danger Zone
+                </h2>
+                <p className="text-sm text-foreground-muted mb-4">Irreversible and destructive actions</p>
+                <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Delete Account</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Permanently delete your account and all associated data</p>
+                  </div>
+                  <button
+                    onClick={() => toast.error('Please contact support to delete your account')}
+                    className="flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition shrink-0"
+                  >
+                    <Trash2 size={13} /> Delete Account
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
+          {/* ══ NOTIFICATIONS TAB ═════════════════════════════════════════ */}
           {activeTab === 'notifications' && (
             <div className="card p-6 animate-fade-in">
-              <h2 className="font-display text-lg font-bold text-foreground mb-1">Notifications</h2>
-              <p className="text-sm text-foreground-muted mb-6">Choose how you want to be notified</p>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-lg font-bold text-foreground">Notifications</h2>
+                  <p className="text-sm text-foreground-muted mt-0.5">Control how and when Flowa contacts you</p>
+                </div>
+                <SavedBadge show={notifSaved} />
+              </div>
 
-              <div className="space-y-5 max-w-md">
-                <ToggleItem
-                  label="Email notifications"
-                  description="Receive email for important updates"
-                  checked={emailNotif}
-                  onChange={setEmailNotif}
-                />
-                <ToggleItem
-                  label="Failure alerts"
-                  description="Get notified when a workflow execution fails"
-                  checked={failureAlerts}
-                  onChange={setFailureAlerts}
-                />
-                <ToggleItem
-                  label="Weekly digest"
-                  description="Summary of your workspace activity every Monday"
-                  checked={weeklyDigest}
-                  onChange={setWeeklyDigest}
-                />
+              <div className="space-y-1 max-w-md divide-y divide-surface-border/60">
+                <div className="pb-4">
+                  <SectionDivider label="Email" />
+                  <div className="mt-4 space-y-5">
+                    <ToggleItem
+                      label="Email notifications"
+                      description="Receive emails for important account updates and alerts"
+                      checked={emailNotif}
+                      onChange={setEmailNotif}
+                    />
+                    <ToggleItem
+                      label="Weekly digest"
+                      description="A summary of your workspace activity sent every Monday"
+                      checked={weeklyDigest}
+                      onChange={setWeeklyDigest}
+                      disabled={!emailNotif}
+                    />
+                  </div>
+                </div>
 
-                <button onClick={handleNotifSave} className="btn-primary flex items-center gap-2">
-                  <Save size={16} /> Save Preferences
+                <div className="pt-4">
+                  <SectionDivider label="Workflow" />
+                  <div className="mt-4 space-y-5">
+                    <ToggleItem
+                      label="Failure alerts"
+                      description="Get notified immediately when a workflow execution fails"
+                      checked={failureAlerts}
+                      onChange={setFailureAlerts}
+                    />
+                  </div>
+
+                  {!failureAlerts && (
+                    <div className="mt-3 flex gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3.5 py-3 text-xs text-yellow-300">
+                      <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                      <span>Failure alerts are disabled — you may miss critical workflow errors.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mt-6 pt-5 border-t border-surface-border">
+                <button onClick={handleNotifSave} disabled={notifSaving}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-60">
+                  {notifSaving
+                    ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                    : <><Save size={14} /> Save Preferences</>
+                  }
                 </button>
               </div>
             </div>
           )}
 
+          {/* ══ APPEARANCE TAB ════════════════════════════════════════════ */}
           {activeTab === 'appearance' && (
             <div className="card p-6 animate-fade-in">
-              <h2 className="font-display text-lg font-bold text-foreground mb-1">Appearance</h2>
-              <p className="text-sm text-foreground-muted mb-6">Customize the look and feel</p>
-
-              <div className="space-y-6 max-w-md">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-3">Theme</label>
-                  <div className="flex gap-3">
+                  <h2 className="font-display text-lg font-bold text-foreground">Appearance</h2>
+                  <p className="text-sm text-foreground-muted mt-0.5">Customize how Flowa looks for you</p>
+                </div>
+                <SavedBadge show={appearanceSaved} />
+              </div>
+
+              <div className="space-y-8 max-w-md">
+                {/* Theme */}
+                <div>
+                  <label className="block text-sm font-semibold text-foreground-secondary mb-3">
+                    Interface Theme
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
                     {([
-                      { key: 'dark', icon: Moon, label: 'Dark' },
-                      { key: 'light', icon: Sun, label: 'Light' },
-                      { key: 'system', icon: Monitor, label: 'System' },
+                      { key: 'dark',   icon: Moon,    label: 'Dark',   desc: 'Easy on the eyes' },
+                      { key: 'light',  icon: Sun,     label: 'Light',  desc: 'Clean & bright' },
+                      { key: 'system', icon: Monitor, label: 'System', desc: 'Follows OS setting' },
                     ] as const).map((t) => (
                       <button
                         key={t.key}
-                        onClick={() => setTheme(t.key as Theme)}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all duration-200 ${
+                        onClick={() => handleAppearanceChange(() => setTheme(t.key as Theme))}
+                        className={`flex flex-col items-center gap-2 px-3 py-4 rounded-xl border text-center transition-all duration-150 ${
                           theme === t.key
-                            ? 'border-brand-500 bg-brand-500/15 text-brand-400'
-                            : 'border-surface-border bg-surface-card text-foreground-muted hover:text-foreground hover:border-surface-hover'
+                            ? 'border-brand-500 bg-brand-500/10 shadow-sm shadow-brand-500/10'
+                            : 'border-surface-border bg-surface-input hover:border-brand-500/30 hover:bg-surface-hover'
                         }`}
                       >
-                        <t.icon size={16} />
-                        {t.label}
+                        <t.icon size={20} className={theme === t.key ? 'text-brand-400' : 'text-foreground-muted'} />
+                        <div>
+                          <p className={`text-sm font-semibold ${theme === t.key ? 'text-brand-400' : 'text-foreground'}`}>
+                            {t.label}
+                          </p>
+                          <p className="text-[10px] text-foreground-muted mt-0.5">{t.desc}</p>
+                        </div>
+                        {theme === t.key && (
+                          <CheckCircle2 size={13} className="text-brand-400" />
+                        )}
                       </button>
                     ))}
                   </div>
                 </div>
 
+                {/* Accent color */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-3">
+                  <label className="block text-sm font-semibold text-foreground-secondary mb-1.5">
                     Accent Color
                   </label>
-                  <div className="flex gap-2">
-                    {(Object.entries(accentPalettes) as Array<
-                      [keyof typeof accentPalettes, (typeof accentPalettes)[keyof typeof accentPalettes]]
-                    >).map(([key, palette]) => (
+                  <p className="text-xs text-foreground-muted mb-3">Applied to buttons, active states, and highlights</p>
+                  <div className="flex flex-wrap gap-3">
+                    {(Object.entries(accentPalettes) as Array<[keyof typeof accentPalettes, (typeof accentPalettes)[keyof typeof accentPalettes]]>).map(([key, palette]) => (
                       <button
                         key={key}
                         title={palette.label}
-                        onClick={() => setAccentTheme(key)}
-                        className={`w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 ${
-                          accentTheme === key
-                            ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-card'
-                            : 'opacity-50 hover:opacity-80'
-                        }`}
-                        style={{ backgroundColor: palette.preview }}
-                      />
+                        onClick={() => handleAppearanceChange(() => setAccentTheme(key))}
+                        className={`flex flex-col items-center gap-1.5 group transition-all duration-150`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-full transition-all duration-150 ${
+                            accentTheme === key
+                              ? 'ring-2 ring-offset-2 ring-offset-surface-card scale-110'
+                              : 'opacity-60 hover:opacity-90 hover:scale-105'
+                          }`}
+                          style={{
+                            backgroundColor: palette.preview,
+                            ...(accentTheme === key ? { boxShadow: `0 0 0 2px ${palette.preview}` } : {}),
+                          }}
+                        />
+                        <span className={`text-[10px] font-medium transition-colors ${
+                          accentTheme === key ? 'text-foreground' : 'text-foreground-muted'
+                        }`}>
+                          {palette.label}
+                        </span>
+                      </button>
                     ))}
                   </div>
-                  <p className="text-xs text-foreground-muted mt-2">
-                    Selected: {accentPalettes[accentTheme].label}
-                  </p>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
-    </div>
-  );
-}
-
-function ToggleItem({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="text-xs text-foreground-muted">{description}</p>
-      </div>
-      <button
-        onClick={() => onChange(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-          checked ? 'bg-brand-500' : 'bg-surface-border'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${
-            checked ? 'translate-x-5' : 'translate-x-0'
-          }`}
-        />
-      </button>
     </div>
   );
 }
