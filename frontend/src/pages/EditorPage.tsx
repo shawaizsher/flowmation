@@ -555,10 +555,10 @@ function EditorCanvas() {
           id: edgeId,
           type: 'smoothstep',
           animated: true,
-          style: { stroke: '#64748b', strokeWidth: 2 },
+          style: { stroke: '#334155', strokeWidth: 1.6 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#64748b',
+            color: '#334155',
           },
         },
         eds
@@ -1055,14 +1055,14 @@ function EditorCanvas() {
             nodesConnectable
             className="bg-surface-base"
             deleteKeyCode={['Backspace', 'Delete']}
-            connectionLineStyle={{ stroke: '#64748b', strokeWidth: 2 }}
+            connectionLineStyle={{ stroke: '#34d399', strokeWidth: 1.8, strokeDasharray: '6 4' }}
             defaultEdgeOptions={{
               type: 'smoothstep',
               animated: true,
-              style: { stroke: '#64748b', strokeWidth: 2 },
+              style: { stroke: '#334155', strokeWidth: 1.6 },
               markerEnd: {
                 type: MarkerType.ArrowClosed,
-                color: '#64748b',
+                color: '#334155',
               },
             }}
           >

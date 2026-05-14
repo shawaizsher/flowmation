@@ -424,8 +424,8 @@ interface NodeIconProps {
 
 const sizeClasses = {
   sm: 'h-6 w-6 rounded',
-  md: 'h-8 w-8 rounded-lg',
-  lg: 'h-10 w-10 rounded-xl',
+  md: 'h-8 w-8 rounded-md',
+  lg: 'h-10 w-10 rounded-lg',
 };
 
 export default function NodeIcon({ nodeType, size = 'md', className = '' }: NodeIconProps) {

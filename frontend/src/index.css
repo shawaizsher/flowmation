@@ -153,29 +153,39 @@ body {
 }
 
 .react-flow__edge-path {
-  stroke: #475569 !important;
-  stroke-width: 2 !important;
+  stroke: #334155 !important;
+  stroke-width: 1.6 !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: rgb(var(--brand-500-rgb)) !important;
+  stroke: #34d399 !important;
+  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.35));
 }
 
 .react-flow__connection-line {
-  stroke: rgb(var(--brand-500-rgb)) !important;
-  stroke-width: 2 !important;
+  stroke: #34d399 !important;
+  stroke-width: 1.8 !important;
+  stroke-dasharray: 6 4;
 }
 
 .react-flow__handle {
-  width: 10px !important;
-  height: 10px !important;
-  border: 2px solid #475569 !important;
-  background: var(--surface-card) !important;
+  width: 8px !important;
+  height: 8px !important;
+  border: 1px solid #64748b !important;
+  background: #0f172a !important;
 }
 
 .react-flow__handle:hover {
-  border-color: rgb(var(--brand-500-rgb)) !important;
-  background: rgb(var(--brand-500-rgb)) !important;
+  border-color: #34d399 !important;
+  background: #34d399 !important;
+}
+
+.react-flow__node-flowNode {
+  border-radius: 6px;
+}
+
+.react-flow__node-flowNode.dragging {
+  z-index: 50 !important;
 }
 
 /* ── Component classes ── */
