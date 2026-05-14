@@ -20,20 +20,17 @@ router.post('/generate-workflow', async (req, res) => {
     // generateWorkflow now returns a structured object — never throws
     const result = await aiService.generateWorkflow(prompt);
 
-    // Unsafe requests → 422
+    // Unsafe operations → 422
     if (result.type === 'unsafe_request') {
       return res.status(422).json(result);
     }
 
-    // Invalid input → 400 with suggestions
+    // Truly invalid input (gibberish, greetings, etc.) → 400
     if (result.type === 'invalid_input') {
       return res.status(400).json(result);
     }
 
-    // Clarification needed → 200 with success: false so frontend can show UI
-    if (result.type === 'clarification_needed') {
-      return res.status(200).json(result);
-    }
+    // All other cases (workflow_generated — including medium with needsClarification) → 200
 
     // Success — log the generation (non-critical, don't fail the request)
     try {
