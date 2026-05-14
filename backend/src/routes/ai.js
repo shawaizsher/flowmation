@@ -32,6 +32,10 @@ router.post('/generate-workflow', async (req, res) => {
       description: result.description
     });
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
+
     logger.error('AI generate workflow error:', err);
     res.status(500).json({ error: 'Failed to generate workflow' });
   }
