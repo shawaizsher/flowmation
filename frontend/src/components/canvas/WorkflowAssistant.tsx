@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, Workflow, X, Trash2 } from 'lucide-react';
+import { Send, Bot, Loader2, Workflow, X, Trash2, AlertCircle, CheckCircle2, HelpCircle } from 'lucide-react';
 import { aiApi } from '../../utils/api';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   workflowUpdated?: boolean;
+  confidence?: 'low' | 'medium' | 'high';
+  summary?: string;
 }
 
 interface WorkflowAssistantProps {
@@ -20,9 +22,10 @@ interface WorkflowAssistantProps {
 const GREETING = "Hi, I'm Freckles! Describe the automation you want to build, or tell me what to change. I can create, edit, and connect nodes for you.";
 
 const SUGGESTIONS = [
-  'Create a workflow that sends a Slack message when a webhook is received',
-  'Add an OpenAI node to summarise emails from Gmail',
-  'Build a daily report that reads from Google Sheets and emails the results',
+  'When a webhook is received, send a Slack message',
+  'Every day at 9 AM generate a report and email it',
+  'When a form is submitted, create a HubSpot lead and send a welcome email',
+  'Add an AI node to summarise Gmail emails',
 ];
 
 export default function WorkflowAssistant({
@@ -161,6 +164,24 @@ export default function WorkflowAssistant({
               }`}
             >
               <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
+
+              {/* Confidence badge */}
+              {msg.confidence && msg.role === 'assistant' && (
+                <div className={`mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider border-t pt-1.5 ${
+                  msg.confidence === 'high'
+                    ? 'text-green-400 border-green-500/20'
+                    : msg.confidence === 'medium'
+                    ? 'text-yellow-400 border-yellow-500/20'
+                    : 'text-foreground-muted border-surface-border'
+                }`}>
+                  {msg.confidence === 'high' ? <CheckCircle2 size={10} /> :
+                   msg.confidence === 'medium' ? <HelpCircle size={10} /> :
+                   <AlertCircle size={10} />}
+                  {msg.confidence} confidence
+                </div>
+              )}
+
+              {/* Workflow updated indicator */}
               {msg.workflowUpdated && (
                 <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 border-t border-emerald-500/20 pt-2">
                   <Workflow size={11} />
