@@ -253,46 +253,164 @@ function detectWorkflowIntent(text) {
 
 
 // ════════════════════════════════════════════════════════════════════════════
-//  PART 4 — CLARIFICATION QUESTIONS
+//  PART 4 — CLARIFICATION QUESTIONS & MEDIUM SUGGESTIONS
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * getMediumSuggestions(text, detectedIntent)
+ * Returns 4 complete, ready-to-run example prompts for a MEDIUM-confidence input.
+ */
+function getMediumSuggestions(text, detectedIntent) {
+  const t = text.toLowerCase();
+
+  if (/(edit|document|doc|pdf|csv|file|upload|process\s+file)/.test(t)) {
+    return [
+      'When a document is uploaded via webhook, extract text and save it to the database',
+      'Every day, fetch PDF attachments from Gmail, extract content and email a summary',
+      'When a file is uploaded, parse the CSV rows and sync them to Google Sheets',
+      'When a Google Drive file is updated, notify the team via Slack',
+    ];
+  }
+  if (/(report|summary|digest|analytics|stats|metric)/.test(t)) {
+    return [
+      'Every day at 9 AM, query the database and email a sales report to the team',
+      'Every Monday morning, compile weekly metrics and post a digest to Slack',
+      'When a webhook is received, generate a report and email it immediately',
+      'Monthly, export data from Google Sheets and send a PDF report via email',
+    ];
+  }
+  if (/(notify|notification|alert|team)/.test(t)) {
+    return [
+      'When a new email arrives, send a Slack notification to the team channel',
+      'When a payment is received, alert the team via Slack and log to database',
+      'When a form is submitted, notify the team on Discord',
+      'Every morning, send a daily digest alert to the team Slack channel',
+    ];
+  }
+  if (/(upload|file)/.test(t)) {
+    return [
+      'When a file is uploaded via webhook, parse it and insert rows into the database',
+      'When a PDF is uploaded, extract text, summarize with AI, and email the result',
+      'When a CSV is uploaded, validate rows and sync to Google Sheets',
+      'When a file is uploaded to S3, notify the team on Slack',
+    ];
+  }
+  if (/(lead|crm|contact|prospect|customer|signup|register)/.test(t)) {
+    return [
+      'When a form is submitted, save the lead to HubSpot and send a welcome email',
+      'When a webhook brings lead data, insert into database and notify the sales team on Slack',
+      'When a new lead arrives, add to Google Sheets and send an email notification',
+      'When a payment is made, save the customer as a CRM contact and send a receipt email',
+    ];
+  }
+  if (/(invoice|billing|payment|charge|receipt)/.test(t)) {
+    return [
+      'When a Stripe payment is received, generate an invoice and email it to the customer',
+      'When a form is submitted, process the invoice and save it to the database',
+      'Every day, fetch pending invoices and send them via email in bulk',
+      'When a webhook is received, validate payment and notify the accounting team on Slack',
+    ];
+  }
+  if (/(save|store|insert|database|db)/.test(t)) {
+    return [
+      'When a form is submitted, save the data to PostgreSQL and email a confirmation',
+      'When a webhook is received, extract fields and insert a row into Google Sheets',
+      'Every day, export CRM records and save them to the database',
+      'When a payment is made, save the transaction record and notify via Slack',
+    ];
+  }
+  if (/(email|gmail|inbox|mail)/.test(t)) {
+    return [
+      'When a new email arrives, summarize it with AI and post the summary to Slack',
+      'Every day, fetch unread emails and save important ones to a Google Sheet',
+      'When an email is received, classify its sentiment and route it based on the result',
+      'When a webhook triggers, compose and send a personalised email via Gmail',
+    ];
+  }
+  if (/(slack|discord|telegram|sms|message)/.test(t)) {
+    return [
+      'When a webhook is received, send a formatted Slack message to the #general channel',
+      'When a new email arrives, forward a Slack notification to the team',
+      'Every morning, post a daily briefing to the Slack channel',
+      'When a payment is received, send an SMS alert via Twilio',
+    ];
+  }
+  if (/(github|deploy|build|ci|devops)/.test(t)) {
+    return [
+      'When a GitHub build fails, send a Slack alert to the dev team',
+      'When a pull request is merged, trigger a deployment and notify via email',
+      'Every day, fetch CI build stats and post a summary to Slack',
+      'When a new GitHub commit is pushed, run tests and log the result',
+    ];
+  }
+  // Generic fallback
+  return [
+    'When a webhook is received, process the data and send a Slack notification',
+    'Every day at 9 AM, fetch data from an API and save it to the database',
+    'When a form is submitted, create a CRM lead and send a welcome email',
+    'When an email arrives, summarize it with AI and forward key points to Slack',
+  ];
+}
+
+/**
+ * generateClarificationQuestion(text, missingParts)
+ * Returns { question, options, suggestions } for a MEDIUM-confidence prompt.
+ *   question  — what to ask the user
+ *   options   — short quick-select chips that answer the question
+ *   suggestions — complete ready-to-run example prompts
+ */
 function generateClarificationQuestion(text, missingParts) {
   const t = text.toLowerCase();
+  const intent = detectWorkflowIntent(t);
+  const suggestions = getMediumSuggestions(t, intent);
 
   if (missingParts.includes('trigger')) {
     if (/(notification|notify|alert)/.test(t)) {
       return {
         question: 'What should trigger the notification?',
         options: ['New email received', 'Webhook / API call', 'Daily schedule', 'Form submission', 'Payment received'],
+        suggestions,
       };
     }
     if (/(report|summary|digest|analytics)/.test(t)) {
       return {
         question: 'When should the report be generated?',
         options: ['Daily at 9 AM', 'Weekly on Mondays', 'Monthly on the 1st', 'On-demand via webhook'],
+        suggestions,
       };
     }
     if (/(save|store|insert|database|crm|lead|contact)/.test(t)) {
       return {
         question: 'What should trigger this save action?',
         options: ['Form submission', 'Webhook / API call', 'New email', 'Scheduled import'],
+        suggestions,
       };
     }
     if (/email/.test(t)) {
       return {
         question: 'What should trigger the email?',
         options: ['Webhook / API call', 'New form submission', 'Payment received', 'Daily schedule'],
+        suggestions,
+      };
+    }
+    if (/(edit|document|file|upload)/.test(t)) {
+      return {
+        question: 'How should the document workflow be triggered?',
+        options: ['When document is uploaded', 'Daily schedule', 'Webhook / API call', 'Manual start'],
+        suggestions,
       };
     }
     if (/(slack|discord|telegram|sms)/.test(t)) {
       return {
         question: 'What should trigger the message?',
         options: ['Webhook / API call', 'New email received', 'Payment received', 'Form submission', 'Daily schedule'],
+        suggestions,
       };
     }
     return {
       question: 'What should trigger this automation?',
       options: ['New email received', 'Webhook / API call', 'Recurring schedule', 'Form submission', 'Payment received'],
+      suggestions,
     };
   }
 
@@ -301,41 +419,54 @@ function generateClarificationQuestion(text, missingParts) {
       return {
         question: 'Where would you like to save the leads or contacts?',
         options: ['HubSpot CRM', 'PostgreSQL Database', 'Google Sheets', 'Notion', 'Airtable'],
+        suggestions,
       };
     }
     if (/(notify|notification|alert)/.test(t)) {
       return {
         question: 'Where should the notification be sent?',
         options: ['Slack channel', 'Email (SMTP)', 'Discord', 'Telegram bot', 'SMS via Twilio'],
+        suggestions,
       };
     }
     if (/(report|data|result|analytics|summary)/.test(t)) {
       return {
         question: 'Where should the report be delivered?',
         options: ['Email', 'Slack channel', 'Google Sheets', 'Notion page'],
+        suggestions,
       };
     }
     if (/email/.test(t)) {
       return {
         question: 'What action should happen with the email?',
         options: ['Send a Slack notification', 'Summarize it with AI', 'Save to database', 'Forward as email'],
+        suggestions,
       };
     }
-    if (/(data|record|row)/.test(t)) {
+    if (/(data|record|row|document|file)/.test(t)) {
       return {
-        question: 'Where should the data be saved?',
-        options: ['PostgreSQL database', 'Google Sheets', 'MongoDB', 'Airtable', 'Notion'],
+        question: 'Where should the data or file be stored?',
+        options: ['PostgreSQL database', 'Google Sheets', 'AWS S3', 'Airtable', 'Notion'],
+        suggestions,
+      };
+    }
+    if (/(invoice|payment|billing)/.test(t)) {
+      return {
+        question: 'What should happen after the invoice or payment is processed?',
+        options: ['Email the customer', 'Save to database', 'Notify team on Slack', 'Log to Google Sheets'],
+        suggestions,
       };
     }
   }
 
   return {
-    question: 'Could you describe your automation in more detail?',
+    question: 'Could you tell me more about this automation?',
     options: [
       'What triggers it? (email, schedule, webhook…)',
       'What should it do? (send, save, notify…)',
       'Which services? (Slack, Gmail, database…)',
     ],
+    suggestions,
   };
 }
 
@@ -454,11 +585,14 @@ function validateWorkflowPrompt(prompt) {
     };
   }
 
-  // ── MEDIUM confidence: partial intent — ask clarification ───────────────
-  // Passes when there is a clear automation verb (action) paired with any domain noun,
-  // a named service/integration, OR enough words to imply context.
-  // This ensures "send report", "notify team", "upload file", "process invoice" etc.
-  // are treated as MEDIUM (ask clarification) rather than rejected outright.
+  // ── MEDIUM confidence: meaningful but incomplete prompt ─────────────────
+  // Passes when the prompt contains a recognisable automation verb paired with
+  // a domain noun, a named service, or enough words to imply automation context.
+  // Prompts like "send report", "notify team", "upload file", "process invoice",
+  // "editing document", "save leads" all qualify as MEDIUM.
+  //
+  // IMPORTANT: MEDIUM is valid: true — we generate a best-guess workflow AND
+  // surface clarification questions/suggestions so the user can refine it.
   const hasPartialShape =
     (hasTrigger || hasAction) &&
     (hasIntegration || hasAutomationNoun || tokens.length >= 4);
@@ -468,15 +602,20 @@ function validateWorkflowPrompt(prompt) {
     if (!hasTrigger)                    missingParts.push('trigger');
     if (!hasAction && !hasIntegration)  missingParts.push('action');
 
+    const clarificationData = generateClarificationQuestion(text, missingParts);
+
     return {
-      valid:            false,
-      confidence:       'medium',
-      reason:           missingParts.length
+      valid:              true,   // valid — we WILL generate a workflow
+      confidence:         'medium',
+      needsClarification: true,   // but we need more info to make it perfect
+      reason:             missingParts.length
         ? `Partially understood — missing: ${missingParts.join(' and ')}`
         : 'Partially understood — ambiguous details',
-      normalizedPrompt: text,
+      normalizedPrompt:   text,
       detectedIntent,
-      suggestedClarification: missingParts,
+      clarification:      clarificationData.question,
+      clarificationOptions: clarificationData.options,
+      suggestions:        clarificationData.suggestions,
     };
   }
 
@@ -1321,38 +1460,43 @@ function applyWorkflowTool(workflow, toolName, input) {
  * generateWorkflow(prompt)
  *
  * Returns a structured response — never throws.
+ *
  * Response types:
- *   { success: true,  type: 'workflow_generated', confidence, summary, detectedIntent, workflowExplanation, graph, ... }
- *   { success: false, type: 'invalid_input',       error, suggestions }
- *   { success: false, type: 'unsafe_request',      error }
- *   { success: false, type: 'clarification_needed', confidence, question, options, detectedIntent }
+ *   { success: true,  type: 'workflow_generated', confidence: 'high', ... }
+ *   { success: true,  type: 'workflow_generated', confidence: 'medium',
+ *                     needsClarification: true, clarification, clarificationOptions, suggestions, ... }
+ *   { success: false, type: 'invalid_input',  error, suggestions }
+ *   { success: false, type: 'unsafe_request', error }
+ *
+ * MEDIUM confidence is now valid: true — we always build a best-guess workflow
+ * and attach clarification data so the user can refine it.
  */
 async function generateWorkflow(prompt) {
   // ── Step 1: Validate ────────────────────────────────────────────────────
   const validation = validateWorkflowPrompt(prompt);
 
-  // Safety rejection
+  // Safety rejection (unsafe operations)
   if (!validation.valid && validation.reason.includes('unsafe')) {
     return {
-      success:  false,
-      type:     'unsafe_request',
-      error:    'This request involves potentially harmful operations and cannot be processed.',
-      graph:    null,
-      nodes:    [],
-      edges:    [],
+      success: false,
+      type:    'unsafe_request',
+      error:   'This request involves potentially harmful operations and cannot be processed.',
+      graph:   null,
+      nodes:   [],
+      edges:   [],
     };
   }
 
-  // LOW confidence — outright reject
-  if (!validation.valid && validation.confidence === 'low') {
+  // LOW confidence — truly meaningless input, reject outright
+  if (!validation.valid) {
     return {
       success:     false,
       type:        'invalid_input',
-      error:       'Invalid input. Please describe a real automation workflow in plain English.',
+      error:       'Please describe a real automation workflow in plain English.',
       suggestions: validation.suggestedClarification || [
         'When I receive an email, send a Slack message',
-        'Every day generate a report and email it',
-        'When a form is submitted, create a CRM lead',
+        'Every day at 9 AM generate a sales report and email it',
+        'When a form is submitted, create a HubSpot lead',
       ],
       graph:  null,
       nodes:  [],
@@ -1360,39 +1504,33 @@ async function generateWorkflow(prompt) {
     };
   }
 
-  // MEDIUM confidence — ask for clarification
-  if (!validation.valid && validation.confidence === 'medium') {
-    const clarification = generateClarificationQuestion(
-      prompt,
-      Array.isArray(validation.suggestedClarification) ? validation.suggestedClarification : []
-    );
-    return {
-      success:        false,
-      type:           'clarification_needed',
-      confidence:     'medium',
-      detectedIntent: validation.detectedIntent,
-      question:       clarification.question,
-      options:        clarification.options,
-      graph:          null,
-      nodes:          [],
-      edges:          [],
-    };
-  }
-
-  // ── Step 2: Build workflow (HIGH confidence) ────────────────────────────
+  // ── Step 2: Build workflow (MEDIUM or HIGH) ─────────────────────────────
+  // MEDIUM: valid but incomplete → generate best-guess + attach clarification data
+  // HIGH:   complete → generate and return immediately
   try {
-    const tpl = buildAutomationWorkflow(prompt);
+    let tpl;
+    try {
+      tpl = buildAutomationWorkflow(prompt);
+    } catch (buildErr) {
+      // buildAutomationWorkflow couldn't detect any action nodes (e.g. "editing document")
+      // → use template matching which always succeeds
+      if (buildErr instanceof WorkflowValidationError) {
+        tpl = matchTemplate(prompt);
+      } else {
+        throw buildErr;
+      }
+    }
 
-    // ── Step 3: Optimize graph quality ─────────────────────────────────────
+    // ── Step 3: Optimise graph ──────────────────────────────────────────────
     const { nodes, edges } = optimizeWorkflowGraph(tpl.graph.nodes, tpl.graph.edges);
 
-    // ── Step 4: Build human-readable output ────────────────────────────────
+    // ── Step 4: Human-readable output ──────────────────────────────────────
     const summary             = buildWorkflowSummary(prompt, nodes);
     const workflowExplanation = buildWorkflowExplanation(nodes);
 
     logger.info(`[intelligence] generateWorkflow: "${tpl.name}" (${nodes.length} nodes, confidence: ${validation.confidence})`);
 
-    return {
+    const result = {
       success:             true,
       type:                'workflow_generated',
       confidence:          validation.confidence,
@@ -1404,24 +1542,18 @@ async function generateWorkflow(prompt) {
       model:               'deterministic-workflow-generator',
       tokensUsed:          0,
     };
-  } catch (err) {
-    // buildAutomationWorkflow threw (e.g., no actions found) — ask for clarification
-    if (err instanceof WorkflowValidationError) {
-      const clarification = generateClarificationQuestion(prompt, ['action']);
-      return {
-        success:        false,
-        type:           'clarification_needed',
-        confidence:     'medium',
-        detectedIntent: validation.detectedIntent,
-        question:       clarification.question,
-        options:        clarification.options,
-        graph:          null,
-        nodes:          [],
-        edges:          [],
-      };
+
+    // Attach clarification data for MEDIUM confidence prompts
+    if (validation.needsClarification) {
+      result.needsClarification    = true;
+      result.clarification         = validation.clarification;
+      result.clarificationOptions  = validation.clarificationOptions;
+      result.suggestions           = validation.suggestions;
     }
 
-    // Unexpected error — safe fallback
+    return result;
+  } catch (err) {
+    // Unexpected error — minimal safe fallback
     logger.error('[intelligence] generateWorkflow unexpected error:', err);
     const fallbackNodes = [
       makeNode('n1', 100, 200, 'Manual Trigger', 'trigger_manual', {}),
@@ -1664,44 +1796,46 @@ async function workflowChat({ message, history, workflow }) {
       case 'generate': {
         const validation = validateWorkflowPrompt(message);
 
-        // Safety check
-        if (!validation.valid && validation.reason.includes('unsafe')) {
-          reply = 'I cannot help with that request — it involves potentially harmful operations.';
+        // Safety / truly meaningless → reject only
+        if (!validation.valid) {
+          if (validation.reason.includes('unsafe')) {
+            reply = 'I cannot help with that — it involves potentially harmful operations.';
+          } else {
+            const examples = (validation.suggestedClarification || []).slice(0, 3);
+            reply = [
+              'I need a clearer description of what you want to automate. Here are some examples:',
+              ...examples.map(e => `  • ${e}`),
+            ].join('\n');
+          }
           break;
         }
 
-        // LOW confidence
-        if (!validation.valid && validation.confidence === 'low') {
-          const examples = (validation.suggestedClarification || []).slice(0, 3);
-          reply = [
-            'I need a clearer description of what you want to automate. Here are some examples:',
-            ...examples.map(e => `  • ${e}`),
-          ].join('\n');
-          break;
-        }
-
-        // MEDIUM confidence — ask clarification
-        if (!validation.valid && validation.confidence === 'medium') {
-          const clarification = generateClarificationQuestion(
-            message,
-            Array.isArray(validation.suggestedClarification) ? validation.suggestedClarification : []
-          );
-          reply = `${clarification.question}\n\n${clarification.options.map((o, i) => `${i + 1}. ${o}`).join('\n')}`;
-          break;
-        }
-
-        // HIGH confidence — build the smart workflow
+        // MEDIUM or HIGH — always build a workflow
+        let tpl;
         try {
-          const tpl      = buildAutomationWorkflow(message);
-          const optimized = optimizeWorkflowGraph(tpl.graph.nodes, tpl.graph.edges);
-          updatedWorkflow  = applyWorkflowTool({ nodes, edges }, 'set_workflow', optimized);
-          const summary    = buildWorkflowSummary(message, optimized.nodes);
-          reply = `Workflow created: ${summary}\n\nI built "${tpl.name}" with ${optimized.nodes.length} nodes. Click any node on the canvas to configure it.`;
+          tpl = buildAutomationWorkflow(message);
         } catch {
-          // Fallback to template matching
-          const tpl   = matchTemplate(message);
-          updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', tpl.graph);
-          reply = `Built a "${tpl.name}" workflow — ${tpl.description}`;
+          tpl = matchTemplate(message);
+        }
+
+        const optimized = optimizeWorkflowGraph(tpl.graph.nodes, tpl.graph.edges);
+        updatedWorkflow  = applyWorkflowTool({ nodes, edges }, 'set_workflow', optimized);
+        const summary    = buildWorkflowSummary(message, optimized.nodes);
+
+        if (validation.needsClarification) {
+          // MEDIUM: build + suggest refinements
+          const sampleSuggestions = (validation.suggestions || []).slice(0, 3);
+          reply = [
+            `Here's a best-guess workflow: ${summary}`,
+            '',
+            validation.clarification,
+            '',
+            'Or try one of these refined versions:',
+            ...sampleSuggestions.map((s, i) => `  ${i + 1}. ${s}`),
+          ].join('\n');
+        } else {
+          // HIGH: clean build
+          reply = `Workflow created: ${summary}\n\nI built "${tpl.name}" with ${optimized.nodes.length} nodes. Click any node on the canvas to configure it.`;
         }
         break;
       }

@@ -76,7 +76,15 @@ export default function DashboardPage() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<{ message: string; suggestions: string[] } | null>(null);
-  const [aiClarification, setAiClarification] = useState<{ question: string; options: string[]; originalPrompt: string } | null>(null);
+  const [aiRefinement, setAiRefinement] = useState<{
+    graph: unknown;
+    summary: string;
+    workflowExplanation: string[];
+    clarification: string;
+    clarificationOptions: string[];
+    suggestions: string[];
+    prompt: string;
+  } | null>(null);
   const [aiConfidence, setAiConfidence] = useState<string | null>(null);
 
   const workspaceId = workspace?.id;
@@ -203,7 +211,7 @@ export default function DashboardPage() {
 
   const resetAiModal = () => {
     setAiError(null);
-    setAiClarification(null);
+    setAiRefinement(null);
     setAiConfidence(null);
   };
 
@@ -218,13 +226,6 @@ export default function DashboardPage() {
       const res = await aiApi.generateWorkflow(workspaceId, prompt);
       const data = res.data;
 
-      // clarification_needed → show question + options in the modal
-      if (!data.success && data.type === 'clarification_needed') {
-        setAiClarification({ question: data.question, options: data.options || [], originalPrompt: prompt });
-        return;
-      }
-
-      // Unexpected non-success at 200
       if (!data.success) {
         toast.error(data.error || 'AI generation failed');
         return;
@@ -232,46 +233,71 @@ export default function DashboardPage() {
 
       setAiConfidence(data.confidence || null);
 
-      const wfRes = await workflowApi.create(workspaceId, {
-        name: prompt.slice(0, 60),
-        description: data.summary || `AI-generated: ${prompt}`,
-        graph: data.graph,
-      });
+      // MEDIUM confidence: show the generated workflow + refinement options
+      // before actually creating it — let user refine or proceed
+      if (data.needsClarification) {
+        setAiRefinement({
+          graph:                data.graph,
+          summary:              data.summary || '',
+          workflowExplanation:  data.workflowExplanation || [],
+          clarification:        data.clarification || '',
+          clarificationOptions: data.clarificationOptions || [],
+          suggestions:          data.suggestions || [],
+          prompt,
+        });
+        return;
+      }
 
-      toast.success(data.summary ? `Workflow created: ${data.summary}` : 'AI workflow generated!');
-      setShowAiModal(false);
-      setAiPrompt('');
-      resetAiModal();
-      navigate(`/workflows/${wfRes.data.workflow.id}`);
+      // HIGH confidence: create immediately and navigate
+      await createAndNavigate(prompt, data);
     } catch (err: any) {
       const errorData = err.response?.data;
 
-      // invalid_input (400) → show inline error with suggestions
       if (errorData?.type === 'invalid_input') {
         setAiError({ message: errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
         return;
       }
-
-      // unsafe_request (422)
       if (errorData?.type === 'unsafe_request') {
-        toast.error('This request involves potentially unsafe operations and cannot be processed.');
+        toast.error('This request involves potentially unsafe operations.');
         return;
       }
-
       toast.error(errorData?.error || 'AI generation failed');
     } finally {
       setAiGenerating(false);
     }
   };
 
-  const handleClarificationOption = (option: string) => {
-    const original = aiClarification?.originalPrompt || '';
-    // Build a refined prompt by appending the chosen clarification
-    const refined = original ? `${original} — ${option.toLowerCase()}` : option;
-    setAiPrompt(refined);
-    setAiClarification(null);
-    // Auto-submit the refined prompt
-    handleAiGenerate(refined);
+  const createAndNavigate = async (prompt: string, data: any) => {
+    const wfRes = await workflowApi.create(workspaceId!, {
+      name:        prompt.slice(0, 60),
+      description: data.summary || `AI-generated: ${prompt}`,
+      graph:       data.graph,
+    });
+    toast.success(data.summary ? `Workflow created: ${data.summary}` : 'Workflow generated!');
+    setShowAiModal(false);
+    setAiPrompt('');
+    resetAiModal();
+    navigate(`/workflows/${wfRes.data.workflow.id}`);
+  };
+
+  // User picks a refined suggestion → re-generate with that prompt
+  const handleRefineSuggestion = (suggestion: string) => {
+    setAiPrompt(suggestion);
+    setAiRefinement(null);
+    handleAiGenerate(suggestion);
+  };
+
+  // User proceeds with the current best-guess workflow without refining
+  const handleProceedWithWorkflow = async () => {
+    if (!aiRefinement || !workspaceId) return;
+    try {
+      setAiGenerating(true);
+      await createAndNavigate(aiRefinement.prompt, aiRefinement);
+    } catch {
+      toast.error('Failed to create workflow');
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -786,130 +812,179 @@ export default function DashboardPage() {
       {/* ═══════════ AI Generate Modal ═══════════ */}
       {showAiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="card mx-4 w-full max-w-lg p-6 animate-scale-in">
-            {/* Header */}
-            <div className="mb-4 flex items-center justify-between">
+          <div className="card mx-4 w-full max-w-lg animate-scale-in overflow-hidden">
+
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4">
               <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
                 <Sparkles size={20} className="text-brand-400" />
                 AI Generate Workflow
-                {aiConfidence && (
-                  <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    aiConfidence === 'high' ? 'bg-green-500/15 text-green-400' :
+                {aiConfidence && !aiRefinement && (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    aiConfidence === 'high'   ? 'bg-green-500/15 text-green-400' :
                     aiConfidence === 'medium' ? 'bg-yellow-500/15 text-yellow-400' :
-                    'bg-surface-border text-foreground-muted'
+                                               'bg-surface-border text-foreground-muted'
                   }`}>
-                    {aiConfidence} confidence
+                    {aiConfidence}
                   </span>
                 )}
               </h2>
-              <button
-                onClick={() => { setShowAiModal(false); resetAiModal(); }}
-                className="text-foreground-muted hover:text-foreground transition"
-              >
+              <button onClick={() => { setShowAiModal(false); resetAiModal(); }}
+                className="text-foreground-muted hover:text-foreground transition">
                 <X size={20} />
               </button>
             </div>
 
-            {/* ── Invalid input error ── */}
-            {aiError && (
-              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-                <div className="flex items-start gap-2 mb-3">
-                  <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
-                  <p className="text-sm font-medium text-red-300">{aiError.message}</p>
-                </div>
-                {aiError.suggestions.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-semibold text-foreground-muted uppercase tracking-wider">Try these instead:</p>
-                    <div className="space-y-1.5">
-                      {aiError.suggestions.map((s, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSuggestionClick(s)}
-                          className="w-full text-left rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-medium text-foreground-secondary hover:border-brand-500/40 hover:text-foreground hover:bg-surface-hover transition"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
+            <div className="px-6 pb-6 space-y-4">
+
+              {/* ══════════════════════════════════════════════════════
+                  STATE A — Invalid input error (LOW confidence)
+              ══════════════════════════════════════════════════════ */}
+              {aiError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+                  <div className="flex items-start gap-2 mb-3">
+                    <AlertCircle size={15} className="text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-sm font-medium text-red-300">{aiError.message}</p>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Clarification question ── */}
-            {aiClarification && (
-              <div className="mb-4 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4">
-                <div className="flex items-start gap-2 mb-3">
-                  <Sparkles size={16} className="text-brand-400 mt-0.5 shrink-0" />
-                  <p className="text-sm font-semibold text-foreground">{aiClarification.question}</p>
-                </div>
-                <div className="space-y-1.5">
-                  {aiClarification.options.map((opt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleClarificationOption(opt)}
-                      disabled={aiGenerating}
-                      className="w-full text-left rounded-lg border border-brand-500/20 bg-surface-card px-3 py-2.5 text-sm font-medium text-foreground hover:border-brand-500/50 hover:bg-brand-500/10 transition disabled:opacity-50"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── Prompt input (shown when no clarification active) ── */}
-            {!aiClarification && (
-              <>
-                {!aiError && (
-                  <p className="mb-3 text-sm text-foreground-muted">
-                    Describe what you want your workflow to do in plain English.
-                  </p>
-                )}
-                <textarea
-                  value={aiPrompt}
-                  onChange={(e) => { setAiPrompt(e.target.value); if (aiError) setAiError(null); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAiGenerate(); }}
-                  placeholder="e.g., When a webhook is received, classify the sentiment using AI, then send a Slack message if it's negative…"
-                  className="input-field mb-4 h-28 resize-none"
-                  autoFocus={!aiError}
-                />
-              </>
-            )}
-
-            {/* ── Actions ── */}
-            <div className="flex justify-between items-center">
-              <button
-                onClick={() => { setShowAiModal(false); resetAiModal(); }}
-                className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
-              >
-                Cancel
-              </button>
-              {!aiClarification && (
-                <button
-                  onClick={() => handleAiGenerate()}
-                  disabled={!aiPrompt.trim() || aiGenerating}
-                  className="btn-primary flex items-center gap-2 disabled:opacity-50"
-                >
-                  {aiGenerating ? (
+                  {aiError.suggestions.length > 0 && (
                     <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} />
-                      Generate
+                      <p className="mb-2 text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+                        Try one of these:
+                      </p>
+                      <div className="space-y-1.5">
+                        {aiError.suggestions.map((s, i) => (
+                          <button key={i} onClick={() => handleSuggestionClick(s)}
+                            className="w-full text-left rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-medium text-foreground-secondary hover:border-brand-500/40 hover:text-foreground hover:bg-surface-hover transition">
+                            {s}
+                          </button>
+                        ))}
+                      </div>
                     </>
                   )}
-                </button>
-              )}
-              {aiClarification && aiGenerating && (
-                <div className="flex items-center gap-2 text-sm text-brand-400">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-400/30 border-t-brand-400" />
-                  Building workflow…
                 </div>
               )}
+
+              {/* ══════════════════════════════════════════════════════
+                  STATE B — Refinement panel (MEDIUM confidence)
+                  Workflow was built but details are incomplete.
+              ══════════════════════════════════════════════════════ */}
+              {aiRefinement && (
+                <>
+                  {/* Generated workflow preview */}
+                  <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 size={14} className="text-green-400 shrink-0" />
+                      <span className="text-xs font-bold text-green-400 uppercase tracking-wider">
+                        Best-guess workflow ready
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-foreground leading-relaxed">
+                      {aiRefinement.summary}
+                    </p>
+                    {aiRefinement.workflowExplanation.length > 0 && (
+                      <div className="mt-2.5 space-y-0.5 border-t border-green-500/10 pt-2.5">
+                        {aiRefinement.workflowExplanation.map((step, i) => (
+                          <p key={i} className="text-xs text-foreground-muted">• {step}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Clarification question */}
+                  {aiRefinement.clarification && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-foreground">
+                        {aiRefinement.clarification}
+                      </p>
+                      {/* Quick-select options (append to prompt) */}
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {aiRefinement.clarificationOptions.map((opt, i) => (
+                          <button key={i}
+                            onClick={() => handleRefineSuggestion(`${aiRefinement.prompt} — ${opt.toLowerCase()}`)}
+                            disabled={aiGenerating}
+                            className="rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-400 hover:bg-brand-500/20 transition disabled:opacity-50">
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Full example suggestions */}
+                  {aiRefinement.suggestions.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+                        Or use a complete example:
+                      </p>
+                      <div className="space-y-1.5">
+                        {aiRefinement.suggestions.map((s, i) => (
+                          <button key={i} onClick={() => handleRefineSuggestion(s)}
+                            disabled={aiGenerating}
+                            className="w-full text-left rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-medium text-foreground-secondary hover:border-brand-500/40 hover:text-foreground hover:bg-surface-hover transition disabled:opacity-50">
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-1 border-t border-surface-border">
+                    <button
+                      onClick={() => { setAiRefinement(null); setAiConfidence(null); }}
+                      className="text-xs text-foreground-muted hover:text-foreground transition">
+                      ← Edit prompt
+                    </button>
+                    <button
+                      onClick={handleProceedWithWorkflow}
+                      disabled={aiGenerating}
+                      className="btn-primary flex items-center gap-1.5 !text-xs !py-1.5 !px-4 disabled:opacity-50">
+                      {aiGenerating
+                        ? <><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />Creating…</>
+                        : <><Workflow size={13} />Use this workflow</>
+                      }
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ══════════════════════════════════════════════════════
+                  STATE C — Default prompt input
+              ══════════════════════════════════════════════════════ */}
+              {!aiRefinement && (
+                <>
+                  {!aiError && (
+                    <p className="text-sm text-foreground-muted">
+                      Describe what you want your workflow to do in plain English.
+                    </p>
+                  )}
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => { setAiPrompt(e.target.value); if (aiError) setAiError(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAiGenerate(); }}
+                    placeholder="e.g., When a webhook fires, classify the sentiment with AI then send a Slack message if negative…"
+                    className="input-field h-28 resize-none"
+                    autoFocus={!aiError}
+                  />
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => { setShowAiModal(false); resetAiModal(); }}
+                      className="text-sm text-foreground-muted hover:text-foreground transition">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleAiGenerate()}
+                      disabled={!aiPrompt.trim() || aiGenerating}
+                      className="btn-primary flex items-center gap-2 disabled:opacity-50">
+                      {aiGenerating
+                        ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />Generating…</>
+                        : <><Sparkles size={16} />Generate</>
+                      }
+                    </button>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
         </div>
