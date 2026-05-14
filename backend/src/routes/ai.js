@@ -17,25 +17,38 @@ router.post('/generate-workflow', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
+    // generateWorkflow now returns a structured object — never throws
     const result = await aiService.generateWorkflow(prompt);
 
-    // Log the generation
-    await query(
-      `INSERT INTO ai_generations (workspace_id, user_id, type, prompt, result, model, tokens_used)
-       VALUES ($1, $2, 'generate-workflow', $3, $4, $5, $6)`,
-      [req.workspaceId, req.user.id, prompt, JSON.stringify(result.graph),
-       result.model || 'claude', result.tokensUsed || 0]
-    );
-
-    res.json({
-      graph: result.graph,
-      description: result.description
-    });
-  } catch (err) {
-    if (err.statusCode) {
-      return res.status(err.statusCode).json({ error: err.message });
+    // Unsafe requests → 422
+    if (result.type === 'unsafe_request') {
+      return res.status(422).json(result);
     }
 
+    // Invalid input → 400 with suggestions
+    if (result.type === 'invalid_input') {
+      return res.status(400).json(result);
+    }
+
+    // Clarification needed → 200 with success: false so frontend can show UI
+    if (result.type === 'clarification_needed') {
+      return res.status(200).json(result);
+    }
+
+    // Success — log the generation (non-critical, don't fail the request)
+    try {
+      await query(
+        `INSERT INTO ai_generations (workspace_id, user_id, type, prompt, result, model, tokens_used)
+         VALUES ($1, $2, 'generate-workflow', $3, $4, $5, $6)`,
+        [req.workspaceId, req.user.id, prompt, JSON.stringify(result.graph),
+         result.model || 'deterministic', result.tokensUsed || 0]
+      );
+    } catch (logErr) {
+      logger.warn('[ai] Failed to log generation:', logErr.message);
+    }
+
+    res.json(result);
+  } catch (err) {
     logger.error('AI generate workflow error:', err);
     res.status(500).json({ error: 'Failed to generate workflow' });
   }
