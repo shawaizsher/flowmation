@@ -1,47 +1,63 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { X } from 'lucide-react';
 import { useStore } from '../../store';
 import NodeIcon from './NodeIcon';
 import { nodeCatalog } from '../../data/nodeCatalog';
 
-// Build a type → short summary lookup once
 const summaryMap: Record<string, string> = {};
 for (const n of nodeCatalog) {
   summaryMap[n.type] = n.description;
 }
 
 const statusColors: Record<string, string> = {
-  running: 'border-yellow-400 shadow-yellow-400/20 shadow-lg',
-  success: 'border-green-400 shadow-green-400/20 shadow-lg',
-  failed: 'border-red-400 shadow-red-400/20 shadow-lg',
-  skipped: 'border-gray-500',
+  running: 'border-yellow-400/80 shadow-[0_0_0_1px_rgba(250,204,21,0.18)]',
+  success: 'border-emerald-400/80 shadow-[0_0_0_1px_rgba(52,211,153,0.16)]',
+  failed: 'border-red-400/80 shadow-[0_0_0_1px_rgba(248,113,113,0.18)]',
+  skipped: 'border-slate-500',
 };
 
 const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
-  running: { bg: 'bg-yellow-400/20', text: 'text-yellow-400', label: '● Running' },
-  success: { bg: 'bg-green-400/20', text: 'text-green-400', label: '✓ Done' },
-  failed: { bg: 'bg-red-400/20', text: 'text-red-400', label: '✗ Failed' },
-  skipped: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: '○ Skipped' },
+  running: { bg: 'bg-yellow-400/10', text: 'text-yellow-300', label: 'Running' },
+  success: { bg: 'bg-emerald-400/10', text: 'text-emerald-300', label: 'Done' },
+  failed: { bg: 'bg-red-400/10', text: 'text-red-300', label: 'Failed' },
+  skipped: { bg: 'bg-slate-500/10', text: 'text-slate-400', label: 'Skipped' },
 };
 
-// Category-specific top-bar accent colors
 const categoryAccent: Record<string, string> = {
-  triggers:  'from-yellow-400 to-amber-500',
-  google:    'from-blue-400 to-blue-600',
-  ai:        'from-rose-400 to-red-600',
-  social:    'from-pink-400 to-rose-500',
+  triggers: 'from-yellow-400 to-amber-500',
+  google: 'from-blue-400 to-blue-600',
+  ai: 'from-rose-400 to-red-600',
+  social: 'from-pink-400 to-rose-500',
   messaging: 'from-green-400 to-emerald-500',
   databases: 'from-orange-400 to-orange-600',
-  cloud:     'from-cyan-400 to-sky-500',
-  http:      'from-indigo-400 to-indigo-600',
-  files:     'from-amber-400 to-yellow-600',
+  cloud: 'from-cyan-400 to-sky-500',
+  http: 'from-indigo-400 to-indigo-600',
+  files: 'from-amber-400 to-yellow-600',
   transform: 'from-teal-400 to-teal-600',
-  logic:     'from-slate-400 to-slate-500',
-  crm:       'from-emerald-400 to-green-600',
-  payments:  'from-lime-400 to-green-500',
+  logic: 'from-slate-400 to-slate-500',
+  crm: 'from-emerald-400 to-green-600',
+  payments: 'from-lime-400 to-green-500',
   analytics: 'from-rose-400 to-pink-600',
   utilities: 'from-gray-400 to-gray-500',
+};
+
+const categoryHandleColor: Record<string, string> = {
+  triggers: '#facc15',
+  google: '#60a5fa',
+  ai: '#fb7185',
+  social: '#f472b6',
+  messaging: '#34d399',
+  databases: '#fb923c',
+  cloud: '#22d3ee',
+  http: '#818cf8',
+  files: '#f59e0b',
+  transform: '#2dd4bf',
+  logic: '#94a3b8',
+  crm: '#34d399',
+  payments: '#84cc16',
+  analytics: '#fb7185',
+  utilities: '#94a3b8',
 };
 
 function getCategoryFromType(type: string): string {
@@ -63,11 +79,12 @@ function getCategoryFromType(type: string): string {
   return 'utilities';
 }
 
-function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
+function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
   const nodeStatuses = useStore((s) => s.nodeStatuses);
   const status = nodeStatuses[id] as string | undefined;
   const category = getCategoryFromType(data.type || '');
   const accent = categoryAccent[category] || 'from-brand-400 to-brand-600';
+  const handleColor = categoryHandleColor[category] || '#34d399';
   const summary = summaryMap[data.type || ''] || '';
   const { deleteElements } = useReactFlow();
 
@@ -78,84 +95,84 @@ function FlowNode({ data, selected, id, isConnectable }: NodeProps) {
 
   return (
     <div
-      className={`group relative min-w-[200px] max-w-[260px] rounded-none border-2 bg-surface-card overflow-visible transition-all duration-150 ${
+      className={`group relative h-[76px] w-[226px] overflow-visible rounded-md border bg-[#0f172a] transition-[border-color,box-shadow,transform,background-color] duration-150 ${
         selected
-          ? 'border-brand-500 shadow-xl shadow-brand-500/25 scale-[1.02]'
+          ? 'border-emerald-400/90 shadow-[0_0_0_1px_rgba(52,211,153,0.18),0_10px_24px_rgba(0,0,0,0.28)]'
           : status && statusColors[status]
           ? statusColors[status]
-          : 'border-[#1e2d42] hover:border-[#3a5070] hover:shadow-lg hover:shadow-black/20'
-      }`}
+          : 'border-slate-700/80 hover:border-slate-500 hover:shadow-[0_0_0_1px_rgba(148,163,184,0.1)]'
+      } ${dragging ? 'scale-[1.015] shadow-[0_12px_28px_rgba(0,0,0,0.32)]' : ''}`}
     >
-      {/* Delete button — visible on hover */}
       <button
         onClick={handleDelete}
-        className="absolute right-1.5 top-1.5 z-10 hidden rounded-md p-1 text-foreground-muted/60 hover:bg-red-500/20 hover:text-red-400 transition group-hover:flex items-center justify-center"
+        className="absolute right-1 top-1 z-10 hidden h-5 w-5 items-center justify-center rounded-sm text-slate-500 transition hover:bg-red-500/15 hover:text-red-300 group-hover:flex"
         title="Delete node"
       >
-        <X size={13} />
+        <X size={12} />
       </button>
 
-      {/* Category accent bar */}
-      <div className={`h-[4px] w-full bg-gradient-to-r ${accent}`} />
+      <div className={`h-[3px] w-full rounded-t-md bg-gradient-to-r ${accent}`} />
 
-      {/* Input connector */}
       <Handle
         type="target"
         id="in"
         position={Position.Left}
         isConnectable={isConnectable}
         style={{
-          background: 'var(--surface-card)',
-          borderColor: 'rgb(var(--brand-500-rgb))',
+          background: '#020617',
+          borderColor: handleColor,
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          boxShadow: `0 0 0 2px rgba(15, 23, 42, 0.95), 0 0 8px ${handleColor}40`,
         }}
-        className="!h-4 !w-4 !rounded-full !border-2 !shadow-[0_0_0_3px_rgba(246,48,73,0.2)] !left-0 !z-20 transition-all group-hover:!shadow-[0_0_0_5px_rgba(246,48,73,0.25)]"
+        className="!left-0 !z-20 !h-2.5 !w-2.5 !rounded-full !border transition-all group-hover:!scale-110"
       />
 
-      {/* Output connector */}
       <Handle
         type="source"
         id="out"
         position={Position.Right}
         isConnectable={isConnectable}
         style={{
-          background: 'var(--surface-card)',
-          borderColor: 'rgb(var(--brand-500-rgb))',
+          background: handleColor,
+          borderColor: handleColor,
+          top: '50%',
+          transform: 'translate(50%, -50%)',
+          boxShadow: `0 0 0 2px rgba(15, 23, 42, 0.95), 0 0 8px ${handleColor}40`,
         }}
-        className="!h-4 !w-4 !rounded-full !border-2 !shadow-[0_0_0_3px_rgba(246,48,73,0.2)] !right-0 !z-20 transition-all group-hover:!shadow-[0_0_0_5px_rgba(246,48,73,0.25)]"
+        className="!right-0 !z-20 !h-2.5 !w-2.5 !rounded-full !border transition-all group-hover:!scale-110"
       />
 
-      {/* Node content */}
-      <div className="flex items-center gap-3 px-3.5 py-3.5">
-        <NodeIcon nodeType={data.type || ''} size="md" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-bold text-foreground leading-tight" title={data.label}>
+      <div className="flex h-[73px] items-center gap-2.5 px-3">
+        <NodeIcon nodeType={data.type || ''} size="sm" className="!h-8 !w-8 !rounded-md" />
+        <div className="min-w-0 flex-1 pr-4">
+          <div className="truncate text-[13px] font-bold leading-4 text-slate-100" title={data.label}>
             {data.label}
           </div>
           {summary ? (
-            <div className="truncate text-[11px] font-medium text-foreground-muted mt-0.5">{summary}</div>
+            <div className="mt-1 truncate text-[11px] font-medium leading-3 text-slate-500" title={summary}>
+              {data.type}
+            </div>
           ) : (
-            <div className="truncate text-[11px] text-foreground-muted/60 mt-0.5">{data.type}</div>
+            <div className="mt-1 truncate text-[11px] leading-3 text-slate-500">{data.type}</div>
           )}
         </div>
       </div>
 
-      {/* Status badge */}
       {status && statusBadge[status] && (
-        <div className={`mx-3 mb-3 flex items-center justify-center gap-1 rounded-none px-2 py-1.5 ${statusBadge[status].bg}`}>
-          <span className={`text-xs font-bold tracking-wide ${statusBadge[status].text}`}>
+        <div className={`absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5 ${statusBadge[status].bg}`}>
+          <span className={`text-[10px] font-semibold leading-none ${statusBadge[status].text}`}>
             {statusBadge[status].label}
           </span>
         </div>
       )}
 
-      {/* Running pulse */}
       {status === 'running' && (
-        <div className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5">
+        <div className="absolute -right-1 -top-1 h-2.5 w-2.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-60" />
-          <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-yellow-400" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400" />
         </div>
       )}
-
     </div>
   );
 }
