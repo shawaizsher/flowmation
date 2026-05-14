@@ -75,6 +75,9 @@ export default function DashboardPage() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<{ message: string; suggestions: string[] } | null>(null);
+  const [aiClarification, setAiClarification] = useState<{ question: string; options: string[]; originalPrompt: string } | null>(null);
+  const [aiConfidence, setAiConfidence] = useState<string | null>(null);
 
   const workspaceId = workspace?.id;
 
@@ -198,28 +201,83 @@ export default function DashboardPage() {
     setMenuOpen(null);
   };
 
-  const handleAiGenerate = async () => {
-    if (!workspaceId || !aiPrompt.trim()) return;
+  const resetAiModal = () => {
+    setAiError(null);
+    setAiClarification(null);
+    setAiConfidence(null);
+  };
+
+  const handleAiGenerate = async (promptOverride?: string) => {
+    const prompt = (promptOverride ?? aiPrompt).trim();
+    if (!workspaceId || !prompt) return;
+
+    resetAiModal();
+
     try {
       setAiGenerating(true);
-      const res = await aiApi.generateWorkflow(workspaceId!, aiPrompt);
-      const graph = res.data.graph;
+      const res = await aiApi.generateWorkflow(workspaceId, prompt);
+      const data = res.data;
+
+      // clarification_needed → show question + options in the modal
+      if (!data.success && data.type === 'clarification_needed') {
+        setAiClarification({ question: data.question, options: data.options || [], originalPrompt: prompt });
+        return;
+      }
+
+      // Unexpected non-success at 200
+      if (!data.success) {
+        toast.error(data.error || 'AI generation failed');
+        return;
+      }
+
+      setAiConfidence(data.confidence || null);
 
       const wfRes = await workflowApi.create(workspaceId, {
-        name: aiPrompt.slice(0, 60),
-        description: `AI-generated: ${aiPrompt}`,
-        graph,
+        name: prompt.slice(0, 60),
+        description: data.summary || `AI-generated: ${prompt}`,
+        graph: data.graph,
       });
 
-      toast.success('AI workflow generated!');
+      toast.success(data.summary ? `Workflow created: ${data.summary}` : 'AI workflow generated!');
       setShowAiModal(false);
       setAiPrompt('');
+      resetAiModal();
       navigate(`/workflows/${wfRes.data.workflow.id}`);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'AI generation failed');
+      const errorData = err.response?.data;
+
+      // invalid_input (400) → show inline error with suggestions
+      if (errorData?.type === 'invalid_input') {
+        setAiError({ message: errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
+        return;
+      }
+
+      // unsafe_request (422)
+      if (errorData?.type === 'unsafe_request') {
+        toast.error('This request involves potentially unsafe operations and cannot be processed.');
+        return;
+      }
+
+      toast.error(errorData?.error || 'AI generation failed');
     } finally {
       setAiGenerating(false);
     }
+  };
+
+  const handleClarificationOption = (option: string) => {
+    const original = aiClarification?.originalPrompt || '';
+    // Build a refined prompt by appending the chosen clarification
+    const refined = original ? `${original} — ${option.toLowerCase()}` : option;
+    setAiPrompt(refined);
+    setAiClarification(null);
+    // Auto-submit the refined prompt
+    handleAiGenerate(refined);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setAiPrompt(suggestion);
+    setAiError(null);
+    handleAiGenerate(suggestion);
   };
 
   const timeAgo = (dateStr: string) => {
@@ -729,52 +787,129 @@ export default function DashboardPage() {
       {showAiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="card mx-4 w-full max-w-lg p-6 animate-scale-in">
+            {/* Header */}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
                 <Sparkles size={20} className="text-brand-400" />
                 AI Generate Workflow
+                {aiConfidence && (
+                  <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    aiConfidence === 'high' ? 'bg-green-500/15 text-green-400' :
+                    aiConfidence === 'medium' ? 'bg-yellow-500/15 text-yellow-400' :
+                    'bg-surface-border text-foreground-muted'
+                  }`}>
+                    {aiConfidence} confidence
+                  </span>
+                )}
               </h2>
               <button
-                onClick={() => setShowAiModal(false)}
+                onClick={() => { setShowAiModal(false); resetAiModal(); }}
                 className="text-foreground-muted hover:text-foreground transition"
               >
                 <X size={20} />
               </button>
             </div>
-            <p className="mb-4 text-sm text-foreground-muted">
-              Describe what you want your workflow to do in plain English.
-            </p>
-            <textarea
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder="e.g., When a webhook is received, classify the sentiment using AI, then send a Slack message if it's negative…"
-              className="input-field mb-4 h-32 resize-none"
-              autoFocus
-            />
-            <div className="flex justify-end gap-3">
+
+            {/* ── Invalid input error ── */}
+            {aiError && (
+              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
+                  <p className="text-sm font-medium text-red-300">{aiError.message}</p>
+                </div>
+                {aiError.suggestions.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold text-foreground-muted uppercase tracking-wider">Try these instead:</p>
+                    <div className="space-y-1.5">
+                      {aiError.suggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSuggestionClick(s)}
+                          className="w-full text-left rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-medium text-foreground-secondary hover:border-brand-500/40 hover:text-foreground hover:bg-surface-hover transition"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Clarification question ── */}
+            {aiClarification && (
+              <div className="mb-4 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <Sparkles size={16} className="text-brand-400 mt-0.5 shrink-0" />
+                  <p className="text-sm font-semibold text-foreground">{aiClarification.question}</p>
+                </div>
+                <div className="space-y-1.5">
+                  {aiClarification.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleClarificationOption(opt)}
+                      disabled={aiGenerating}
+                      className="w-full text-left rounded-lg border border-brand-500/20 bg-surface-card px-3 py-2.5 text-sm font-medium text-foreground hover:border-brand-500/50 hover:bg-brand-500/10 transition disabled:opacity-50"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Prompt input (shown when no clarification active) ── */}
+            {!aiClarification && (
+              <>
+                {!aiError && (
+                  <p className="mb-3 text-sm text-foreground-muted">
+                    Describe what you want your workflow to do in plain English.
+                  </p>
+                )}
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => { setAiPrompt(e.target.value); if (aiError) setAiError(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAiGenerate(); }}
+                  placeholder="e.g., When a webhook is received, classify the sentiment using AI, then send a Slack message if it's negative…"
+                  className="input-field mb-4 h-28 resize-none"
+                  autoFocus={!aiError}
+                />
+              </>
+            )}
+
+            {/* ── Actions ── */}
+            <div className="flex justify-between items-center">
               <button
-                onClick={() => setShowAiModal(false)}
+                onClick={() => { setShowAiModal(false); resetAiModal(); }}
                 className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleAiGenerate}
-                disabled={!aiPrompt.trim() || aiGenerating}
-                className="btn-primary flex items-center gap-2 disabled:opacity-50"
-              >
-                {aiGenerating ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    Generate
-                  </>
-                )}
-              </button>
+              {!aiClarification && (
+                <button
+                  onClick={() => handleAiGenerate()}
+                  disabled={!aiPrompt.trim() || aiGenerating}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                >
+                  {aiGenerating ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      Generate
+                    </>
+                  )}
+                </button>
+              )}
+              {aiClarification && aiGenerating && (
+                <div className="flex items-center gap-2 text-sm text-brand-400">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-400/30 border-t-brand-400" />
+                  Building workflow…
+                </div>
+              )}
             </div>
           </div>
         </div>
