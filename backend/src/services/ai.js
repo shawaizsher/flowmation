@@ -158,6 +158,26 @@ const ACTION_TERMS = [
   'summarize', 'sync', 'update', 'write', 'store', 'log', 'alert',
   'email', 'message', 'process', 'extract', 'transform', 'fetch', 'read',
   'forward', 'push', 'deliver', 'record', 'archive', 'export', 'import',
+  // Extended action verbs — cover common automation phrasing
+  'upload', 'edit', 'delete', 'remove', 'move', 'copy', 'merge', 'parse',
+  'monitor', 'manage', 'check', 'watch', 'convert', 'share', 'assign',
+  'approve', 'review', 'submit', 'download', 'backup', 'restore', 'scan',
+  'tag', 'label', 'schedule', 'trigger', 'run', 'execute', 'start', 'stop',
+  'search', 'find', 'track', 'report', 'collect', 'aggregate', 'publish',
+  'draft', 'send out', 'set up', 'configure', 'deploy', 'build',
+];
+
+// Automation domain nouns — indicate a clear automation target even without a named service
+const AUTOMATION_NOUNS = [
+  'report', 'invoice', 'document', 'team', 'task', 'ticket', 'event',
+  'data', 'entry', 'item', 'order', 'payment', 'form', 'submission',
+  'user', 'product', 'backup', 'content', 'post', 'page', 'image',
+  'row', 'column', 'request', 'response', 'transaction', 'appointment',
+  'meeting', 'reminder', 'record', 'account', 'subscription', 'receipt',
+  'template', 'summary', 'digest', 'alert', 'log', 'file', 'folder',
+  'asset', 'contract', 'proposal', 'quote', 'feedback', 'review', 'survey',
+  'customer', 'member', 'employee', 'vendor', 'partner', 'client', 'ticket',
+  'issue', 'bug', 'feature', 'release', 'build', 'pipeline', 'workflow',
 ];
 
 
@@ -355,11 +375,14 @@ function validateWorkflowPrompt(prompt) {
   const uniqueLetters = new Set((lower.match(/[a-z]/g) || [])).size;
 
   // ── Hard rejections (LOW confidence) ───────────────────────────────────
+  // Standalone words/phrases with no automation meaning — no verb+noun context possible
   const MEANINGLESS = new Set([
     'automation', 'workflow', 'make workflow', 'create workflow', 'build workflow',
     'automate', 'test', 'qwerty', 'asdf', 'random', 'something', 'whatever',
-    'make something', 'build something', 'do something', 'make', 'build', 'create',
-    'run', 'start', 'go', 'help',
+    'make something', 'build something', 'do something', 'make', 'go', 'help',
+    // Note: single action verbs like 'create', 'build', 'run', 'start' are NOT
+    // listed here so that "build report", "run workflow", etc. can reach MEDIUM.
+    // They are caught by hasPartialShape requiring a paired noun/integration.
   ]);
 
   const greetingOnly       = /^(hi|hello|hey|yo|thanks|thank you|test|ok|okay|sure|yes|no|maybe|please|help|sup|howdy)$/i.test(text.trim());
@@ -387,10 +410,11 @@ function validateWorkflowPrompt(prompt) {
   }
 
   // ── Detect presence of semantic categories ──────────────────────────────
-  const detectedIntent = detectWorkflowIntent(normalized);
-  const hasTrigger     = hasAny(normalized, TRIGGER_TERMS) || /^(daily|weekly|hourly|monthly|morning)/.test(normalized);
-  const hasAction      = hasAny(normalized, ACTION_TERMS);
-  const hasIntegration = hasAny(normalized, INTEGRATION_TERMS);
+  const detectedIntent    = detectWorkflowIntent(normalized);
+  const hasTrigger        = hasAny(normalized, TRIGGER_TERMS) || /^(daily|weekly|hourly|monthly|morning)/.test(normalized);
+  const hasAction         = hasAny(normalized, ACTION_TERMS);
+  const hasIntegration    = hasAny(normalized, INTEGRATION_TERMS);
+  const hasAutomationNoun = hasAny(normalized, AUTOMATION_NOUNS);
 
   // ── HIGH confidence: clear recognizable automation patterns ─────────────
   const HIGH_CONFIDENCE_PATTERNS = [
@@ -431,7 +455,13 @@ function validateWorkflowPrompt(prompt) {
   }
 
   // ── MEDIUM confidence: partial intent — ask clarification ───────────────
-  const hasPartialShape = (hasTrigger || hasAction) && (hasIntegration || tokens.length >= 4);
+  // Passes when there is a clear automation verb (action) paired with any domain noun,
+  // a named service/integration, OR enough words to imply context.
+  // This ensures "send report", "notify team", "upload file", "process invoice" etc.
+  // are treated as MEDIUM (ask clarification) rather than rejected outright.
+  const hasPartialShape =
+    (hasTrigger || hasAction) &&
+    (hasIntegration || hasAutomationNoun || tokens.length >= 4);
 
   if (hasPartialShape) {
     const missingParts = [];
