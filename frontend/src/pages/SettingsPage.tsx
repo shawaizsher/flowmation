@@ -1,8 +1,9 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import {
   User, Lock, Bell, Palette, Eye, EyeOff, Save, Shield,
   Mail, Sun, Moon, Monitor, CheckCircle2, AlertCircle,
-  AlertTriangle, Loader2, Info, Trash2,
+  AlertTriangle, Loader2, Info, Trash2, Camera, Upload,
+  X, Smile,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../store';
@@ -115,22 +116,285 @@ function ToggleItem({
   );
 }
 
-// ── Avatar ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+//  AVATAR SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
 
-function Avatar({ name, size = 16 }: { name: string; size?: number }) {
-  const hue = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+type AvatarType = 'gradient' | 'emoji' | 'image';
+
+interface AvatarData {
+  type: AvatarType;
+  gradient?: { from: string; to: string };
+  emoji?: string;
+  imageUrl?: string;
+}
+
+const AVATAR_GRADIENTS = [
+  { id: 'ocean',    label: 'Ocean',   from: '#3b82f6', to: '#06b6d4' },
+  { id: 'sunset',   label: 'Sunset',  from: '#f97316', to: '#ef4444' },
+  { id: 'forest',   label: 'Forest',  from: '#22c55e', to: '#16a34a' },
+  { id: 'violet',   label: 'Violet',  from: '#8b5cf6', to: '#6366f1' },
+  { id: 'rose',     label: 'Rose',    from: '#ec4899', to: '#f43f5e' },
+  { id: 'gold',     label: 'Gold',    from: '#f59e0b', to: '#f97316' },
+  { id: 'teal',     label: 'Teal',    from: '#14b8a6', to: '#0ea5e9' },
+  { id: 'slate',    label: 'Slate',   from: '#64748b', to: '#334155' },
+  { id: 'candy',    label: 'Candy',   from: '#f472b6', to: '#c084fc' },
+  { id: 'mint',     label: 'Mint',    from: '#34d399', to: '#3b82f6' },
+  { id: 'crimson',  label: 'Crimson', from: '#ef4444', to: '#7c3aed' },
+  { id: 'dawn',     label: 'Dawn',    from: '#fbbf24', to: '#f472b6' },
+];
+
+const AVATAR_EMOJIS = [
+  '😀','😎','🤓','🧑‍💻','👨‍💻','👩‍💻','🧑‍🎨','🧑‍🚀','🦸','🥷',
+  '🦊','🐺','🦁','🐉','🦋','🦅','🐬','🦄','🐙','🦋',
+  '⚡','🔥','✨','🚀','💎','🎯','🌊','🌙','⭐','🎭',
+  '🏆','💡','🎮','🌈','🎪','🧩',
+];
+
+const AVATAR_STORAGE_KEY = 'flowa-user-avatar';
+
+function loadAvatar(): AvatarData | null {
+  try {
+    const stored = localStorage.getItem(AVATAR_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch { return null; }
+}
+
+function saveAvatar(data: AvatarData) {
+  try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+
+// ── AvatarDisplay — renders any avatar type ────────────────────────────────
+
+function AvatarDisplay({ avatar, name, size = 64 }: { avatar: AvatarData | null; name: string; size?: number }) {
+  const fontSize = size * 0.38;
+
+  if (avatar?.type === 'image' && avatar.imageUrl) {
+    return (
+      <img
+        src={avatar.imageUrl}
+        alt="Profile"
+        className="rounded-full object-cover shadow-lg shrink-0"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  if (avatar?.type === 'emoji' && avatar.emoji) {
+    return (
+      <div
+        className="rounded-full flex items-center justify-center shadow-lg shrink-0 bg-surface-border"
+        style={{ width: size, height: size, fontSize: fontSize * 1.3 }}
+      >
+        {avatar.emoji}
+      </div>
+    );
+  }
+
+  // Gradient (default or chosen)
+  const bg = avatar?.type === 'gradient' && avatar.gradient
+    ? `linear-gradient(135deg, ${avatar.gradient.from}, ${avatar.gradient.to})`
+    : (() => {
+        const hue = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+        return `linear-gradient(135deg, hsl(${hue},70%,55%), hsl(${(hue + 40) % 360},70%,45%))`;
+      })();
+
   return (
     <div
-      className="flex items-center justify-center rounded-full text-white font-bold uppercase select-none shadow-lg"
-      style={{
-        width: size, height: size, fontSize: size * 0.38,
-        background: `linear-gradient(135deg, hsl(${hue},70%,55%), hsl(${(hue + 40) % 360},70%,45%))`,
-      }}
+      className="rounded-full flex items-center justify-center text-white font-bold uppercase select-none shadow-lg shrink-0"
+      style={{ width: size, height: size, fontSize, background: bg }}
     >
       {name.trim().charAt(0) || 'U'}
     </div>
   );
 }
+
+// ── AvatarPickerModal ──────────────────────────────────────────────────────
+
+function AvatarPickerModal({
+  name,
+  current,
+  onSave,
+  onClose,
+}: {
+  name: string;
+  current: AvatarData | null;
+  onSave: (data: AvatarData) => void;
+  onClose: () => void;
+}) {
+  type PickerTab = 'gradient' | 'emoji' | 'photo';
+  const [tab, setTab]           = useState<PickerTab>('gradient');
+  const [draft, setDraft]       = useState<AvatarData>(current ?? { type: 'gradient' });
+  const [imgError, setImgError] = useState('');
+  const fileRef                 = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { setImgError('Image must be under 2 MB'); return; }
+    if (!file.type.startsWith('image/')) { setImgError('Please select an image file'); return; }
+    setImgError('');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setDraft({ type: 'image', imageUrl: ev.target?.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="card w-full max-w-md mx-4 animate-scale-in overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
+          <h3 className="font-display text-base font-bold text-foreground">Choose Avatar</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-foreground-muted hover:bg-surface-border hover:text-foreground transition">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Preview */}
+        <div className="flex items-center gap-4 px-5 py-4 border-b border-surface-border bg-surface-input/40">
+          <AvatarDisplay avatar={draft} name={name} size={56} />
+          <div>
+            <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
+            <p className="text-xs text-foreground-muted mt-0.5">Preview</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-surface-border">
+          {([
+            { id: 'gradient', label: 'Colors',  icon: Palette },
+            { id: 'emoji',    label: 'Emoji',   icon: Smile },
+            { id: 'photo',    label: 'Photo',   icon: Camera },
+          ] as { id: PickerTab; label: string; icon: React.ElementType }[]).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${
+                tab === t.id
+                  ? 'text-brand-400 border-b-2 border-brand-500'
+                  : 'text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              <t.icon size={13} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="p-5 min-h-[200px]">
+
+          {/* ── Colors ── */}
+          {tab === 'gradient' && (
+            <div className="grid grid-cols-6 gap-3">
+              {AVATAR_GRADIENTS.map(g => {
+                const active = draft.type === 'gradient' && draft.gradient?.from === g.from;
+                return (
+                  <button
+                    key={g.id}
+                    title={g.label}
+                    onClick={() => setDraft({ type: 'gradient', gradient: { from: g.from, to: g.to } })}
+                    className={`relative w-full aspect-square rounded-full transition-all duration-150 hover:scale-110 ${
+                      active ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-card scale-110' : ''
+                    }`}
+                    style={{ background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
+                  >
+                    {active && (
+                      <CheckCircle2 size={12} className="absolute -top-0.5 -right-0.5 text-white bg-brand-500 rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Emoji ── */}
+          {tab === 'emoji' && (
+            <div className="grid grid-cols-9 gap-2">
+              {AVATAR_EMOJIS.map(em => (
+                <button
+                  key={em}
+                  onClick={() => setDraft({ type: 'emoji', emoji: em })}
+                  className={`text-xl rounded-lg p-1.5 transition-all hover:bg-surface-hover hover:scale-110 ${
+                    draft.type === 'emoji' && draft.emoji === em
+                      ? 'bg-brand-500/20 ring-1 ring-brand-500 scale-110'
+                      : ''
+                  }`}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Photo ── */}
+          {tab === 'photo' && (
+            <div className="space-y-4">
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="w-full flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-surface-border bg-surface-input py-8 text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 hover:bg-brand-500/5 transition"
+              >
+                <Upload size={28} />
+                <div className="text-center">
+                  <p className="text-sm font-semibold">Click to upload photo</p>
+                  <p className="text-xs mt-0.5">PNG, JPG, GIF — max 2 MB</p>
+                </div>
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFile}
+              />
+              {imgError && <p className="text-xs text-red-400 flex items-center gap-1.5"><AlertCircle size={12} />{imgError}</p>}
+              {draft.type === 'image' && draft.imageUrl && (
+                <div className="flex items-center gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+                  <img src={draft.imageUrl} alt="Preview" className="w-10 h-10 rounded-full object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-green-400">Image ready</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">Click Save to apply</p>
+                  </div>
+                  <button
+                    onClick={() => setDraft({ type: 'gradient' })}
+                    className="text-foreground-muted hover:text-red-400 transition"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-surface-border">
+          <button
+            onClick={() => { onSave({ type: 'gradient' }); onClose(); }}
+            className="text-xs text-foreground-muted hover:text-foreground transition"
+          >
+            Reset to default
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="text-sm text-foreground-muted hover:text-foreground transition px-3 py-1.5">
+              Cancel
+            </button>
+            <button
+              onClick={() => { onSave(draft); onClose(); }}
+              className="btn-primary !py-1.5 !px-4 !text-sm flex items-center gap-1.5"
+            >
+              <CheckCircle2 size={14} /> Save Avatar
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════
 //  SETTINGS PAGE
@@ -139,6 +403,16 @@ function Avatar({ name, size = 16 }: { name: string; size?: number }) {
 export default function SettingsPage() {
   const { user } = useStore();
   const [activeTab, setActiveTab]   = useState<Tab>('profile');
+
+  // ── Avatar ──────────────────────────────────────────────────────────────
+  const [avatar, setAvatar]               = useState<AvatarData | null>(loadAvatar);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  const handleAvatarSave = (data: AvatarData) => {
+    saveAvatar(data);
+    setAvatar(data);
+    toast.success('Avatar updated');
+  };
 
   // ── Profile ─────────────────────────────────────────────────────────────
   const [name, setName]             = useState(user?.name || '');
@@ -308,11 +582,30 @@ export default function SettingsPage() {
               <form onSubmit={handleProfileSave} className="space-y-6 max-w-md">
                 {/* Avatar */}
                 <div className="flex items-center gap-4">
-                  <Avatar name={name || 'U'} size={64} />
+                  {/* Clickable avatar with camera overlay */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarPicker(true)}
+                    className="relative group shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    aria-label="Change avatar"
+                  >
+                    <AvatarDisplay avatar={avatar} name={name || 'U'} size={64} />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <Camera size={18} className="text-white" />
+                    </div>
+                  </button>
+
                   <div>
                     <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
                     <p className="text-xs text-foreground-muted mt-0.5">{user?.role || 'Member'}</p>
-                    <p className="text-xs text-foreground-muted/60 mt-1">Avatar is generated from your name</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAvatarPicker(true)}
+                      className="mt-1.5 text-xs font-medium text-brand-400 hover:text-brand-300 transition"
+                    >
+                      Change avatar
+                    </button>
                   </div>
                 </div>
 
@@ -669,6 +962,17 @@ export default function SettingsPage() {
 
         </div>
       </div>
+
+      {/* Avatar picker modal */}
+      {showAvatarPicker && (
+        <AvatarPickerModal
+          name={name || 'U'}
+          current={avatar}
+          onSave={handleAvatarSave}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
     </div>
   );
 }
+
