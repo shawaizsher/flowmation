@@ -2242,9 +2242,6 @@ async function workflowChat({ message, history, workflow }) {
     const edges  = workflow?.edges || [];
     let updatedWorkflow = null;
     let reply           = '';
-
-    let updatedWorkflow = null;
-    let reply           = '';
     let messageType     = 'message';
     let suggestions     = [];
     let metadata        = {};
