@@ -522,7 +522,10 @@ function validateWorkflowPrompt(prompt) {
   const keyboardMash       = tokens.length <= 2 && uniqueLetters >= 5 && !/[aeiou]/i.test(text) && alphaCount > 3;
   const noAlpha            = alphaCount < 3;
   const genericOnly        = MEANINGLESS.has(text.trim().toLowerCase());
-  const noMeaningfulWords  = tokens.length <= 2 && !hasAny(normalized, [...TRIGGER_TERMS, ...ACTION_TERMS, ...INTEGRATION_TERMS]);
+  // Guard: short prompt with zero meaningful words across ALL term lists (including nouns)
+  const noMeaningfulWords  = tokens.length <= 2 && !hasAny(normalized, [
+    ...TRIGGER_TERMS, ...ACTION_TERMS, ...INTEGRATION_TERMS, ...AUTOMATION_NOUNS,
+  ]);
 
   if (greetingOnly || tooShort || onlyNumbers || keyboardMash || noAlpha || genericOnly || noMeaningfulWords) {
     return {
@@ -586,16 +589,18 @@ function validateWorkflowPrompt(prompt) {
   }
 
   // ── MEDIUM confidence: meaningful but incomplete prompt ─────────────────
-  // Passes when the prompt contains a recognisable automation verb paired with
-  // a domain noun, a named service, or enough words to imply automation context.
-  // Prompts like "send report", "notify team", "upload file", "process invoice",
-  // "editing document", "save leads" all qualify as MEDIUM.
+  // Any prompt that passes the hard rejections AND contains at least one
+  // meaningful signal (action verb, trigger term, named service, or domain
+  // noun) alongside at least one other word qualifies as MEDIUM.
   //
-  // IMPORTANT: MEDIUM is valid: true — we generate a best-guess workflow AND
-  // surface clarification questions/suggestions so the user can refine it.
-  const hasPartialShape =
-    (hasTrigger || hasAction) &&
-    (hasIntegration || hasAutomationNoun || tokens.length >= 4);
+  // This guarantees that "editing document", "send report", "save leads",
+  // "notify team", "upload file", "process invoice", "generate workflow for
+  // editing document" etc. all reach MEDIUM and get a best-guess workflow.
+  //
+  // MEDIUM is valid: true — a workflow IS generated, and clarification data
+  // is attached so the user can refine it further.
+  const hasMeaningfulSignal = hasAction || hasTrigger || hasIntegration || hasAutomationNoun;
+  const hasPartialShape     = hasMeaningfulSignal && tokens.length >= 2;
 
   if (hasPartialShape) {
     const missingParts = [];
