@@ -120,6 +120,248 @@ function makeNode(id, x, y, label, type, config = {}) {
   return { id, type: 'flowNode', position: { x, y }, data: { label, type, icon: '🔗', config } };
 }
 
+class WorkflowValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'WorkflowValidationError';
+    this.statusCode = 400;
+  }
+}
+
+const INVALID_AUTOMATION_MESSAGE = 'Invalid automation request. Please describe the workflow you want to automate in plain English.';
+
+const INTEGRATION_TERMS = [
+  'airtable', 'api', 'asana', 'calendar', 'crm', 'database', 'discord', 'email', 'file', 'gmail',
+  'github', 'google', 'hubspot', 'jira', 'mail', 'mongodb', 'notion', 'postgres', 'redis', 'salesforce',
+  'sheet', 'sheets', 'slack', 'stripe', 'telegram', 'trello', 'twilio', 'webhook', 'zapier',
+];
+
+const TRIGGER_TERMS = [
+  'after', 'daily', 'every', 'hourly', 'new', 'on', 'once', 'received', 'recurring', 'schedule',
+  'succeeds', 'trigger', 'updated', 'webhook', 'weekly', 'when', 'whenever',
+];
+
+const ACTION_TERMS = [
+  'add', 'append', 'call', 'classify', 'create', 'delay', 'filter', 'generate', 'insert', 'notify',
+  'post', 'route', 'save', 'send', 'summarize', 'sync', 'update', 'write',
+];
+
+function tokenizePrompt(prompt) {
+  return String(prompt || '').toLowerCase().match(/[a-z0-9]+/g) || [];
+}
+
+function hasAny(text, terms) {
+  return terms.some(term => text.includes(term));
+}
+
+function validateAutomationPrompt(prompt) {
+  const text = String(prompt || '').trim();
+  const lower = text.toLowerCase();
+  const tokens = tokenizePrompt(text);
+  const alphaCount = (text.match(/[a-z]/gi) || []).length;
+  const uniqueLetters = new Set((lower.match(/[a-z]/g) || [])).size;
+
+  const greetingOnly = /^(hi|hello|hey|yo|thanks|thank you)$/i.test(text);
+  const mostlySymbolsOrNumbers = alphaCount < 4 || alphaCount / Math.max(text.length, 1) < 0.35;
+  const tooShort = tokens.length < 4 && text.length < 24;
+  const likelyKeyboardMash = tokens.length <= 2 && uniqueLetters > 4 && !/[aeiou]/i.test(text);
+  const hasAutomationShape =
+    hasAny(lower, TRIGGER_TERMS) &&
+    hasAny(lower, ACTION_TERMS) &&
+    (hasAny(lower, INTEGRATION_TERMS) || lower.includes('ai') || lower.includes('automation') || lower.includes('workflow'));
+
+  if (greetingOnly || mostlySymbolsOrNumbers || tooShort || likelyKeyboardMash || !hasAutomationShape) {
+    throw new WorkflowValidationError(INVALID_AUTOMATION_MESSAGE);
+  }
+}
+
+function inferTrigger(prompt) {
+  const lower = prompt.toLowerCase();
+
+  if (/(every|daily|morning|weekly|hourly|schedule|cron)/.test(lower)) {
+    let expression = '0 9 * * *';
+    if (/hourly|every hour/.test(lower)) expression = '0 * * * *';
+    if (/weekly|every week/.test(lower)) expression = '0 9 * * 1';
+    if (/morning/.test(lower)) expression = '0 8 * * *';
+    return makeNode('n1', 100, 220, 'Schedule Trigger', 'trigger_cron', { expression });
+  }
+
+  if (/(gmail|email|mail|inbox|unread).*(new|received|arrives)|new .*?(gmail|email|mail)/.test(lower)) {
+    return makeNode('n1', 100, 220, 'New Email Trigger', 'trigger_email', {
+      mailbox: 'INBOX',
+      unreadOnly: lower.includes('unread'),
+    });
+  }
+
+  if (/stripe|payment|checkout/.test(lower)) {
+    return makeNode('n1', 100, 220, 'Stripe Event Webhook', 'trigger_webhook', {
+      event: lower.includes('succeed') ? 'payment_intent.succeeded' : 'stripe.event',
+    });
+  }
+
+  if (/hubspot|lead|crm|form|submission|contact/.test(lower)) {
+    return makeNode('n1', 100, 220, 'Lead Capture Trigger', 'trigger_webhook', {
+      source: lower.includes('hubspot') ? 'HubSpot' : 'Form or CRM webhook',
+    });
+  }
+
+  if (/github|pull request|commit|deployment|build/.test(lower)) {
+    return makeNode('n1', 100, 220, 'GitHub Webhook', 'trigger_webhook', { source: 'GitHub' });
+  }
+
+  return makeNode('n1', 100, 220, 'Webhook Trigger', 'trigger_webhook', {});
+}
+
+function actionNodeFor(prompt, action, id, x, y) {
+  const lower = prompt.toLowerCase();
+  const commonConfig = { sourcePrompt: prompt };
+
+  switch (action) {
+    case 'classify':
+      return makeNode(id, x, y, 'Classify with AI', 'ai_classify', {
+        input: '{{input}}',
+        labels: lower.includes('sentiment') ? ['positive', 'neutral', 'negative'] : [],
+      });
+    case 'summarize':
+      return makeNode(id, x, y, 'Summarize with AI', 'ai_summarize', { input: '{{input}}' });
+    case 'gmail_read':
+      return makeNode(id, x, y, 'Read Gmail Emails', 'google_gmail_read', {
+        mailbox: 'INBOX',
+        unreadOnly: prompt.toLowerCase().includes('unread'),
+      });
+    case 'slack':
+      return makeNode(id, x, y, 'Send Slack Message', 'slack_send', { channel: '#general', message: '{{message}}' });
+    case 'discord':
+      return makeNode(id, x, y, 'Send Discord Message', 'discord_send', { channel: '', message: '{{message}}' });
+    case 'email':
+      return makeNode(id, x, y, 'Send Email', 'email_send', { to: '', subject: 'Workflow notification', body: '{{message}}' });
+    case 'gmail':
+      return makeNode(id, x, y, 'Send Gmail Email', 'google_gmail_send', { to: '', subject: 'Workflow notification', body: '{{message}}' });
+    case 'airtable':
+      return makeNode(id, x, y, 'Update Airtable', 'http_request', {
+        method: 'PATCH',
+        url: 'https://api.airtable.com/v0/{baseId}/{tableName}',
+        body: '{{data}}',
+      });
+    case 'sheet':
+      return makeNode(id, x, y, 'Update Spreadsheet', 'google_sheets_write', { spreadsheetId: '', range: '', values: '{{data}}' });
+    case 'database':
+      return makeNode(id, x, y, 'Insert Database Record', 'postgres_insert', { table: '', data: '{{data}}' });
+    case 'hubspot':
+      return makeNode(id, x, y, 'Create HubSpot Contact', 'hubspot_contact', { email: '{{email}}', name: '{{name}}' });
+    case 'jira':
+      return makeNode(id, x, y, 'Create Jira Issue', 'jira_create', { project: '', summary: '{{summary}}' });
+    case 'notion':
+      return makeNode(id, x, y, 'Create Notion Page', 'notion_page', { title: '{{title}}', content: '{{content}}' });
+    case 'http':
+      return makeNode(id, x, y, 'Call External API', 'http_request', { method: 'POST', url: '', body: '{{data}}' });
+    case 'delay':
+      return makeNode(id, x, y, 'Delay', 'delay', { duration: lower.match(/(\d+)\s*(minute|minutes|min|hour|hours|day|days)/)?.[0] || '5 minutes' });
+    default:
+      return makeNode(id, x, y, 'Prepare Data', 'transform_set', commonConfig);
+  }
+}
+
+function inferActions(prompt) {
+  const lower = prompt.toLowerCase();
+  const actions = [];
+
+  if (/(gmail|email|mail).*(read|unread|inbox|summar)|(?:read|unread|inbox|summar).*?(gmail|email|mail)/.test(lower)) actions.push('gmail_read');
+  if (/classif|categor|sentiment|label/.test(lower)) actions.push('classify');
+  if (/summar/.test(lower)) actions.push('summarize');
+  if (/delay|wait|pause/.test(lower)) actions.push('delay');
+  if (/hubspot/.test(lower)) actions.push('hubspot');
+  if (/airtable/.test(lower)) actions.push('airtable');
+  if (/spreadsheet|google sheet|sheets/.test(lower)) actions.push('sheet');
+  if (/database|postgres|sql|store|save|insert/.test(lower)) actions.push('database');
+  if (/jira|ticket|issue/.test(lower)) actions.push('jira');
+  if (/notion/.test(lower)) actions.push('notion');
+  if (/api|http|webhook response|call/.test(lower) && !lower.includes('webhook is received')) actions.push('http');
+  if (/send.*gmail|gmail.*send.*(email|mail)/.test(lower)) actions.push('gmail');
+  else if (/(send|notify|alert).*\b(email|mail)\b|\b(email|mail)\b.*(send|notify|alert)/.test(lower)) actions.push('email');
+  if (/slack/.test(lower)) actions.push('slack');
+  if (/discord/.test(lower)) actions.push('discord');
+
+  return [...new Set(actions)];
+}
+
+function inferCondition(prompt) {
+  const lower = prompt.toLowerCase();
+  if (/\bif\b|only if|when .* negative|unless|where|filter/.test(lower)) {
+    let condition = '{{condition}}';
+    if (/negative/.test(lower)) condition = '{{classification}} === "negative"';
+    if (/payment.*succeed|succeeded|success/.test(lower)) condition = '{{payment.status}} === "succeeded"';
+    if (/high[- ]?value|qualified|hot lead/.test(lower)) condition = '{{lead.score}} >= 80';
+    return { label: 'Check Condition', condition };
+  }
+  return null;
+}
+
+function buildAutomationWorkflow(prompt) {
+  validateAutomationPrompt(prompt);
+
+  const nodes = [inferTrigger(prompt)];
+  const edges = [];
+  let previousId = 'n1';
+  let nextIndex = 2;
+  let x = 390;
+
+  const actions = inferActions(prompt);
+  if (actions.length === 0) {
+    throw new WorkflowValidationError('Please include at least one action, such as send, update, create, summarize, classify, or notify.');
+  }
+
+  const sourceActions = actions.filter(action => ['gmail_read'].includes(action));
+  for (const action of sourceActions) {
+    const id = `n${nextIndex++}`;
+    nodes.push(actionNodeFor(prompt, action, id, x, 220));
+    edges.push(makeEdge(`e${edges.length + 1}`, previousId, id));
+    previousId = id;
+    x += 290;
+  }
+
+  const needsTransform = actions.some(action => ['slack', 'discord', 'email', 'gmail', 'sheet', 'database', 'hubspot', 'jira', 'notion', 'http', 'airtable'].includes(action));
+  if (needsTransform) {
+    const id = `n${nextIndex++}`;
+    nodes.push(makeNode(id, x, 220, 'Prepare Data', 'transform_set', { mapping: '{}' }));
+    edges.push(makeEdge(`e${edges.length + 1}`, previousId, id));
+    previousId = id;
+    x += 290;
+  }
+
+  const analysisActions = actions.filter(action => ['classify', 'summarize', 'delay'].includes(action));
+  for (const action of analysisActions) {
+    const id = `n${nextIndex++}`;
+    nodes.push(actionNodeFor(prompt, action, id, x, 220));
+    edges.push(makeEdge(`e${edges.length + 1}`, previousId, id));
+    previousId = id;
+    x += 290;
+  }
+
+  const condition = inferCondition(prompt);
+  if (condition) {
+    const id = `n${nextIndex++}`;
+    nodes.push(makeNode(id, x, 220, condition.label, 'logic_if', { condition: condition.condition }));
+    edges.push(makeEdge(`e${edges.length + 1}`, previousId, id));
+    previousId = id;
+    x += 290;
+  }
+
+  const outputActions = actions.filter(action => !['gmail_read', 'classify', 'summarize', 'delay'].includes(action));
+  for (const [index, action] of outputActions.entries()) {
+    const id = `n${nextIndex++}`;
+    const y = condition && outputActions.length > 1 ? 120 + (index * 180) : 220;
+    nodes.push(actionNodeFor(prompt, action, id, x, y));
+    edges.push(makeEdge(`e${edges.length + 1}`, previousId, id));
+  }
+
+  return {
+    name: 'Generated Automation Workflow',
+    description: `Generated from: ${prompt}`,
+    graph: { nodes, edges },
+  };
+}
+
 const WORKFLOW_TEMPLATES = [
   {
     name: 'Email Automation',
@@ -702,15 +944,18 @@ function applyWorkflowTool(workflow, toolName, input) {
  */
 async function generateWorkflow(prompt) {
   try {
-    const tpl = matchTemplate(prompt);
-    logger.info(`[intelligence] generateWorkflow matched template: "${tpl.name}"`);
+    const tpl = buildAutomationWorkflow(prompt);
+    logger.info(`[intelligence] generateWorkflow built automation graph: "${tpl.name}"`);
     return {
       graph:      tpl.graph,
       description: tpl.description || prompt,
-      model:      'template-matching',
+      model:      'deterministic-workflow-generator',
       tokensUsed: 0,
     };
   } catch (err) {
+    if (err instanceof WorkflowValidationError) {
+      throw err;
+    }
     logger.error('[intelligence] generateWorkflow error:', err);
     return {
       graph: {
