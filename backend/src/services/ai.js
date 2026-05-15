@@ -559,6 +559,205 @@ function analyzeWorkflowHealth(workflow) {
   return { score, grade, issues, tips: tips.slice(0, 4) };
 }
 
+function getRuntimeRegistry() {
+  try {
+    return require('../nodes/registry');
+  } catch {
+    return null;
+  }
+}
+
+function getNodeRuntimeType(node) {
+  return node?.data?.type || node?.type || 'unknown';
+}
+
+function getNodeLabel(node) {
+  return node?.data?.label || node?.id || 'Unnamed node';
+}
+
+function isMissingValue(value) {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+
+function inferNodeOutputSchema(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('webhook')) return ['body', 'headers', 'query', 'method'];
+  if (t.includes('trigger') || t.includes('cron') || t.includes('schedule')) return ['timestamp', 'payload'];
+  if (t.includes('http') || t.includes('rest')) return ['statusCode', 'body', 'headers', 'success'];
+  if (t.includes('slack') || t.includes('email') || t.includes('telegram') || t.includes('discord')) return ['success', 'messageId', 'sentAt'];
+  if (t.includes('classify')) return ['category', 'confidence'];
+  if (t.includes('summar')) return ['summary'];
+  if (t.includes('database') || t.includes('postgres') || t.includes('mysql')) return ['rows', 'count', 'result'];
+  if (t.includes('filter')) return ['passed', 'rejected'];
+  if (t.includes('split') || t.includes('loop')) return ['items', 'count'];
+  if (t.includes('date')) return ['datetime', 'timestamp'];
+  if (t.includes('math')) return ['result'];
+  return ['data'];
+}
+
+function buildDataContracts(nodes, edges) {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  return (edges || []).map((edge) => {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    return {
+      edgeId: edge.id,
+      from: getNodeLabel(source),
+      to: getNodeLabel(target),
+      sourceType: getNodeRuntimeType(source),
+      targetType: getNodeRuntimeType(target),
+      availableFields: inferNodeOutputSchema(getNodeRuntimeType(source)),
+      expectedInput: 'data'
+    };
+  });
+}
+
+function analyzePolicyGuardrails(nodes) {
+  const findings = [];
+  const secretPatterns = [
+    { name: 'API key', pattern: /(sk-|xox[baprs]-|ghp_|AIza|SG\.)[A-Za-z0-9_\-]{8,}/ },
+    { name: 'JWT/private token', pattern: /eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/ },
+    { name: 'Password field', pattern: /(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*["']?[^"',}\s]+/i },
+  ];
+  const piiPatterns = [
+    { name: 'Email address', pattern: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i },
+    { name: 'Phone number', pattern: /\+?\d[\d\s().-]{8,}\d/ },
+  ];
+
+  for (const node of nodes || []) {
+    const type = getNodeRuntimeType(node);
+    const label = getNodeLabel(node);
+    const configText = JSON.stringify(node?.data?.config || {});
+
+    for (const rule of secretPatterns) {
+      if (rule.pattern.test(configText)) {
+        findings.push({
+          severity: 'high',
+          nodeId: node.id,
+          nodeLabel: label,
+          type: 'secret_exposure',
+          message: `${rule.name} appears to be stored directly in node config. Move it to Credentials Manager.`
+        });
+      }
+    }
+
+    for (const rule of piiPatterns) {
+      if (rule.pattern.test(configText)) {
+        findings.push({
+          severity: 'medium',
+          nodeId: node.id,
+          nodeLabel: label,
+          type: 'pii_literal',
+          message: `${rule.name} detected in node config. Confirm this workflow is allowed to process PII.`
+        });
+      }
+    }
+
+    const url = node?.data?.config?.url || node?.data?.config?.webhookUrl;
+    if (typeof url === 'string' && /^http:\/\//i.test(url)) {
+      findings.push({
+        severity: 'medium',
+        nodeId: node.id,
+        nodeLabel: label,
+        type: 'insecure_http',
+        message: 'External HTTP URL is not encrypted. Use HTTPS before production.'
+      });
+    }
+
+    if ((type.includes('ai') || type.includes('openai') || type.includes('anthropic')) && configText.length > 2) {
+      findings.push({
+        severity: 'low',
+        nodeId: node.id,
+        nodeLabel: label,
+        type: 'ai_review',
+        message: 'AI node should be reviewed for prompt safety, PII handling, and output constraints.'
+      });
+    }
+  }
+
+  return {
+    status: findings.some(f => f.severity === 'high') ? 'blocked' : findings.length ? 'review' : 'clear',
+    findings
+  };
+}
+
+function findMissingConfig(nodes, registry) {
+  return (nodes || []).flatMap((node) => {
+    const type = getNodeRuntimeType(node);
+    const definition = registry?.get?.(type);
+    const schema = definition?.configSchema || {};
+    const config = node?.data?.config || {};
+    const missingFields = Object.entries(schema)
+      .filter(([, field]) => field?.required)
+      .map(([key]) => key)
+      .filter((key) => isMissingValue(config[key]));
+
+    if (missingFields.length === 0) return [];
+
+    return [{
+      nodeId: node.id,
+      nodeLabel: getNodeLabel(node),
+      nodeType: type,
+      fields: missingFields
+    }];
+  });
+}
+
+function compileWorkflow(workflow) {
+  const nodes = workflow?.nodes || [];
+  const edges = workflow?.edges || [];
+  const registry = getRuntimeRegistry();
+  const health = analyzeWorkflowHealth({ nodes, edges });
+  const unsupportedNodes = nodes
+    .filter((node) => !registry?.get?.(getNodeRuntimeType(node)))
+    .map((node) => ({
+      nodeId: node.id,
+      nodeLabel: getNodeLabel(node),
+      nodeType: getNodeRuntimeType(node)
+    }));
+  const missingConfig = findMissingConfig(nodes, registry);
+  const dataContracts = buildDataContracts(nodes, edges);
+  const simulation = simulateWorkflow({ nodes, edges });
+  const policy = analyzePolicyGuardrails(nodes);
+
+  let readinessScore = health.score;
+  readinessScore -= unsupportedNodes.length * 15;
+  readinessScore -= missingConfig.reduce((total, item) => total + item.fields.length * 6, 0);
+  readinessScore -= policy.findings.reduce((total, finding) => total + (finding.severity === 'high' ? 18 : finding.severity === 'medium' ? 8 : 3), 0);
+  readinessScore = Math.max(0, Math.min(100, readinessScore));
+
+  const releaseChecklist = [
+    unsupportedNodes.length === 0 ? 'All node types are supported by the runtime.' : `Resolve ${unsupportedNodes.length} unsupported runtime node(s).`,
+    missingConfig.length === 0 ? 'Required node configuration is complete.' : `Fill required fields on ${missingConfig.length} node(s).`,
+    policy.status === 'clear' ? 'Policy guardrails passed.' : `Review ${policy.findings.length} policy finding(s).`,
+    health.issues.filter((issue) => issue.type === 'error').length === 0 ? 'No blocking graph errors detected.' : 'Fix blocking graph health errors.',
+    edges.length > 0 || nodes.length <= 1 ? 'Connection structure is valid for this graph size.' : 'Connect workflow steps before publishing.',
+    'Run one dry-run execution with sample payload before production.'
+  ];
+
+  const hasBlockingGraphError = health.issues.some((issue) => issue.type === 'error');
+  const status =
+    unsupportedNodes.length > 0 || hasBlockingGraphError || policy.status === 'blocked' ? 'blocked' :
+    missingConfig.length > 0 || readinessScore < 85 ? 'review' :
+    'ready';
+
+  return {
+    status,
+    readinessScore,
+    health,
+    unsupportedNodes,
+    missingConfig,
+    dataContracts,
+    policy,
+    simulation,
+    releaseChecklist
+  };
+}
+
 
 /* ┌──────────────────────────────────────────────────────────────────────┐
  * │ 7.  ERROR / DEBUG RULES                                              │
@@ -770,20 +969,46 @@ async function generateWorkflow(prompt) {
       confidence: entities.confidence,
     })}`);
     const graph = buildWorkflowFromEntities(entities);
+    const compile = compileWorkflow(graph);
     let description = '';
     if (entities.schedule)            description += `Runs ${entities.schedule.label}. `;
     if (entities.sources.length)      description += `Reads from ${entities.sources.join(' + ')}. `;
     if (entities.actions.length)      description += `Performs ${entities.actions.join(', ')}. `;
     if (entities.destinations.length) description += `Sends to ${entities.destinations.join(' + ')}.`;
     if (!description) description = prompt;
-    return { graph, description: description.trim(), model: 'compositional-builder', tokensUsed: 0 };
+    const summary = description.trim();
+    return {
+      success: true,
+      type: 'workflow_generated',
+      graph,
+      summary,
+      description: summary,
+      workflowExplanation: graph.nodes.map(n => `${n.data.label} (${n.data.type})`),
+      confidence: entities.confidence >= 5 ? 'high' : 'medium',
+      needsClarification: false,
+      suggestions: [],
+      compile,
+      model: 'compositional-builder',
+      tokensUsed: 0
+    };
   } catch (err) {
     logger.error('[intelligence] generateWorkflow error:', err);
+    const graph = { nodes: [makeNode('n1', 100, 220, 'Manual Trigger', 'trigger_manual', {}),
+                            makeNode('n2', 400, 220, 'Log Output', 'console_log', { message: prompt })],
+                    edges: [makeEdge('e1', 'n1', 'n2')] };
     return {
-      graph: { nodes: [makeNode('n1', 100, 220, 'Manual Trigger', 'trigger_manual', {}),
-                       makeNode('n2', 400, 220, 'Log Output', 'console_log', { message: prompt })],
-               edges: [makeEdge('e1', 'n1', 'n2')] },
-      description: prompt, model: 'fallback', tokensUsed: 0,
+      success: true,
+      type: 'workflow_generated',
+      graph,
+      summary: prompt,
+      description: prompt,
+      workflowExplanation: graph.nodes.map(n => `${n.data.label} (${n.data.type})`),
+      confidence: 'low',
+      needsClarification: false,
+      suggestions: [],
+      compile: compileWorkflow(graph),
+      model: 'fallback',
+      tokensUsed: 0,
     };
   }
 }
@@ -936,6 +1161,7 @@ async function workflowChat({ message, history = [], workflow = {} }) {
     if (intent === 'generate' || isStrongGenerate) {
       const built = buildWorkflowFromEntities(entities);
       const updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', built);
+      const compile = compileWorkflow(updatedWorkflow);
       const parts = [];
       if (entities.schedule)            parts.push(`runs **${entities.schedule.label}**`);
       else if (entities.triggers.length) parts.push(`triggered by **${entities.triggers[0].type.replace('_', ' ')}**`);
@@ -953,6 +1179,9 @@ async function workflowChat({ message, history = [], workflow = {} }) {
           explanation: built.nodes.map(n => `${n.data.label} (${n.data.type})`),
           confidence: confidence > 0.25 ? 'high' : confidence > 0.1 ? 'medium' : 'low',
           changes: built.nodes.map(n => `+ ${n.data.label}`),
+          compile,
+          health: compile.health,
+          simulation: compile.simulation,
         },
       };
     }
@@ -1035,12 +1264,13 @@ async function workflowChat({ message, history = [], workflow = {} }) {
     if (intent === 'health') {
       if (!nodes.length) return { reply: 'The canvas is empty — nothing to analyse.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: ['Build a workflow'], metadata: {} };
       const health = analyzeWorkflowHealth({ nodes, edges });
+      const compile = compileWorkflow({ nodes, edges });
       return {
         reply: `**Workflow Health: ${health.score}/100 — ${health.grade}**\n\n` +
                (health.issues.length ? health.issues.map(i => `• ${i.type === 'error' ? '❌' : '⚠️'} ${i.msg}`).join('\n') : '✅ No issues detected.'),
         toolCalls: [], updatedWorkflow: null, messageType: 'health',
         suggestions: health.tips.length ? health.tips.slice(0, 3) : ['Simulate the workflow', 'Add an error handler'],
-        metadata: { health },
+        metadata: { health, compile },
       };
     }
 
@@ -1051,7 +1281,7 @@ async function workflowChat({ message, history = [], workflow = {} }) {
         reply: '🎬 Here\'s how this workflow would execute:',
         toolCalls: [], updatedWorkflow: null, messageType: 'simulation',
         suggestions: ['Check workflow health', 'Add an error handler'],
-        metadata: { simulation: simulateWorkflow({ nodes, edges }) },
+        metadata: { simulation: simulateWorkflow({ nodes, edges }), compile: compileWorkflow({ nodes, edges }) },
       };
     }
 
@@ -1129,5 +1359,6 @@ module.exports = {
   debugNode,
   suggestNodes,
   documentWorkflow,
+  compileWorkflow,
   workflowChat,
 };
