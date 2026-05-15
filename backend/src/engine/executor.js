@@ -283,7 +283,17 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         );
         const logId = logResult.rows[0].id;
 
-        // Broadcast node started
+        // Build the input snapshot that will be persisted and surfaced in the INPUT tab.
+        // Starts with the raw (unresolved) config so something is always captured;
+        // gets upgraded to the fully-resolved config once variables are interpolated.
+        let nodeInputData = {
+          nodeId: node.id,
+          nodeType,
+          config: nodeConfig,
+          incomingData: input,
+        };
+
+        // Broadcast node started — include both upstream data and the raw config
         if (wsManager) {
           wsManager.broadcastToWorkspace(workflow.workspace_id, {
             type: 'node_started',
@@ -292,22 +302,28 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
             logId,
             nodeLabel,
             nodeType,
-            input
+            input: nodeInputData,
           });
         }
 
         try {
-          // Resolve variables in config
+          // Resolve variable interpolation ({{nodeId.field}} → actual values)
           const resolvedConfig = resolveVariables(nodeConfig, context);
 
-          // ── Inject per-user credentials into config ──
-          // If the node has a credentialId, look up the credential values
-          // from the credentials map sent by the frontend
+          // Inject per-user credentials into config
           const credentialId = node.data?.credentialId || nodeConfig?.credentialId;
           if (credentialId && credentials[credentialId]) {
             resolvedConfig._credentials = credentials[credentialId].values;
             resolvedConfig._credentialServiceId = credentials[credentialId].serviceId;
           }
+
+          // Upgrade the input snapshot to the fully-resolved config
+          nodeInputData = {
+            nodeId: node.id,
+            nodeType,
+            config: resolvedConfig,
+            incomingData: input,
+          };
 
           // Get handler from registry
           const handler = registry.get(nodeType);
@@ -328,11 +344,11 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           context.nodeOutputs[node.id] = output;
           completed.add(node.id);
 
-          // Update log
+          // Persist resolved input + output to node_logs
           await query(
             `UPDATE node_logs SET status = 'success', output = $1, finished_at = GETDATE(), duration_ms = $2, input = $3
              WHERE id = $4`,
-            [JSON.stringify(output), duration, JSON.stringify(input), logId]
+            [JSON.stringify(output), duration, JSON.stringify(nodeInputData), logId]
           );
 
           // Broadcast node finished
@@ -352,11 +368,11 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           executionStatus = 'failed';
           executionError = `Node "${nodeLabel}" failed: ${err.message}`;
 
-          // Update log with failure
+          // Persist whatever input we managed to resolve before the error
           await query(
             `UPDATE node_logs SET status = 'failed', error = $1, finished_at = GETDATE(), duration_ms = $2, input = $3
              WHERE id = $4`,
-            [err.message, duration, JSON.stringify(input), logId]
+            [err.message, duration, JSON.stringify(nodeInputData), logId]
           );
 
           // Broadcast node failed
