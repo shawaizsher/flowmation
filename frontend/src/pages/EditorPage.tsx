@@ -89,6 +89,7 @@ function EditorCanvas() {
   // Quick-add popover
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
+  const [quickAddSourceId, setQuickAddSourceId] = useState<string | null>(null);
   const quickAddRef = useRef<HTMLDivElement>(null);
 
   // Close quick-add when clicking outside
@@ -97,11 +98,24 @@ function EditorCanvas() {
     const handler = (e: MouseEvent) => {
       if (quickAddRef.current && !quickAddRef.current.contains(e.target as globalThis.Node)) {
         setShowQuickAdd(false);
+        setQuickAddSourceId(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showQuickAdd]);
+
+  // Listen for + button clicks on individual nodes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { sourceNodeId } = (e as CustomEvent).detail;
+      setQuickAddSourceId(sourceNodeId);
+      setQuickSearch('');
+      setShowQuickAdd(true);
+    };
+    window.addEventListener('flowa:node-quick-add', handler);
+    return () => window.removeEventListener('flowa:node-quick-add', handler);
+  }, []);
 
   // Execution
   const [executionId, setExecutionId] = useState<string | null>(null);
@@ -692,15 +706,20 @@ function EditorCanvas() {
     }
   };
 
-  const handleAddNode = (def: NodeDef) => {
-    const viewport = reactFlowInstance.getViewport();
-    const position = {
-      x: (-viewport.x + 400) / viewport.zoom,
-      y: (-viewport.y + 300) / viewport.zoom,
-    };
+  const handleAddNode = (def: NodeDef, sourceId?: string | null) => {
+    const sourceNode = sourceId ? nodes.find(n => n.id === sourceId) : null;
 
+    // Position: to the right of source node, or at viewport centre
+    const position = sourceNode
+      ? { x: sourceNode.position.x + 280, y: sourceNode.position.y }
+      : (() => {
+          const viewport = reactFlowInstance.getViewport();
+          return { x: (-viewport.x + 400) / viewport.zoom, y: (-viewport.y + 300) / viewport.zoom };
+        })();
+
+    const newId = `${def.type}-${Date.now()}`;
     const newNode: Node = {
-      id: `${def.type}-${Date.now()}`,
+      id: newId,
       type: 'flowNode',
       position,
       data: {
@@ -717,6 +736,24 @@ function EditorCanvas() {
     };
 
     setNodes((nds) => [...nds, newNode]);
+
+    // Auto-connect if triggered from a node's + button
+    if (sourceNode) {
+      const edgeId = `e-${sourceId}-${newId}-${Date.now()}`;
+      setEdges((eds) => [
+        ...eds,
+        {
+          id: edgeId,
+          source: sourceId!,
+          target: newId,
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#374151', strokeWidth: 1.5 },
+        },
+      ]);
+    }
+
+    setQuickAddSourceId(null);
   };
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
@@ -1145,7 +1182,7 @@ function EditorCanvas() {
                         {(defs as NodeDef[]).slice(0, quickSearch ? 20 : 5).map(def => (
                           <button
                             key={def.type}
-                            onClick={() => { handleAddNode(def); setShowQuickAdd(false); setQuickSearch(''); }}
+                            onClick={() => { handleAddNode(def, quickAddSourceId); setShowQuickAdd(false); setQuickSearch(''); }}
                             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.05] transition"
                           >
                             <NodeIcon nodeType={def.type} size="sm" className="!h-7 !w-7 !rounded-md shrink-0" />
