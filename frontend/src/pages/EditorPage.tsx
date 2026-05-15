@@ -541,11 +541,21 @@ function EditorCanvas() {
         break;
       case 'node_started':
         setNodeStatuses((prev: Record<string, string>) => ({ ...prev, [msg.nodeId]: 'running' }));
-        // Add running entry to I/O
-        setIoEntries((prev) => [
-          ...prev.filter((e) => e.nodeId !== msg.nodeId),
-          { nodeId: msg.nodeId, nodeLabel: msg.nodeLabel || msg.nodeId, nodeType: msg.nodeType || '', status: 'running', input: msg.input },
-        ]);
+        setIoEntries((prev) => {
+          const existing = prev.find((e) => e.nodeId === msg.nodeId);
+          return [
+            ...prev.filter((e) => e.nodeId !== msg.nodeId),
+            {
+              nodeId: msg.nodeId,
+              nodeLabel: msg.nodeLabel || existing?.nodeLabel || msg.nodeId,
+              nodeType: msg.nodeType  || existing?.nodeType  || '',
+              status: 'running',
+              // If the WS message doesn't carry input, fall back to the config
+              // that handleExecute pre-populated so the INPUT tab always shows something
+              input: msg.input ?? existing?.input,
+            },
+          ];
+        });
         break;
       case 'node_finished':
         setNodeStatuses((prev: Record<string, string>) => ({ ...prev, [msg.nodeId]: msg.status }));
