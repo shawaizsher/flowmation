@@ -831,22 +831,28 @@ function EditorCanvas() {
   return (
     <div className="flex h-screen flex-col bg-surface-base">
       {/* ── Editor Header ── */}
-      <header className="flex h-14 items-center justify-between border-b border-surface-border bg-surface-card px-4">
-        <div className="flex items-center gap-3">
+      <header className="flex h-14 items-center border-b border-surface-border bg-surface-card px-4 gap-4">
+
+        {/* Left — back + workflow name */}
+        <div className="flex flex-1 items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/dashboard')}
-            className="rounded-lg p-1.5 text-foreground-muted hover:bg-surface-border hover:text-foreground transition"
+            className="rounded-lg p-1.5 text-foreground-muted hover:bg-surface-border hover:text-foreground transition shrink-0"
             title="Back to dashboard"
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="h-4 w-px bg-surface-border" />
+          <div className="h-4 w-px bg-surface-border shrink-0" />
           <input
             type="text"
             value={workflowName}
             onChange={(e) => setWorkflowName(e.target.value)}
-            className="bg-transparent font-body text-base font-bold text-foreground outline-none focus:border-b-2 focus:border-brand-500 min-w-0 max-w-[220px] transition-all"
+            className="bg-transparent font-body text-base font-bold text-foreground outline-none focus:border-b-2 focus:border-brand-500 min-w-0 max-w-[200px] transition-all truncate"
           />
+        </div>
+
+        {/* Centre — version + status badges */}
+        <div className="flex items-center gap-2 shrink-0">
           <span className="rounded-md bg-surface-border px-2 py-0.5 text-xs font-bold text-foreground-muted tracking-wide">
             v{workflowVersion}
           </span>
@@ -855,7 +861,8 @@ function EditorCanvas() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right — panel toggles + action buttons */}
+        <div className="flex flex-1 items-center justify-end gap-2">
           {/* Collaborator avatars */}
           {collaborators.length > 0 && (
             <div className="flex -space-x-2 mr-3">
