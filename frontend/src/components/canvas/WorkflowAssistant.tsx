@@ -15,6 +15,15 @@ interface HealthData {
   tips: string[];
 }
 
+interface CompileData {
+  status: 'ready' | 'review' | 'blocked';
+  readinessScore: number;
+  unsupportedNodes: { nodeLabel: string; nodeType: string }[];
+  missingConfig: { nodeLabel: string; nodeType: string; fields: string[] }[];
+  dataContracts: { from: string; to: string; availableFields: string[] }[];
+  releaseChecklist: string[];
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -27,6 +36,7 @@ interface ChatMessage {
     confidence?: string;
     changes?: string[];
     health?: HealthData;
+    compile?: CompileData;
     simulation?: string[];
     issues?: { type: string; msg: string }[];
   };
@@ -122,6 +132,60 @@ function SimulationSteps({ steps }: { steps: string[] }) {
 }
 
 // ── Message icon ───────────────────────────────────────────────────────────
+
+function CompileReport({ compile }: { compile: CompileData }) {
+  const tone =
+    compile.status === 'ready'
+      ? 'text-green-400 border-green-500/25 bg-green-500/5'
+      : compile.status === 'review'
+        ? 'text-yellow-400 border-yellow-500/25 bg-yellow-500/5'
+        : 'text-red-400 border-red-500/25 bg-red-500/5';
+
+  const blockers = [
+    ...compile.unsupportedNodes.map((node) => `${node.nodeLabel}: unsupported runtime type ${node.nodeType}`),
+    ...compile.missingConfig.map((node) => `${node.nodeLabel}: missing ${node.fields.join(', ')}`),
+  ];
+
+  return (
+    <div className="mt-2.5 rounded-lg border border-surface-border bg-surface-base p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 size={12} className="text-brand-400" />
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-400">AI Compiler</span>
+        </div>
+        <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+          {compile.readinessScore}/100 {compile.status}
+        </span>
+      </div>
+
+      {blockers.length > 0 ? (
+        <div className="space-y-1">
+          {blockers.slice(0, 4).map((item, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-xs text-foreground-muted">
+              <AlertCircle size={11} className="mt-0.5 shrink-0 text-yellow-400" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-foreground-muted">No runtime blockers detected. Ready for a dry run.</p>
+      )}
+
+      {compile.dataContracts.length > 0 && (
+        <div className="mt-2 border-t border-surface-border pt-2">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-foreground-muted">
+            Data contracts
+          </div>
+          {compile.dataContracts.slice(0, 3).map((contract, i) => (
+            <div key={i} className="truncate text-xs font-mono text-foreground-secondary">
+              {contract.from} -&gt; {contract.to}: {contract.availableFields.join(', ')}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MessageTypeIcon({ type }: { type?: string }) {
   if (!type || type === 'message') return null;
@@ -311,6 +375,10 @@ export default function WorkflowAssistant({
               {/* Health bar */}
               {msg.metadata?.health && (
                 <HealthBar health={msg.metadata.health} />
+              )}
+
+              {msg.metadata?.compile && (
+                <CompileReport compile={msg.metadata.compile} />
               )}
 
               {/* Simulation steps */}
