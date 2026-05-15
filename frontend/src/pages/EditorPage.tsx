@@ -724,6 +724,20 @@ function EditorCanvas() {
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
     if (!selectedNode) return;
+    if (key === 'credentialId') {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === selectedNode.id
+            ? { ...n, data: { ...n.data, credentialId: value || undefined } }
+            : n
+        )
+      );
+      setSelectedNode((prev) =>
+        prev ? { ...prev, data: { ...prev.data, credentialId: value || undefined } } : null
+      );
+      return;
+    }
+
     setNodes((nds) =>
       nds.map((n) =>
         n.id === selectedNode.id
@@ -735,6 +749,34 @@ function EditorCanvas() {
       prev ? { ...prev, data: { ...prev.data, config: { ...prev.data.config, [key]: value } } } : null
     );
   };
+
+  const focusNodeFromAdvanced = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      toast.error('Node no longer exists in the canvas');
+      return;
+    }
+
+    setSelectedNode(node);
+    setRightPanel('config');
+    reactFlowInstance.setCenter(
+      node.position.x + 120,
+      node.position.y + 40,
+      { zoom: Math.max(reactFlowInstance.getViewport().zoom, 0.9), duration: 350 }
+    );
+  }, [nodes, reactFlowInstance]);
+
+  const openCredentialFix = useCallback((item: any) => {
+    const serviceId = item?.serviceId || getServiceForNodeType(item?.nodeType || '')?.serviceId;
+    if (!serviceId) {
+      focusNodeFromAdvanced(item.nodeId);
+      toast('Open the node and fill the required fields first');
+      return;
+    }
+    focusNodeFromAdvanced(item.nodeId);
+    setCredPreselectedService(serviceId);
+    setCredModalOpen(true);
+  }, [focusNodeFromAdvanced]);
 
   // ── Version history ──
   const loadVersions = async () => {
@@ -1730,6 +1772,48 @@ function EditorCanvas() {
                       </p>
                     </div>
 
+                    {((advancedReport.compiler?.missingConfig || []).length > 0 || (advancedReport.compiler?.unsupportedNodes || []).length > 0) && (
+                      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">Fix Missing Config</h4>
+                        <div className="space-y-2">
+                          {(advancedReport.compiler?.missingConfig || []).slice(0, 5).map((item: any) => (
+                            <div key={item.nodeId} className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <p className="text-xs font-bold text-foreground">{item.nodeLabel}</p>
+                              <p className="mt-0.5 text-xs text-foreground-muted">{item.fields?.join(', ')}</p>
+                              <div className="mt-2 flex gap-2">
+                                <button
+                                  onClick={() => focusNodeFromAdvanced(item.nodeId)}
+                                  className="rounded border border-surface-border px-2 py-1 text-[11px] font-bold text-foreground-muted hover:border-brand-500/40 hover:text-brand-400"
+                                >
+                                  Open Node
+                                </button>
+                                {item.serviceId && (
+                                  <button
+                                    onClick={() => openCredentialFix(item)}
+                                    className="rounded border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[11px] font-bold text-brand-400 hover:bg-brand-500/20"
+                                  >
+                                    Add Credential
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {(advancedReport.compiler?.unsupportedNodes || []).slice(0, 3).map((item: any) => (
+                            <div key={item.nodeId} className="rounded-md border border-red-500/25 bg-red-500/5 p-2">
+                              <p className="text-xs font-bold text-red-300">{item.nodeLabel}</p>
+                              <p className="mt-0.5 text-xs text-foreground-muted">Unsupported runtime type: {item.nodeType}</p>
+                              <button
+                                onClick={() => focusNodeFromAdvanced(item.nodeId)}
+                                className="mt-2 rounded border border-surface-border px-2 py-1 text-[11px] font-bold text-foreground-muted hover:border-brand-500/40 hover:text-brand-400"
+                              >
+                                Open Node
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="rounded-lg border border-surface-border bg-surface-input p-3">
                       <h4 className="mb-2 text-sm font-semibold text-foreground">Policy Guardrails</h4>
                       {(advancedReport.policyGuardrails?.findings || []).length === 0 ? (
@@ -1770,6 +1854,26 @@ function EditorCanvas() {
                         <p className={`text-xs font-bold ${advancedReport.workflowUnitTests.result.status === 'passed' ? 'text-green-400' : 'text-red-400'}`}>
                           {advancedReport.workflowUnitTests.result.status}
                         </p>
+                        {advancedReport.workflowUnitTests.result.summary && (
+                          <p className="mt-1 text-xs text-foreground-muted">{advancedReport.workflowUnitTests.result.summary}</p>
+                        )}
+                        {(advancedReport.workflowUnitTests.result.failureReasons || []).slice(0, 4).map((reason: any, i: number) => (
+                          <div key={`${reason.nodeId || i}-${i}`} className="mt-2 rounded-md border border-surface-border bg-surface-card p-2">
+                            <p className="text-xs font-semibold text-foreground">{reason.nodeLabel || 'Workflow'}</p>
+                            <p className="mt-0.5 text-xs text-foreground-muted">{reason.message}</p>
+                            {reason.fix && <p className="mt-1 text-xs text-brand-400">{reason.fix}</p>}
+                          </div>
+                        ))}
+                        {(advancedReport.workflowUnitTests.result.results || []).slice(0, 2).map((test: any) => (
+                          <div key={test.name} className="mt-2">
+                            <p className="text-xs font-semibold text-foreground-muted">{test.name}</p>
+                            {(test.assertions || []).slice(0, 3).map((assertion: any) => (
+                              <p key={assertion.assertion} className={`text-xs ${assertion.passed ? 'text-green-400' : 'text-red-400'}`}>
+                                {assertion.passed ? 'Pass' : 'Fail'}: {assertion.assertion}
+                              </p>
+                            ))}
+                          </div>
+                        ))}
                       </div>
                     )}
 

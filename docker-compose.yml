@@ -50,6 +50,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
       sqlserver:
@@ -76,6 +77,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
       sqlserver:
