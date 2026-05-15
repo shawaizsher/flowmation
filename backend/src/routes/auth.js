@@ -29,20 +29,15 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
-    // Auto-verify if no SMTP is configured (dev mode)
-    const smtpConfigured = !!process.env.SMTP_HOST;
-    const autoVerify = !smtpConfigured;
+    const isDev = !process.env.SMTP_HOST; // true when running without real SMTP
 
     const result = await transaction(async (client) => {
-      // Create user — auto-verify if no SMTP
       const userResult = await client.query(
         'INSERT INTO users (email, password_hash, name, email_verified) OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role VALUES ($1, $2, $3, $4)',
-        [email.toLowerCase(), passwordHash, name, autoVerify ? 1 : 0]
+        [email.toLowerCase(), passwordHash, name, 0]
       );
       const user = userResult.rows[0];
 
-      // Create a personal workspace
       const slug = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
       const workspaceResult = await client.query(
         'INSERT INTO workspaces (name, slug, owner_id) OUTPUT INSERTED.id, INSERTED.name, INSERTED.slug VALUES ($1, $2, $3)',
@@ -50,61 +45,42 @@ router.post('/register', async (req, res) => {
       );
       const workspace = workspaceResult.rows[0];
 
-      // Add user as workspace owner
       await client.query(
         'INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, $3)',
         [workspace.id, user.id, 'owner']
       );
 
-      let verificationToken = null;
-      if (!autoVerify) {
-        // Generate 6-digit OTP (valid 15 minutes)
-        verificationToken = generateToken();
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-        await client.query(
-          'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-          [user.id, verificationToken, expiresAt]
-        );
-      }
+      // Always generate OTP — Ethereal SMTP is used as dev fallback
+      const verificationToken = generateToken();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await client.query(
+        'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, verificationToken, expiresAt]
+      );
 
       return { user, workspace, verificationToken };
     });
 
-    if (autoVerify) {
-      // No SMTP — auto-verified, issue JWT immediately so user can log in
-      const jwtToken = jwt.sign({ userId: result.user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-      const workspaces = await query(
-        `SELECT w.id, w.name, w.slug, wm.role
-         FROM workspaces w
-         JOIN workspace_members wm ON w.id = wm.workspace_id
-         WHERE wm.user_id = $1
-         ORDER BY w.created_at ASC`,
-        [result.user.id]
-      );
-
-      logger.info(`User registered (auto-verified, no SMTP): ${result.user.email}`);
-
-      return res.status(201).json({
-        message: 'Account created and verified!',
-        token: jwtToken,
-        user: { id: result.user.id, email: result.user.email, name: result.user.name },
-        workspace: workspaces.rows[0] || null,
-        emailVerificationRequired: false,
-      });
-    }
-
-    // Send verification email (non-blocking — don't fail registration if email fails)
+    // Send OTP via email (Ethereal in dev, real SMTP in production)
     sendVerificationEmail(email.toLowerCase(), name, result.verificationToken).catch((err) => {
-      logger.error('Failed to send verification email:', err);
+      logger.error('Failed to send OTP email:', err);
     });
 
-    logger.info(`User registered (pending verification): ${result.user.email}`);
+    // In dev mode: print the OTP code to the terminal so it can be used without checking Ethereal
+    if (isDev) {
+      logger.info(`\n${'─'.repeat(50)}`);
+      logger.info(`🔑  OTP CODE for ${email}: ${result.verificationToken}`);
+      logger.info(`${'─'.repeat(50)}\n`);
+    }
+
+    logger.info(`User registered (OTP sent): ${result.user.email}`);
 
     res.status(201).json({
-      message: 'Account created! Please check your email to verify your address.',
+      message: 'Account created! Enter the 6-digit code we sent to your email.',
       user: { id: result.user.id, email: result.user.email, name: result.user.name },
       emailVerificationRequired: true,
+      // Expose code only in dev so frontend can show a hint (never in production)
+      devOtp: isDev ? result.verificationToken : undefined,
     });
   } catch (err) {
     logger.error('Registration error:', err);
