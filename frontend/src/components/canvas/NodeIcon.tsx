@@ -152,14 +152,14 @@ interface IconDef {
   fg?: string;   // Tailwind text color (defaults to white)
 }
 
-const ICON_SIZE = 18;
-const SI_SIZE = 16;
+const ICON_SIZE = 22;
+const SI_SIZE   = 20;
 
-const appFavicon = (domain: string) => (
+const appFavicon = (domain: string, plain = false) => (
   <img
     src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
     alt=""
-    className="h-4 w-4 rounded-sm object-contain"
+    className={plain ? 'h-6 w-6 object-contain' : 'h-5 w-5 rounded-sm object-contain'}
     loading="lazy"
     referrerPolicy="no-referrer"
     draggable={false}
@@ -420,6 +420,8 @@ interface NodeIconProps {
   nodeType: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /** plain — renders just the icon in its brand colour, no background box */
+  plain?: boolean;
 }
 
 const sizeClasses = {
@@ -428,8 +430,20 @@ const sizeClasses = {
   lg: 'h-10 w-10 rounded-lg',
 };
 
-export default function NodeIcon({ nodeType, size = 'md', className = '' }: NodeIconProps) {
+export default function NodeIcon({ nodeType, size = 'md', className = '', plain = false }: NodeIconProps) {
   const def = iconMap[nodeType] || defaultIcon;
+
+  if (plain) {
+    // Raw icon — brand colour, no background box, slightly scaled up
+    return (
+      <span
+        className={`flex shrink-0 items-center justify-center scale-[1.35] ${def.fg || 'text-brand-400'} ${className}`}
+        aria-hidden="true"
+      >
+        {def.icon}
+      </span>
+    );
+  }
 
   return (
     <div
