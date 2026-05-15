@@ -69,7 +69,7 @@ export const serviceDefinitions: ServiceDefinition[] = [
     fields: [
       { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-ant-...', required: true },
     ],
-    nodeTypePrefixes: ['anthropic_'],
+    nodeTypePrefixes: ['anthropic_', 'ai_classify', 'ai_summarize', 'ai_'],
   },
   {
     serviceId: 'huggingface',
@@ -85,11 +85,12 @@ export const serviceDefinitions: ServiceDefinition[] = [
   {
     serviceId: 'slack',
     label: 'Slack',
-    description: 'Send messages, manage channels',
+    description: 'Send messages through Slack incoming webhooks',
     icon: 'slack_message',
     authType: 'bearer',
     fields: [
-      { key: 'bot_token', label: 'Bot Token', type: 'password', placeholder: 'xoxb-...', required: true },
+      { key: 'webhook_url', label: 'Incoming Webhook URL', type: 'password', placeholder: 'https://hooks.slack.com/services/...', required: true },
+      { key: 'bot_token', label: 'Bot Token (optional)', type: 'password', placeholder: 'xoxb-...' },
       { key: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: '' },
     ],
     nodeTypePrefixes: ['slack_'],
