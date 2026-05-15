@@ -1,0 +1,188 @@
+name: Build & Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ACR: ${{ secrets.ACR_LOGIN_SERVER }}   # e.g. flowaregistry.azurecr.io
+  RG: flowa-rg
+  ENV_NAME: flowa-env
+
+jobs:
+  # ── Job 1: Build images and push to Azure Container Registry ──────────────
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Backend image (used by both API server and worker)
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/flowa-backend:${{ github.sha }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/flowa-backend:latest
+
+      # Frontend image (nginx production build)
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/flowa-frontend:${{ github.sha }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/flowa-frontend:latest
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_WS_URL=${{ secrets.VITE_WS_URL }}
+
+  # ── Job 2: Deploy containers to Azure Container Apps ──────────────────────
+  deploy:
+    name: Deploy Container Apps
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Create the shared Container Apps environment if it doesn't exist yet
+      - name: Ensure Container Apps environment
+        run: |
+          az containerapp env show \
+            --name $ENV_NAME \
+            --resource-group $RG \
+            2>/dev/null || \
+          az containerapp env create \
+            --name $ENV_NAME \
+            --resource-group $RG \
+            --location eastus
+
+      # ── Backend API ────────────────────────────────────────────────────────
+      - name: Deploy backend API
+        run: |
+          # Set secrets on the container app (creates or updates)
+          az containerapp secret set \
+            --name flowa-backend \
+            --resource-group $RG \
+            --secrets \
+              db-password="${{ secrets.DB_PASSWORD }}" \
+              jwt-secret="${{ secrets.JWT_SECRET }}" \
+              encryption-key="${{ secrets.ENCRYPTION_KEY }}" \
+              redis-url="${{ secrets.REDIS_URL }}" \
+              groq-api-key="${{ secrets.GROQ_API_KEY }}" \
+              anthropic-api-key="${{ secrets.ANTHROPIC_API_KEY }}" \
+              openai-api-key="${{ secrets.OPENAI_API_KEY }}" \
+              smtp-pass="${{ secrets.SMTP_PASS }}" \
+            2>/dev/null || true
+
+          az containerapp up \
+            --name flowa-backend \
+            --resource-group $RG \
+            --environment $ENV_NAME \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/flowa-backend:${{ github.sha }} \
+            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --ingress external \
+            --target-port 4000 \
+            --min-replicas 1 \
+            --max-replicas 3 \
+            --env-vars \
+              NODE_ENV=production \
+              PORT=4000 \
+              DB_SERVER="${{ secrets.DB_SERVER }}" \
+              DB_DATABASE="${{ secrets.DB_DATABASE }}" \
+              DB_USER="${{ secrets.DB_USER }}" \
+              DB_ENCRYPT=true \
+              DB_TRUST_CERT=false \
+              SMTP_HOST=smtp.gmail.com \
+              SMTP_PORT=587 \
+              SMTP_SECURE=false \
+              SMTP_USER="${{ secrets.SMTP_USER }}" \
+              SMTP_FROM="${{ secrets.SMTP_USER }}" \
+              FRONTEND_URL="${{ secrets.VITE_API_URL }}" \
+              CORS_ORIGIN="${{ secrets.FRONTEND_URL }}" \
+              DB_PASSWORD=secretref:db-password \
+              JWT_SECRET=secretref:jwt-secret \
+              ENCRYPTION_KEY=secretref:encryption-key \
+              REDIS_URL=secretref:redis-url \
+              GROQ_API_KEY=secretref:groq-api-key \
+              ANTHROPIC_API_KEY=secretref:anthropic-api-key \
+              OPENAI_API_KEY=secretref:openai-api-key \
+              SMTP_PASS=secretref:smtp-pass
+
+      # ── BullMQ Worker ──────────────────────────────────────────────────────
+      - name: Deploy worker
+        run: |
+          az containerapp secret set \
+            --name flowa-worker \
+            --resource-group $RG \
+            --secrets \
+              db-password="${{ secrets.DB_PASSWORD }}" \
+              jwt-secret="${{ secrets.JWT_SECRET }}" \
+              encryption-key="${{ secrets.ENCRYPTION_KEY }}" \
+              redis-url="${{ secrets.REDIS_URL }}" \
+              groq-api-key="${{ secrets.GROQ_API_KEY }}" \
+              anthropic-api-key="${{ secrets.ANTHROPIC_API_KEY }}" \
+              openai-api-key="${{ secrets.OPENAI_API_KEY }}" \
+            2>/dev/null || true
+
+          az containerapp up \
+            --name flowa-worker \
+            --resource-group $RG \
+            --environment $ENV_NAME \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/flowa-backend:${{ github.sha }} \
+            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --ingress internal \
+            --target-port 4000 \
+            --min-replicas 1 \
+            --max-replicas 1 \
+            --command "node" "src/worker.js" \
+            --env-vars \
+              NODE_ENV=production \
+              DB_SERVER="${{ secrets.DB_SERVER }}" \
+              DB_DATABASE="${{ secrets.DB_DATABASE }}" \
+              DB_USER="${{ secrets.DB_USER }}" \
+              DB_ENCRYPT=true \
+              DB_TRUST_CERT=false \
+              DB_PASSWORD=secretref:db-password \
+              JWT_SECRET=secretref:jwt-secret \
+              ENCRYPTION_KEY=secretref:encryption-key \
+              REDIS_URL=secretref:redis-url \
+              GROQ_API_KEY=secretref:groq-api-key \
+              ANTHROPIC_API_KEY=secretref:anthropic-api-key \
+              OPENAI_API_KEY=secretref:openai-api-key
+
+      # ── Frontend ───────────────────────────────────────────────────────────
+      - name: Deploy frontend
+        run: |
+          az containerapp up \
+            --name flowa-frontend \
+            --resource-group $RG \
+            --environment $ENV_NAME \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/flowa-frontend:${{ github.sha }} \
+            --registry-server ${{ secrets.ACR_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --ingress external \
+            --target-port 80 \
+            --min-replicas 1 \
+            --max-replicas 3
