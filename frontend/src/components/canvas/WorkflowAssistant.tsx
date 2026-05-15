@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  Send, Bot, Loader2, Workflow, X, Trash2, AlertCircle,
-  CheckCircle2, HelpCircle, Activity, Play, Lightbulb,
-  Wrench, Zap, ChevronRight,
-} from 'lucide-react';
+import { Send, Bot, Workflow, X, Trash2, Activity, Play, CheckCircle2 } from 'lucide-react';
 import { aiApi } from '../../utils/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -51,60 +47,69 @@ interface WorkflowAssistantProps {
   onClose: () => void;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
+// ── Greeting ───────────────────────────────────────────────────────────────
 
 const GREETING: ChatMessage = {
   role: 'assistant',
-  content: "Hi, I'm Freckles — your AI workflow copilot! I can build, edit, debug, and optimize workflows conversationally.\n\nWhat would you like to automate today?",
+  content: "Hi, I'm Freckles. Tell me what you want to automate and I'll build it for you.",
   messageType: 'message',
   suggestions: [
     'When email arrives, send a Slack notification',
     'Daily sales report emailed at 9 AM',
-    'Analyze workflow health',
-    'Show help',
+    'Any suggestions?',
+    'What does this workflow do?',
   ],
 };
 
-const THINKING_STATES = [
-  'Thinking…',
-  'Analyzing workflow…',
-  'Detecting intent…',
-  'Optimizing structure…',
-  'Building connections…',
-  'Inspecting nodes…',
-  'Generating workflow…',
-];
+// ── Typing indicator (3 bouncing dots) ────────────────────────────────────
 
-// ── Health bar component ───────────────────────────────────────────────────
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-3 py-2.5">
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          className="h-1.5 w-1.5 rounded-full bg-foreground-muted/40 animate-bounce"
+          style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.9s' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Health bar ────────────────────────────────────────────────────────────
 
 function HealthBar({ health }: { health: HealthData }) {
-  const color =
-    health.score >= 80 ? 'bg-green-500' :
+  const barColor =
+    health.score >= 80 ? 'bg-emerald-500' :
     health.score >= 60 ? 'bg-yellow-500' :
     health.score >= 40 ? 'bg-orange-500' : 'bg-red-500';
 
-  const textColor =
-    health.score >= 80 ? 'text-green-400' :
+  const scoreColor =
+    health.score >= 80 ? 'text-emerald-400' :
     health.score >= 60 ? 'text-yellow-400' :
     health.score >= 40 ? 'text-orange-400' : 'text-red-400';
 
   return (
-    <div className="mt-2.5 rounded-lg border border-surface-border bg-surface-base p-3">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-foreground-muted uppercase tracking-wider">Workflow Health</span>
-        <span className={`text-sm font-bold ${textColor}`}>{health.score}/100 — {health.grade}</span>
+    <div className="mt-2 rounded-xl border border-surface-border bg-surface-base p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Activity size={12} className="text-foreground-muted" />
+          <span className="text-xs font-semibold text-foreground-muted">Workflow Health</span>
+        </div>
+        <span className={`text-xs font-bold ${scoreColor}`}>{health.score}/100 · {health.grade}</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-surface-border overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${health.score}%` }} />
+      <div className="h-1 w-full rounded-full bg-surface-border overflow-hidden">
+        <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${health.score}%` }} />
       </div>
       {health.issues.length > 0 && (
-        <div className="mt-2 space-y-1">
+        <div className="space-y-1 pt-1">
           {health.issues.map((iss, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-xs">
-              <span className={iss.type === 'error' ? 'text-red-400' : 'text-yellow-400'}>
-                {iss.type === 'error' ? '●' : '◐'}
+            <div key={i} className="flex items-start gap-2 text-xs text-foreground-muted">
+              <span className={`mt-px shrink-0 ${iss.type === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                {iss.type === 'error' ? '●' : '○'}
               </span>
-              <span className="text-foreground-muted">{iss.msg}</span>
+              <span>{iss.msg}</span>
             </div>
           ))}
         </div>
@@ -113,99 +118,38 @@ function HealthBar({ health }: { health: HealthData }) {
   );
 }
 
-// ── Simulation steps component ─────────────────────────────────────────────
+// ── Simulation steps ──────────────────────────────────────────────────────
 
 function SimulationSteps({ steps }: { steps: string[] }) {
   return (
-    <div className="mt-2.5 rounded-lg border border-surface-border bg-surface-base p-3">
+    <div className="mt-2 rounded-xl border border-surface-border bg-surface-base p-3 space-y-1">
       <div className="flex items-center gap-1.5 mb-2">
         <Play size={11} className="text-brand-400" />
-        <span className="text-xs font-bold text-brand-400 uppercase tracking-wider">Execution Preview</span>
+        <span className="text-xs font-semibold text-foreground-muted">Execution Preview</span>
       </div>
-      <div className="space-y-1">
-        {steps.map((step, i) => (
-          <div key={i} className="text-xs font-mono text-foreground-secondary leading-relaxed">{step}</div>
-        ))}
-      </div>
+      {steps.map((step, i) => (
+        <div key={i} className="text-xs font-mono text-foreground-secondary leading-relaxed">{step}</div>
+      ))}
     </div>
   );
 }
 
-// ── Message icon ───────────────────────────────────────────────────────────
+// ── Changes list ──────────────────────────────────────────────────────────
 
-function CompileReport({ compile }: { compile: CompileData }) {
-  const tone =
-    compile.status === 'ready'
-      ? 'text-green-400 border-green-500/25 bg-green-500/5'
-      : compile.status === 'review'
-        ? 'text-yellow-400 border-yellow-500/25 bg-yellow-500/5'
-        : 'text-red-400 border-red-500/25 bg-red-500/5';
-
-  const blockers = [
-    ...compile.unsupportedNodes.map((node) => `${node.nodeLabel}: unsupported runtime type ${node.nodeType}`),
-    ...compile.missingConfig.map((node) => `${node.nodeLabel}: missing ${node.fields.join(', ')}`),
-  ];
-
+function ChangesList({ changes }: { changes: string[] }) {
   return (
-    <div className="mt-2.5 rounded-lg border border-surface-border bg-surface-base p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={12} className="text-brand-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-brand-400">AI Compiler</span>
+    <div className="mt-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2.5 space-y-1">
+      {changes.map((c, i) => (
+        <div key={i} className="flex items-center gap-1.5 text-xs text-emerald-400">
+          <CheckCircle2 size={10} className="shrink-0" />
+          <span>{c}</span>
         </div>
-        <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone}`}>
-          {compile.readinessScore}/100 {compile.status}
-        </span>
-      </div>
-
-      {blockers.length > 0 ? (
-        <div className="space-y-1">
-          {blockers.slice(0, 4).map((item, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-xs text-foreground-muted">
-              <AlertCircle size={11} className="mt-0.5 shrink-0 text-yellow-400" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-foreground-muted">No runtime blockers detected. Ready for a dry run.</p>
-      )}
-
-      {compile.dataContracts.length > 0 && (
-        <div className="mt-2 border-t border-surface-border pt-2">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-foreground-muted">
-            Data contracts
-          </div>
-          {compile.dataContracts.slice(0, 3).map((contract, i) => (
-            <div key={i} className="truncate text-xs font-mono text-foreground-secondary">
-              {contract.from} -&gt; {contract.to}: {contract.availableFields.join(', ')}
-            </div>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
 
-function MessageTypeIcon({ type }: { type?: string }) {
-  if (!type || type === 'message') return null;
-  const map: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
-    workflow_built:  { icon: <Zap size={10} />,        label: 'Workflow built',   color: 'text-green-400 bg-green-500/10 border-green-500/20' },
-    workflow_edited: { icon: <Wrench size={10} />,      label: 'Workflow updated', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-    health:          { icon: <Activity size={10} />,    label: 'Health analysis',  color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' },
-    simulation:      { icon: <Play size={10} />,        label: 'Simulation',       color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
-    debug:           { icon: <AlertCircle size={10} />, label: 'Debug report',     color: 'text-orange-400 bg-orange-500/10 border-orange-500/20' },
-  };
-  const cfg = map[type];
-  if (!cfg) return null;
-  return (
-    <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cfg.color} mb-1.5`}>
-      {cfg.icon} {cfg.label}
-    </div>
-  );
-}
-
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────
 
 export default function WorkflowAssistant({
   workspaceId,
@@ -225,36 +169,18 @@ export default function WorkflowAssistant({
     return [GREETING];
   });
 
-  const [input, setInput] = useState('');
+  const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
-  const [thinkingMsg, setThinkingMsg] = useState(THINKING_STATES[0]);
-  const thinkingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const bottomRef   = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef             = useRef<HTMLDivElement>(null);
+  const textareaRef           = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(messages)); }
-    catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(messages)); } catch {}
   }, [messages, storageKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
-
-  // Cycle through thinking messages while loading
-  useEffect(() => {
-    if (loading) {
-      let i = 0;
-      thinkingRef.current = setInterval(() => {
-        i = (i + 1) % THINKING_STATES.length;
-        setThinkingMsg(THINKING_STATES[i]);
-      }, 1400);
-    } else {
-      if (thinkingRef.current) clearInterval(thinkingRef.current);
-      setThinkingMsg(THINKING_STATES[0]);
-    }
-    return () => { if (thinkingRef.current) clearInterval(thinkingRef.current); };
-  }, [loading]);
 
   const clearHistory = () => {
     setMessages([GREETING]);
@@ -264,41 +190,28 @@ export default function WorkflowAssistant({
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
-
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: trimmed }]);
     setLoading(true);
-
     try {
       const history = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
-
       const res = await aiApi.workflowChat(workspaceId, {
         message: trimmed,
         history,
         workflow: { nodes: workflowNodes, edges: workflowEdges },
       });
-
       const { reply, updatedWorkflow, messageType, suggestions, metadata } = res.data;
-
-      const assistantMsg: ChatMessage = {
+      setMessages(prev => [...prev, {
         role: 'assistant',
         content: reply || 'Done.',
         workflowUpdated: !!updatedWorkflow,
         messageType: messageType || 'message',
         suggestions: suggestions || [],
         metadata: metadata || {},
-      };
-
-      setMessages(prev => [...prev, assistantMsg]);
-
-      if (updatedWorkflow) {
-        onWorkflowUpdate(updatedWorkflow.nodes, updatedWorkflow.edges);
-      }
+      }]);
+      if (updatedWorkflow) onWorkflowUpdate(updatedWorkflow.nodes, updatedWorkflow.edges);
     } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.', messageType: 'message' },
-      ]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.', messageType: 'message' }]);
     } finally {
       setLoading(false);
       textareaRef.current?.focus();
@@ -306,10 +219,14 @@ export default function WorkflowAssistant({
   }, [messages, loading, workspaceId, workflowNodes, workflowEdges, onWorkflowUpdate]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
+  };
+
+  // Auto-resize textarea
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
 
   return (
@@ -317,97 +234,85 @@ export default function WorkflowAssistant({
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-brand-500/15 flex items-center justify-center">
-            <Bot size={14} className="text-brand-400" />
+        <div className="flex items-center gap-2.5">
+          {/* Avatar */}
+          <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 shadow-sm">
+            <Bot size={15} className="text-white" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-surface-card" />
           </div>
           <div>
-            <span className="font-body text-sm font-bold text-foreground">Freckles</span>
-            <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">
-              AI Copilot
-            </span>
+            <p className="text-sm font-semibold text-foreground leading-none">Freckles</p>
+            <p className="text-[10px] text-foreground-muted mt-0.5">AI Workflow Copilot</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={clearHistory} title="Clear history"
-            className="rounded-lg p-1.5 text-foreground-muted hover:bg-surface-border hover:text-foreground transition">
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={clearHistory}
+            title="Clear chat"
+            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
+          >
             <Trash2 size={13} />
           </button>
-          <button onClick={onClose}
-            className="rounded-lg p-1.5 text-foreground-muted hover:bg-surface-border hover:text-foreground transition">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
+          >
             <X size={14} />
           </button>
         </div>
       </div>
 
       {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start gap-2.5'}`}>
+
+            {/* Bot avatar */}
             {msg.role === 'assistant' && (
-              <div className="w-6 h-6 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0 mt-0.5 mr-2">
-                <Bot size={11} className="text-brand-400" />
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 mt-1">
+                <Bot size={11} className="text-white" />
               </div>
             )}
 
-            <div className="max-w-[85%] space-y-1.5">
-              {/* Message type badge */}
-              {msg.role === 'assistant' && msg.messageType && msg.messageType !== 'message' && (
-                <MessageTypeIcon type={msg.messageType} />
-              )}
+            <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : 'max-w-[88%]'}`}>
 
               {/* Bubble */}
-              <div className={`rounded-xl px-3 py-2.5 text-sm leading-relaxed ${
+              <div className={
                 msg.role === 'user'
-                  ? 'bg-brand-500/15 border border-brand-500/20 text-foreground ml-auto'
-                  : 'bg-surface-input border border-surface-border text-foreground'
-              }`}>
-                <p className="whitespace-pre-wrap font-medium">{msg.content}</p>
+                  ? 'bg-brand-500 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm leading-relaxed'
+                  : 'bg-surface-hover rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-foreground'
+              }>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
 
-                {/* Workflow updated indicator */}
+                {/* Canvas updated pill */}
                 {msg.workflowUpdated && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 border-t border-emerald-500/20 pt-2">
-                    <Workflow size={11} /> Canvas updated
+                  <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[11px] font-medium text-emerald-300">
+                    <Workflow size={10} />
+                    Canvas updated
                   </div>
                 )}
               </div>
 
-              {/* Health bar */}
-              {msg.metadata?.health && (
-                <HealthBar health={msg.metadata.health} />
-              )}
-
-              {msg.metadata?.compile && (
-                <CompileReport compile={msg.metadata.compile} />
-              )}
-
-              {/* Simulation steps */}
+              {/* Metadata cards */}
+              {msg.metadata?.health && <HealthBar health={msg.metadata.health} />}
               {msg.metadata?.simulation && msg.metadata.simulation.length > 0 && (
                 <SimulationSteps steps={msg.metadata.simulation} />
               )}
-
-              {/* Changes list */}
               {msg.metadata?.changes && msg.metadata.changes.length > 0 && (
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 space-y-1">
-                  {msg.metadata.changes.map((c, ci) => (
-                    <div key={ci} className="flex items-center gap-1.5 text-xs text-blue-300">
-                      <CheckCircle2 size={10} /> {c}
-                    </div>
-                  ))}
-                </div>
+                <ChangesList changes={msg.metadata.changes} />
               )}
 
               {/* Suggestion chips */}
               {msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <div className="flex flex-wrap gap-1.5">
                   {msg.suggestions.map((s, si) => (
                     <button
                       key={si}
                       onClick={() => sendMessage(s)}
                       disabled={loading}
-                      className="flex items-center gap-1 rounded-full border border-surface-border bg-surface-base px-2.5 py-1 text-[11px] font-medium text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 hover:bg-brand-500/5 transition disabled:opacity-40"
+                      className="rounded-full border border-surface-border bg-surface-card px-2.5 py-1 text-[11px] text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 hover:bg-brand-500/5 transition disabled:opacity-40"
                     >
-                      <ChevronRight size={9} /> {s}
+                      {s}
                     </button>
                   ))}
                 </div>
@@ -416,17 +321,14 @@ export default function WorkflowAssistant({
           </div>
         ))}
 
-        {/* Thinking indicator */}
+        {/* Typing indicator */}
         {loading && (
-          <div className="flex justify-start items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0">
-              <Bot size={11} className="text-brand-400" />
+          <div className="flex justify-start gap-2.5">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 mt-1">
+              <Bot size={11} className="text-white" />
             </div>
-            <div className="bg-surface-input border border-surface-border rounded-xl px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Loader2 size={12} className="animate-spin text-brand-400 shrink-0" />
-                <span className="text-xs font-medium text-foreground-muted transition-all">{thinkingMsg}</span>
-              </div>
+            <div className="bg-surface-hover rounded-2xl rounded-tl-sm">
+              <TypingDots />
             </div>
           </div>
         )}
@@ -435,27 +337,28 @@ export default function WorkflowAssistant({
       </div>
 
       {/* ── Input ── */}
-      <div className="shrink-0 border-t border-surface-border p-3">
-        <div className="flex gap-2 items-end">
+      <div className="shrink-0 px-4 pb-4 pt-2 border-t border-surface-border">
+        <div className="flex items-end gap-2 rounded-2xl border border-surface-border bg-surface-input px-3 py-2 focus-within:border-brand-500/50 transition">
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Build, edit, debug, or ask anything about your workflow…"
-            rows={2}
+            placeholder="Ask anything about your workflow…"
+            rows={1}
             disabled={loading}
-            className="flex-1 resize-none rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50 disabled:opacity-60"
+            className="flex-1 resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-muted/50 disabled:opacity-60 leading-relaxed"
+            style={{ minHeight: '24px', maxHeight: '120px' }}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={loading || !input.trim()}
-            className="p-2.5 rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end"
+            className="h-7 w-7 rounded-xl bg-brand-500 text-white flex items-center justify-center hover:bg-brand-600 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end"
           >
-            <Send size={14} />
+            <Send size={12} />
           </button>
         </div>
-        <p className="mt-1.5 text-[10px] font-medium text-foreground-muted/40">
+        <p className="mt-1.5 text-[10px] text-foreground-muted/35 text-center">
           Enter to send · Shift+Enter for new line
         </p>
       </div>
