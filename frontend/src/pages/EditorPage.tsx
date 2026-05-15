@@ -1092,7 +1092,7 @@ function EditorCanvas() {
               },
             }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#1e2535" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} />
             <Controls className="!rounded-lg !bg-[#1a1f2e] !border-white/[0.07] !shadow-xl [&>button]:!bg-[#1a1f2e] [&>button]:!border-white/[0.07] [&>button]:!text-white/50 [&>button:hover]:!bg-white/[0.06] [&>button:hover]:!text-white/80" />
           </ReactFlow>
 
