@@ -56,6 +56,7 @@ import CredentialsManager from '../components/modals/CredentialsManager';
 import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
+import { useTheme } from '../hooks/useTheme';
 
 const nodeTypes = { flowNode: FlowNode };
 const edgeTypes = { animatedEdge: AnimatedEdge };
@@ -67,6 +68,8 @@ function EditorCanvas() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { workspace, user, setNodeStatuses } = useStore();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const reactFlowInstance = useReactFlow();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -1277,7 +1280,7 @@ function EditorCanvas() {
             className="bg-surface-base"
             deleteKeyCode={['Backspace', 'Delete']}
             connectionLineStyle={{
-              stroke: 'rgba(129,140,248,0.55)',
+              stroke: isDark ? 'rgba(129,140,248,0.55)' : 'rgba(79,70,229,0.6)',
               strokeWidth: 2,
               strokeDasharray: '6 4',
             }}
@@ -1285,7 +1288,7 @@ function EditorCanvas() {
               type: 'animatedEdge',
               markerEnd: {
                 type: MarkerType.ArrowClosed,
-                color: 'rgba(148,163,184,0.45)',
+                color: isDark ? 'rgba(148,163,184,0.45)' : 'rgba(100,116,139,0.55)',
                 width: 14,
                 height: 14,
               },
@@ -1295,23 +1298,27 @@ function EditorCanvas() {
               variant={BackgroundVariant.Dots}
               gap={24}
               size={1.3}
-              color="rgba(148,163,184,0.12)"
+              color={isDark ? 'rgba(148,163,184,0.1)' : 'rgba(100,116,139,0.18)'}
             />
-            <Controls className="!rounded-xl !bg-[#0d1220]/90 !border-white/[0.07] !shadow-xl !backdrop-blur-sm [&>button]:!bg-transparent [&>button]:!border-white/[0.06] [&>button]:!text-white/40 [&>button:hover]:!bg-white/[0.05] [&>button:hover]:!text-white/75" />
+            <Controls className={`!rounded-xl !shadow-xl !backdrop-blur-sm ${
+              isDark
+                ? '!bg-[#0d1220]/90 !border-white/[0.07] [&>button]:!bg-transparent [&>button]:!border-white/[0.06] [&>button]:!text-white/40 [&>button:hover]:!bg-white/[0.05] [&>button:hover]:!text-white/75'
+                : '!bg-white/95 !border-black/[0.07] [&>button]:!bg-transparent [&>button]:!border-black/[0.06] [&>button]:!text-slate-500 [&>button:hover]:!bg-black/[0.04] [&>button:hover]:!text-slate-800'
+            }`} />
             <MiniMap
               nodeColor={(node) => {
                 const t = (node.data as any)?.type || '';
                 if (t.startsWith('trigger_')) return '#F59E0B';
                 if (['openai_chat','anthropic_chat','gemini_chat','ai_text_classifier','ai_summarizer'].includes(t)) return '#A78BFA';
-                if (['logic_if','logic_switch','logic_loop','error_handler'].includes(t)) return '#94A3B8';
+                if (['logic_if','logic_switch','logic_loop','error_handler'].includes(t)) return isDark ? '#94A3B8' : '#64748B';
                 if (['postgres_query','mongodb_find','redis_command','supabase_query'].includes(t)) return '#60A5FA';
                 if (['slack_message','discord_message','email_send','twilio_sms'].includes(t)) return '#34D399';
                 return '#818CF8';
               }}
-              maskColor="rgba(6,10,20,0.82)"
+              maskColor={isDark ? 'rgba(6,10,20,0.82)' : 'rgba(241,245,249,0.85)'}
               style={{
-                backgroundColor: 'rgba(10,14,26,0.92)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                backgroundColor: isDark ? 'rgba(10,14,26,0.92)' : 'rgba(255,255,255,0.96)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`,
                 borderRadius: 12,
               }}
               className="!rounded-xl !shadow-xl !bottom-4 !right-4"

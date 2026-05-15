@@ -3,10 +3,11 @@ import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { X, Copy, Play, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../../store';
+import { useTheme } from '../../hooks/useTheme';
 import NodeIcon from './NodeIcon';
 import { nodeCatalog } from '../../data/nodeCatalog';
 
-// ── Lookup map ────────────────────────────────────────────────────────────────
+// ── Description lookup ────────────────────────────────────────────────────────
 
 const summaryMap: Record<string, string> = {};
 for (const n of nodeCatalog) summaryMap[n.type] = n.description;
@@ -54,65 +55,138 @@ function getNodeVariant(nodeType: string): NodeVariant {
   return 'integration';
 }
 
-// ── Variant config (only what's needed for icon-box layout) ───────────────────
+// ── Variant config: accent + per-theme border/shadow values ───────────────────
 
-interface VariantConfig {
-  accentColor: string;
+interface ThemeVariants {
   idleBorder: string;
   idleShadow: string;
   hoverBorder: string;
+  hoverShadow: string;
+  selectedBorder: string;
   selectedShadow: string;
+}
+
+interface VariantConfig {
+  accentColor: string;
   dotColor: string;
+  dark: ThemeVariants;
+  light: ThemeVariants;
 }
 
 const VARIANT_CONFIG: Record<NodeVariant, VariantConfig> = {
   trigger: {
-    accentColor: '#F59E0B',
-    idleBorder: 'rgba(245,158,11,0.2)',
-    idleShadow: '0 0 0 1px rgba(245,158,11,0.12), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(245,158,11,0.45)',
-    selectedShadow: '0 0 0 2px rgba(245,158,11,0.6), 0 0 28px rgba(245,158,11,0.2)',
-    dotColor: '#F59E0B',
+    accentColor: '#F59E0B', dotColor: '#F59E0B',
+    dark: {
+      idleBorder:      'rgba(245,158,11,0.22)',
+      idleShadow:      '0 0 0 1px rgba(245,158,11,0.12), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(245,158,11,0.5)',
+      hoverShadow:     '0 0 0 1px rgba(245,158,11,0.4), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#F59E0B',
+      selectedShadow:  '0 0 0 2px rgba(245,158,11,0.65), 0 0 28px rgba(245,158,11,0.22)',
+    },
+    light: {
+      idleBorder:      'rgba(245,158,11,0.38)',
+      idleShadow:      '0 0 0 1px rgba(245,158,11,0.22), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(245,158,11,0.75)',
+      hoverShadow:     '0 0 0 1px rgba(245,158,11,0.6), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#D97706',
+      selectedShadow:  '0 0 0 2px rgba(217,119,6,0.75), 0 4px 12px rgba(217,119,6,0.15)',
+    },
   },
   ai: {
-    accentColor: '#A78BFA',
-    idleBorder: 'rgba(139,92,246,0.22)',
-    idleShadow: '0 0 0 1px rgba(139,92,246,0.14), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(139,92,246,0.5)',
-    selectedShadow: '0 0 0 2px rgba(139,92,246,0.65), 0 0 30px rgba(139,92,246,0.22)',
-    dotColor: '#A78BFA',
+    accentColor: '#A78BFA', dotColor: '#A78BFA',
+    dark: {
+      idleBorder:      'rgba(139,92,246,0.24)',
+      idleShadow:      '0 0 0 1px rgba(139,92,246,0.14), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(139,92,246,0.55)',
+      hoverShadow:     '0 0 0 1px rgba(139,92,246,0.44), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#A78BFA',
+      selectedShadow:  '0 0 0 2px rgba(139,92,246,0.7), 0 0 30px rgba(139,92,246,0.24)',
+    },
+    light: {
+      idleBorder:      'rgba(109,40,217,0.3)',
+      idleShadow:      '0 0 0 1px rgba(109,40,217,0.18), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(109,40,217,0.68)',
+      hoverShadow:     '0 0 0 1px rgba(109,40,217,0.55), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#7C3AED',
+      selectedShadow:  '0 0 0 2px rgba(124,58,237,0.72), 0 4px 12px rgba(124,58,237,0.15)',
+    },
   },
   logic: {
-    accentColor: '#94A3B8',
-    idleBorder: 'rgba(100,116,139,0.2)',
-    idleShadow: '0 0 0 1px rgba(100,116,139,0.12), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(100,116,139,0.4)',
-    selectedShadow: '0 0 0 2px rgba(100,116,139,0.55), 0 0 22px rgba(100,116,139,0.16)',
-    dotColor: '#94A3B8',
+    accentColor: '#94A3B8', dotColor: '#94A3B8',
+    dark: {
+      idleBorder:      'rgba(100,116,139,0.22)',
+      idleShadow:      '0 0 0 1px rgba(100,116,139,0.12), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(100,116,139,0.45)',
+      hoverShadow:     '0 0 0 1px rgba(100,116,139,0.35), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#94A3B8',
+      selectedShadow:  '0 0 0 2px rgba(100,116,139,0.6), 0 0 22px rgba(100,116,139,0.18)',
+    },
+    light: {
+      idleBorder:      'rgba(71,85,105,0.22)',
+      idleShadow:      '0 0 0 1px rgba(71,85,105,0.14), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(71,85,105,0.5)',
+      hoverShadow:     '0 0 0 1px rgba(71,85,105,0.38), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#475569',
+      selectedShadow:  '0 0 0 2px rgba(71,85,105,0.65), 0 4px 12px rgba(0,0,0,0.1)',
+    },
   },
   database: {
-    accentColor: '#60A5FA',
-    idleBorder: 'rgba(59,130,246,0.22)',
-    idleShadow: '0 0 0 1px rgba(59,130,246,0.14), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(59,130,246,0.48)',
-    selectedShadow: '0 0 0 2px rgba(59,130,246,0.62), 0 0 28px rgba(59,130,246,0.2)',
-    dotColor: '#60A5FA',
+    accentColor: '#60A5FA', dotColor: '#60A5FA',
+    dark: {
+      idleBorder:      'rgba(59,130,246,0.24)',
+      idleShadow:      '0 0 0 1px rgba(59,130,246,0.14), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(59,130,246,0.52)',
+      hoverShadow:     '0 0 0 1px rgba(59,130,246,0.42), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#60A5FA',
+      selectedShadow:  '0 0 0 2px rgba(59,130,246,0.68), 0 0 28px rgba(59,130,246,0.22)',
+    },
+    light: {
+      idleBorder:      'rgba(29,78,216,0.28)',
+      idleShadow:      '0 0 0 1px rgba(29,78,216,0.16), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(29,78,216,0.6)',
+      hoverShadow:     '0 0 0 1px rgba(29,78,216,0.48), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#1D4ED8',
+      selectedShadow:  '0 0 0 2px rgba(29,78,216,0.7), 0 4px 12px rgba(29,78,216,0.15)',
+    },
   },
   communication: {
-    accentColor: '#34D399',
-    idleBorder: 'rgba(16,185,129,0.22)',
-    idleShadow: '0 0 0 1px rgba(16,185,129,0.14), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(16,185,129,0.48)',
-    selectedShadow: '0 0 0 2px rgba(16,185,129,0.62), 0 0 28px rgba(16,185,129,0.2)',
-    dotColor: '#34D399',
+    accentColor: '#34D399', dotColor: '#34D399',
+    dark: {
+      idleBorder:      'rgba(16,185,129,0.24)',
+      idleShadow:      '0 0 0 1px rgba(16,185,129,0.14), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(16,185,129,0.52)',
+      hoverShadow:     '0 0 0 1px rgba(16,185,129,0.42), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#34D399',
+      selectedShadow:  '0 0 0 2px rgba(16,185,129,0.68), 0 0 28px rgba(16,185,129,0.22)',
+    },
+    light: {
+      idleBorder:      'rgba(5,150,105,0.28)',
+      idleShadow:      '0 0 0 1px rgba(5,150,105,0.16), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(5,150,105,0.62)',
+      hoverShadow:     '0 0 0 1px rgba(5,150,105,0.5), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#059669',
+      selectedShadow:  '0 0 0 2px rgba(5,150,105,0.72), 0 4px 12px rgba(5,150,105,0.15)',
+    },
   },
   integration: {
-    accentColor: '#818CF8',
-    idleBorder: 'rgba(99,102,241,0.18)',
-    idleShadow: '0 0 0 1px rgba(99,102,241,0.1), 0 4px 16px rgba(0,0,0,0.3)',
-    hoverBorder: 'rgba(99,102,241,0.42)',
-    selectedShadow: '0 0 0 2px rgba(99,102,241,0.58), 0 0 26px rgba(99,102,241,0.18)',
-    dotColor: '#818CF8',
+    accentColor: '#818CF8', dotColor: '#818CF8',
+    dark: {
+      idleBorder:      'rgba(99,102,241,0.2)',
+      idleShadow:      '0 0 0 1px rgba(99,102,241,0.1), 0 4px 16px rgba(0,0,0,0.32)',
+      hoverBorder:     'rgba(99,102,241,0.46)',
+      hoverShadow:     '0 0 0 1px rgba(99,102,241,0.36), 0 8px 28px rgba(0,0,0,0.42)',
+      selectedBorder:  '#818CF8',
+      selectedShadow:  '0 0 0 2px rgba(99,102,241,0.62), 0 0 26px rgba(99,102,241,0.2)',
+    },
+    light: {
+      idleBorder:      'rgba(67,56,202,0.24)',
+      idleShadow:      '0 0 0 1px rgba(67,56,202,0.14), 0 1px 4px rgba(0,0,0,0.06)',
+      hoverBorder:     'rgba(67,56,202,0.56)',
+      hoverShadow:     '0 0 0 1px rgba(67,56,202,0.44), 0 4px 14px rgba(0,0,0,0.1)',
+      selectedBorder:  '#4338CA',
+      selectedShadow:  '0 0 0 2px rgba(67,56,202,0.7), 0 4px 12px rgba(67,56,202,0.14)',
+    },
   },
 };
 
@@ -142,9 +216,11 @@ function NodeHandle({ type, position, id: handleId, isConnectable, isHovered, ac
         width: 12,
         height: 12,
         borderRadius: '50%',
-        background: isHovered ? accentColor : 'rgba(11, 16, 27, 0.95)',
-        border: `2px solid ${isHovered ? accentColor : 'rgba(255,255,255,0.14)'}`,
-        boxShadow: isHovered ? `0 0 10px ${accentColor}70, 0 0 0 3px ${accentColor}20` : '0 1px 4px rgba(0,0,0,0.5)',
+        background: isHovered ? accentColor : 'var(--node-handle-idle-bg)',
+        border: `2px solid ${isHovered ? accentColor : 'var(--node-handle-idle-border)'}`,
+        boxShadow: isHovered
+          ? `0 0 10px ${accentColor}70, 0 0 0 3px ${accentColor}22`
+          : '0 1px 3px rgba(0,0,0,0.18)',
         transition: 'all 0.16s ease',
         zIndex: 20,
       }}
@@ -152,72 +228,49 @@ function NodeHandle({ type, position, id: handleId, isConnectable, isHovered, ac
   );
 }
 
-// ── Quick-action button ───────────────────────────────────────────────────────
-
-function ActionBtn({
-  icon,
-  label,
-  onClick,
-  danger = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      title={label}
-      onClick={onClick}
-      className={`flex h-[24px] w-[24px] items-center justify-center rounded-lg transition-all duration-100 ${
-        danger
-          ? 'text-red-400/60 hover:bg-red-500/10 hover:text-red-400'
-          : 'text-white/35 hover:bg-white/[0.06] hover:text-white/75'
-      }`}
-    >
-      {icon}
-    </button>
-  );
-}
-
-// ── Status dot (bottom-right of icon box) ─────────────────────────────────────
+// ── Status dot ────────────────────────────────────────────────────────────────
 
 function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
+  const colorClass = {
     running: 'bg-blue-400',
-    success: 'bg-emerald-400',
-    failed:  'bg-red-400',
-    skipped: 'bg-slate-500',
-  };
+    success: 'bg-emerald-500',
+    failed:  'bg-red-500',
+    skipped: 'bg-slate-400',
+  }[status] ?? 'bg-slate-400';
+
+  const glowStyle = {
+    running: '0 0 6px rgba(96,165,250,0.75)',
+    success: '0 0 5px rgba(16,185,129,0.7)',
+    failed:  '0 0 6px rgba(239,68,68,0.75)',
+  }[status] ?? 'none';
+
   return (
     <div
-      className={`absolute bottom-[7px] right-[7px] h-[8px] w-[8px] rounded-full ${colors[status] || 'bg-slate-500'} ${
+      className={`absolute bottom-[7px] right-[7px] h-[8px] w-[8px] rounded-full z-10 ${colorClass} ${
         status === 'running' ? 'animate-pulse' : ''
-      } z-10`}
-      style={{
-        boxShadow:
-          status === 'running' ? '0 0 6px rgba(96,165,250,0.7)' :
-          status === 'success' ? '0 0 5px rgba(52,211,153,0.6)' :
-          status === 'failed'  ? '0 0 6px rgba(239,68,68,0.7)' : 'none',
-      }}
+      }`}
+      style={{ boxShadow: glowStyle }}
     />
   );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const BOX_SIZE = 88; // icon box square dimension in px
-const CONTAINER_W = 92; // outer container width (provides slight overflow space)
+const BOX_SIZE = 88;
+const CONTAINER_W = 92;
 
 function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
   const nodeStatuses = useStore((s) => s.nodeStatuses);
   const status = nodeStatuses[id] as string | undefined;
   const { deleteElements } = useReactFlow();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const [isHovered, setIsHovered] = useState(false);
 
   const nodeType: string = data.type || '';
   const variant = getNodeVariant(nodeType);
-  const vcfg = VARIANT_CONFIG[variant];
+  const cfg = VARIANT_CONFIG[variant];
+  const vc = isDark ? cfg.dark : cfg.light;
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
@@ -227,25 +280,25 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
     [id, deleteElements]
   );
 
-  // ── Box border + shadow based on state ──
-  let borderColor = vcfg.idleBorder;
-  let boxShadow = vcfg.idleShadow;
+  // ── Compute box border + shadow ──
+  let borderColor = vc.idleBorder;
+  let boxShadow   = vc.idleShadow;
 
   if (status === 'running') {
     borderColor = '#3B82F6';
-    boxShadow = '0 0 0 1.5px rgba(59,130,246,0.5), 0 0 24px rgba(59,130,246,0.22), 0 4px 16px rgba(0,0,0,0.35)';
+    boxShadow   = `0 0 0 1.5px rgba(59,130,246,0.55), 0 0 24px rgba(59,130,246,0.22), ${isDark ? '0 4px 16px rgba(0,0,0,0.35)' : '0 2px 10px rgba(0,0,0,0.08)'}`;
   } else if (status === 'success') {
     borderColor = '#10B981';
-    boxShadow = '0 0 0 1.5px rgba(16,185,129,0.5), 0 0 18px rgba(16,185,129,0.18), 0 4px 16px rgba(0,0,0,0.35)';
+    boxShadow   = `0 0 0 1.5px rgba(16,185,129,0.55), 0 0 18px rgba(16,185,129,0.18), ${isDark ? '0 4px 16px rgba(0,0,0,0.35)' : '0 2px 10px rgba(0,0,0,0.08)'}`;
   } else if (status === 'failed') {
     borderColor = '#EF4444';
-    boxShadow = '0 0 0 1.5px rgba(239,68,68,0.55), 0 0 22px rgba(239,68,68,0.22), 0 4px 16px rgba(0,0,0,0.35)';
+    boxShadow   = `0 0 0 1.5px rgba(239,68,68,0.6), 0 0 22px rgba(239,68,68,0.22), ${isDark ? '0 4px 16px rgba(0,0,0,0.35)' : '0 2px 10px rgba(0,0,0,0.08)'}`;
   } else if (selected) {
-    borderColor = vcfg.accentColor;
-    boxShadow = vcfg.selectedShadow;
+    borderColor = vc.selectedBorder;
+    boxShadow   = vc.selectedShadow;
   } else if (isHovered && !dragging) {
-    borderColor = vcfg.hoverBorder;
-    boxShadow = `0 0 0 1px ${vcfg.hoverBorder}, 0 8px 28px rgba(0,0,0,0.4)`;
+    borderColor = vc.hoverBorder;
+    boxShadow   = vc.hoverShadow;
   }
 
   return (
@@ -265,77 +318,63 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         style={{
           width: BOX_SIZE,
           height: BOX_SIZE,
-          backgroundColor: 'rgba(11, 16, 27, 0.9)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          background: 'var(--node-box-bg)',
+          backdropFilter: 'var(--node-backdrop-blur)',
+          WebkitBackdropFilter: 'var(--node-backdrop-blur)',
           borderColor,
           boxShadow,
           transition: 'border-color 0.2s ease, box-shadow 0.25s ease, transform 0.12s ease',
         }}
       >
-        {/* Input handle (left center of box) */}
+        {/* Input handle */}
         <NodeHandle
-          type="target"
-          id="in"
-          position={Position.Left}
+          type="target" id="in" position={Position.Left}
           isConnectable={isConnectable}
           isHovered={isHovered && !dragging}
-          accentColor={vcfg.accentColor}
+          accentColor={cfg.accentColor}
         />
 
-        {/* Category accent dot — top-right corner */}
+        {/* Category accent dot — top-right */}
         <div
-          className="absolute top-[8px] right-[8px] h-[6px] w-[6px] rounded-full"
+          className="absolute top-[8px] right-[8px] h-[6px] w-[6px] rounded-full pointer-events-none"
           style={{
-            backgroundColor: vcfg.dotColor,
-            opacity: selected || (status && status !== 'skipped') ? 0.9 : 0.38,
-            boxShadow: (isHovered || selected) ? `0 0 6px ${vcfg.dotColor}80` : 'none',
+            backgroundColor: cfg.dotColor,
+            opacity: selected || (status && status !== 'skipped') ? 0.9 : isDark ? 0.38 : 0.55,
+            boxShadow: (isHovered || selected) ? `0 0 6px ${cfg.dotColor}90` : 'none',
             transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
           }}
         />
 
-        {/* Icon — scaled up inside the box */}
-        <div
-          className="flex items-center justify-center [&_img]:!w-10 [&_img]:!h-10 [&_img]:!rounded-[4px] [&_svg]:!w-10 [&_svg]:!h-10"
-          style={{ color: 'inherit' }}
-        >
+        {/* Icon */}
+        <div className="flex items-center justify-center [&_img]:!w-10 [&_img]:!h-10 [&_img]:!rounded-[4px] [&_svg]:!w-10 [&_svg]:!h-10">
           <NodeIcon nodeType={nodeType} plain />
         </div>
 
-        {/* Running shimmer overlay */}
+        {/* Running tint overlay */}
         {status === 'running' && (
           <div
             className="absolute inset-0 rounded-2xl pointer-events-none"
-            style={{
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.06) 0%, transparent 70%)',
-            }}
+            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, transparent 70%)' }}
           />
         )}
 
-        {/* Status dot — bottom-right corner */}
+        {/* Status dot */}
         {status && <StatusDot status={status} />}
 
-        {/* Output handle (right center of box) */}
+        {/* Output handle */}
         <NodeHandle
-          type="source"
-          id="out"
-          position={Position.Right}
+          type="source" id="out" position={Position.Right}
           isConnectable={isConnectable}
           isHovered={isHovered && !dragging}
-          accentColor={vcfg.accentColor}
+          accentColor={cfg.accentColor}
         />
       </div>
 
-      {/* Running pulse ring outside box */}
+      {/* Running pulse ring */}
       {status === 'running' && (
         <div
           className="absolute pointer-events-none"
-          style={{
-            top: 0,
-            left: (CONTAINER_W - BOX_SIZE) / 2,
-            width: BOX_SIZE,
-            height: BOX_SIZE,
-          }}
+          style={{ top: 0, left: (CONTAINER_W - BOX_SIZE) / 2, width: BOX_SIZE, height: BOX_SIZE }}
         >
           <div
             className="absolute inset-0 rounded-2xl border-2 border-blue-400/20 animate-ping"
@@ -344,17 +383,17 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         </div>
       )}
 
-      {/* ── Text section (below box) ── */}
+      {/* ── Text section below box ── */}
       <div className="mt-[9px] flex flex-col items-center" style={{ maxWidth: 116 }}>
         <div
-          className="w-full text-center text-[11.5px] font-semibold leading-tight text-foreground truncate"
+          className="w-full text-center text-[11.5px] font-semibold leading-tight text-slate-800 dark:text-slate-100 truncate"
           title={data.label}
         >
           {data.label}
         </div>
         {summaryMap[nodeType] && (
           <div
-            className="mt-[2px] w-full text-center text-[9.5px] leading-snug text-foreground-muted truncate"
+            className="mt-[2px] w-full text-center text-[9.5px] leading-snug text-slate-400 dark:text-slate-500 truncate"
             title={summaryMap[nodeType]}
           >
             {summaryMap[nodeType]}
@@ -362,7 +401,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         )}
       </div>
 
-      {/* ── Hover quick-action toolbar (above box) ── */}
+      {/* ── Hover toolbar (above box) ── */}
       <AnimatePresence>
         {isHovered && !dragging && (
           <motion.div
@@ -370,19 +409,25 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ duration: 0.11, ease: 'easeOut' }}
-            className="absolute z-40 flex items-center gap-[2px] rounded-[10px] border border-white/[0.07] bg-[#0a0f1c]/96 px-[4px] py-[3px] shadow-2xl backdrop-blur-md"
-            style={{ top: -38, left: '50%', transform: 'translateX(-50%)' }}
+            className="absolute z-40 flex items-center gap-[2px] rounded-[10px] border px-[4px] py-[3px] shadow-xl backdrop-blur-md"
+            style={{
+              top: -38,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'var(--node-toolbar-bg)',
+              borderColor: 'var(--node-toolbar-border)',
+            }}
             onMouseEnter={() => setIsHovered(true)}
           >
-            <ActionBtn icon={<Play size={10} />} label="Run node" onClick={(e) => e.stopPropagation()} />
-            <ActionBtn icon={<Copy size={10} />} label="Duplicate" onClick={(e) => e.stopPropagation()} />
-            <div className="mx-[2px] h-[14px] w-px bg-white/[0.07]" />
-            <ActionBtn icon={<X size={10} />} label="Delete" onClick={handleDelete} danger />
+            <ToolbarBtn icon={<Play size={10} />} label="Run node" onClick={(e) => e.stopPropagation()} />
+            <ToolbarBtn icon={<Copy size={10} />} label="Duplicate" onClick={(e) => e.stopPropagation()} />
+            <div className="mx-[2px] h-[14px] w-px" style={{ background: 'var(--node-separator)' }} />
+            <ToolbarBtn icon={<X size={10} />} label="Delete" onClick={handleDelete} danger />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Quick-add connected node button (right of box) ── */}
+      {/* ── Quick-add button (right of box) ── */}
       <AnimatePresence>
         {isHovered && !dragging && (
           <motion.button
@@ -393,14 +438,15 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              window.dispatchEvent(
-                new CustomEvent('flowa:node-quick-add', { detail: { sourceNodeId: id } })
-              );
+              window.dispatchEvent(new CustomEvent('flowa:node-quick-add', { detail: { sourceNodeId: id } }));
             }}
-            className="absolute z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full border border-white/[0.1] bg-[#0a0f1c]/92 text-white/40 shadow-xl backdrop-blur-sm hover:border-white/20 hover:text-white/80"
+            className="absolute z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-lg backdrop-blur-sm transition-colors"
             style={{
-              top: BOX_SIZE / 2 - 13,   // vertically centered on box
-              right: -(CONTAINER_W - BOX_SIZE) / 2 - 38, // outside right edge
+              top: BOX_SIZE / 2 - 13,
+              right: -(CONTAINER_W - BOX_SIZE) / 2 - 38,
+              background: 'var(--node-quickadd-bg)',
+              border: `1px solid var(--node-quickadd-border)`,
+              color: 'var(--node-quickadd-icon)',
             }}
             title="Add connected node"
           >
@@ -409,6 +455,32 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ── Toolbar button ────────────────────────────────────────────────────────────
+
+function ToolbarBtn({
+  icon, label, onClick, danger = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      title={label}
+      onClick={onClick}
+      className={`flex h-[24px] w-[24px] items-center justify-center rounded-lg transition-all duration-100 ${
+        danger
+          ? 'text-red-400/60 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400'
+          : 'hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-slate-700 dark:hover:text-white/80'
+      }`}
+      style={{ color: danger ? undefined : 'var(--node-toolbar-icon)' }}
+    >
+      {icon}
+    </button>
   );
 }
 
