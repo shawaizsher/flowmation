@@ -665,7 +665,15 @@ function EditorCanvas() {
     if (executing) {
       setExecuting(false);
       clearExecutionMonitors();
-      toast('Execution cancelled', { icon: '⏹️' });
+      // Reset any nodes still showing "running" to a neutral state
+      setNodeStatuses((prev: Record<string, string>) => {
+        const next: Record<string, string> = {};
+        for (const [nodeId, s] of Object.entries(prev)) {
+          next[nodeId] = s === 'running' || s === 'pending' ? 'skipped' : s;
+        }
+        return next;
+      });
+      toast('Execution stopped', { icon: '⏹' });
       return;
     }
 
