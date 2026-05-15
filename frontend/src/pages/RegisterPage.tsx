@@ -24,6 +24,7 @@ export default function RegisterPage() {
   const [digits, setDigits]       = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
+  const [devOtp, setDevOtp]       = useState<string | null>(null);
   const inputRefs                 = useRef<(HTMLInputElement | null)[]>([]);
 
   /* ── Submit registration form ── */
@@ -37,10 +38,10 @@ export default function RegisterPage() {
       const { data } = await authApi.register({ name: fullName, email, password });
 
       if (data.emailVerificationRequired) {
+        if (data.devOtp) setDevOtp(data.devOtp); // dev mode hint
         setStep('otp');
-        toast.success('A 6-digit code was sent to your email!');
+        toast.success(data.devOtp ? 'Dev mode — code shown below.' : 'A 6-digit code was sent to your email!');
       } else {
-        // No SMTP — auto-verified
         setAuth(data.token, data.user, data.workspace ?? { id: '', name: '', slug: '', role: '' });
         toast.success('Account created!');
         navigate('/dashboard');
@@ -200,6 +201,14 @@ export default function RegisterPage() {
                   : <><CheckCircle2 size={15} /> Verify Email</>
                 }
               </button>
+
+              {/* Dev-mode code hint */}
+              {devOtp && (
+                <div className="w-full mb-3 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70 mb-0.5">Dev mode — no SMTP configured</p>
+                  <p className="text-sm font-mono font-bold tracking-[0.25em] text-amber-400">{devOtp}</p>
+                </div>
+              )}
 
               <p className="text-xs text-foreground-muted mb-3">
                 Code expires in 15 minutes.
