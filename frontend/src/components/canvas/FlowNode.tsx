@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { useStore } from '../../store';
 import NodeIcon from './NodeIcon';
 import { nodeCatalog } from '../../data/nodeCatalog';
@@ -132,6 +132,22 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         }}
         className="transition-transform group-hover:scale-110"
       />
+
+      {/* ── Quick-add button (right of output handle, visible on hover) ── */}
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          window.dispatchEvent(
+            new CustomEvent('flowa:node-quick-add', { detail: { sourceNodeId: id } })
+          );
+        }}
+        className="absolute top-1/2 -translate-y-1/2 z-30 hidden h-6 w-6 items-center justify-center rounded-full border border-surface-border bg-surface-card text-foreground-muted shadow-md transition-all duration-150 hover:border-brand-500 hover:bg-brand-500 hover:text-white group-hover:flex"
+        style={{ right: -38 }}
+        title="Add connected node"
+      >
+        <Plus size={13} />
+      </button>
 
       {/* ── Left coloured icon section ────────────────────────────────── */}
       <div
