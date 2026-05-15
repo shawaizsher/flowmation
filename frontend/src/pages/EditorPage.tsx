@@ -717,13 +717,15 @@ function EditorCanvas() {
       setNodeStatuses({});
       setRightPanel('logs');
 
-      // Populate I/O entries from current nodes (as pending)
+      // Populate I/O entries from current nodes (as pending).
+      // input is intentionally undefined here — the INPUT tab should only show
+      // runtime data returned by the backend, not the node's own config object.
       const initialEntries: NodeIOEntry[] = nodes.map((n) => ({
         nodeId: n.id,
         nodeLabel: n.data.label || n.id,
         nodeType: n.data.type || '',
         status: 'pending' as const,
-        input: n.data.config || {},
+        input: undefined,
       }));
       setIoEntries(initialEntries);
       setIoVisible(true);
