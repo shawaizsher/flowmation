@@ -262,7 +262,7 @@ const CONTAINER_W = 92;
 function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
   const nodeStatuses = useStore((s) => s.nodeStatuses);
   const status = nodeStatuses[id] as string | undefined;
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, addNodes, getNode } = useReactFlow();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const [isHovered, setIsHovered] = useState(false);
@@ -278,6 +278,29 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
       deleteElements({ nodes: [{ id }] });
     },
     [id, deleteElements]
+  );
+
+  const handleDuplicate = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const source = getNode(id);
+      if (!source) return;
+      addNodes({
+        id: `${nodeType}-copy-${Date.now()}`,
+        type: 'flowNode',
+        position: { x: source.position.x + 40, y: source.position.y + 80 },
+        data: { ...source.data },
+      });
+    },
+    [id, nodeType, getNode, addNodes]
+  );
+
+  const handleRunNode = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      window.dispatchEvent(new CustomEvent('flowa:node-run', { detail: { nodeId: id } }));
+    },
+    [id]
   );
 
   // ── Compute box border + shadow ──
@@ -419,8 +442,8 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             }}
             onMouseEnter={() => setIsHovered(true)}
           >
-            <ToolbarBtn icon={<Play size={10} />} label="Run node" onClick={(e) => e.stopPropagation()} />
-            <ToolbarBtn icon={<Copy size={10} />} label="Duplicate" onClick={(e) => e.stopPropagation()} />
+            <ToolbarBtn icon={<Play size={10} />} label="Run node"  onClick={handleRunNode} />
+            <ToolbarBtn icon={<Copy size={10} />} label="Duplicate" onClick={handleDuplicate} />
             <div className="mx-[2px] h-[14px] w-px" style={{ background: 'var(--node-separator)' }} />
             <ToolbarBtn icon={<X size={10} />} label="Delete" onClick={handleDelete} danger />
           </motion.div>

@@ -124,6 +124,13 @@ function EditorCanvas() {
     return () => window.removeEventListener('flowa:node-quick-add', handler);
   }, []);
 
+  // Listen for "Run node" clicks — always calls the latest handleExecute via ref
+  useEffect(() => {
+    const handler = () => handleExecuteRef.current();
+    window.addEventListener('flowa:node-run', handler);
+    return () => window.removeEventListener('flowa:node-run', handler);
+  }, []);
+
   // Execution
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [nodeLogs, setNodeLogs] = useState<any[]>([]);
@@ -158,6 +165,9 @@ function EditorCanvas() {
   const executeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const executionPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const executionPollInFlightRef = useRef(false);
+  // Always points to the latest handleExecute so the node-run event listener
+  // never captures a stale closure
+  const handleExecuteRef = useRef<() => void>(() => {});
 
   const workspaceId = workspace?.id;
 
@@ -740,6 +750,9 @@ function EditorCanvas() {
       setExecuting(false);
     }
   };
+
+  // Keep the ref pointing to the latest handleExecute every render
+  handleExecuteRef.current = handleExecute;
 
   const handleAddNode = (def: NodeDef, sourceId?: string | null) => {
     const sourceNode = sourceId ? nodes.find(n => n.id === sourceId) : null;
