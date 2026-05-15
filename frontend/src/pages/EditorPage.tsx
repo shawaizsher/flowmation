@@ -1055,19 +1055,21 @@ function EditorCanvas() {
             nodesConnectable
             className="bg-surface-base"
             deleteKeyCode={['Backspace', 'Delete']}
-            connectionLineStyle={{ stroke: '#34d399', strokeWidth: 1.8, strokeDasharray: '6 4' }}
+            connectionLineStyle={{ stroke: '#4b5563', strokeWidth: 1.5, strokeDasharray: '5 4' }}
             defaultEdgeOptions={{
               type: 'smoothstep',
-              animated: true,
-              style: { stroke: '#334155', strokeWidth: 1.6 },
+              animated: false,
+              style: { stroke: '#374151', strokeWidth: 1.5 },
               markerEnd: {
                 type: MarkerType.ArrowClosed,
-                color: '#334155',
+                color: '#4b5563',
+                width: 16,
+                height: 16,
               },
             }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e2d42" />
-            <Controls className="!bg-surface-card !border-surface-border !shadow-xl [&>button]:!bg-surface-card [&>button]:!border-surface-border [&>button]:!text-foreground-muted [&>button:hover]:!bg-surface-hover" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#1e2535" />
+            <Controls className="!rounded-lg !bg-[#1a1f2e] !border-white/[0.07] !shadow-xl [&>button]:!bg-[#1a1f2e] [&>button]:!border-white/[0.07] [&>button]:!text-white/50 [&>button:hover]:!bg-white/[0.06] [&>button:hover]:!text-white/80" />
           </ReactFlow>
 
           {/* I/O Panel — bottom of canvas */}
