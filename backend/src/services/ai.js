@@ -154,6 +154,8 @@ const NODE_INDEX = [
   { type: 'transform_set',   cat: 'TRANSFORM', kw: 'set variable value transform map field convert format', desc: 'Set or map data fields' },
   { type: 'json_parse',      cat: 'TRANSFORM', kw: 'json parse string object convert', desc: 'Parse a JSON string' },
   { type: 'code_execute',    cat: 'TRANSFORM', kw: 'code run execute javascript python custom logic script', desc: 'Run custom code' },
+  { type: 'code_python',     cat: 'TRANSFORM', kw: 'python code run execute script custom logic', desc: 'Run custom Python code' },
+  { type: 'code_javascript', cat: 'TRANSFORM', kw: 'javascript js code run execute script custom', desc: 'Run custom JavaScript code' },
   { type: 'transform_filter',cat: 'TRANSFORM', kw: 'filter array data remove where condition only', desc: 'Filter array items' },
   { type: 'transform_split', cat: 'TRANSFORM', kw: 'split array divide chunk items batch', desc: 'Split array into batches' },
   { type: 'transform_merge', cat: 'TRANSFORM', kw: 'merge combine join objects arrays data', desc: 'Merge multiple data objects' },
@@ -628,7 +630,7 @@ const INTENT_PROTOTYPES = {
   remove_node: 'remove delete drop eliminate get rid take out the node',
   connect:     'connect link wire join attach edge between two nodes',
   clear:       'clear reset wipe empty start over fresh canvas everything',
-  explain:     'what does explain how works describe tell about workflow current',
+  explain:     'what does this do explain how works describe tell about workflow current purpose function does it do',
   health:      'health score grade analyze quality check status validate review',
   simulate:    'simulate dry run preview test execution trace what happens',
   debug:       'debug fix problem error failure broken issue troubleshoot why',
@@ -889,6 +891,83 @@ async function documentWorkflow(workflow) {
  * │  workflowChat — strict scope, intent-routed, multi-modal response    │
  * └──────────────────────────────────────────────────────────────────────┘ */
 
+/* ┌──────────────────────────────────────────────────────────────────────┐
+ * │  SMART WORKFLOW EXPLANATION                                          │
+ * │  Reads labels, configs and A* path to produce natural-language desc. │
+ * └──────────────────────────────────────────────────────────────────────┘ */
+
+function describeNode(node) {
+  const type    = node?.data?.type || node?.type || '';
+  const label   = node?.data?.label || type;
+  const config  = node?.data?.config || {};
+  const catalog = NODE_INDEX.find(n => n.type === type);
+  const base    = catalog?.desc || type.replace(/_/g, ' ');
+
+  // Pull the most meaningful config value to surface as a hint
+  const hints = [];
+  if (config.expression)                  hints.push(`on schedule \`${config.expression}\``);
+  if (config.url)                         hints.push(`→ \`${String(config.url).slice(0, 60)}\``);
+  if (config.query)                       hints.push(`\`${String(config.query).slice(0, 50)}${String(config.query).length > 50 ? '…' : ''}\``);
+  if (config.channel)                     hints.push(`in **${config.channel}**`);
+  if (config.to)                          hints.push(`to **${config.to}**`);
+  if (config.table)                       hints.push(`table **${config.table}**`);
+  if (config.subject)                     hints.push(`"${config.subject}"`);
+  if (config.condition)                   hints.push(`if \`${String(config.condition).slice(0, 40)}\``);
+  if (config.code || config.script)       hints.push(`(custom code)`);
+  if (config.categories)                  hints.push(`categories: ${config.categories}`);
+  if (config.message && !config.channel)  hints.push(`"${String(config.message).slice(0, 40)}${String(config.message).length > 40 ? '…' : ''}"`);
+
+  const hint = hints.length ? ` ${hints[0]}` : '';
+  return { label, base, hint, full: `**${label}**${hint} — *${base}*` };
+}
+
+function buildWorkflowExplanation(nodes, edges) {
+  const { unreachable } = analyzeGraphDFS(nodes, edges);
+  const path = aStarShortestPath(nodes, edges);
+
+  // ── Single node ──────────────────────────────────────────────────────
+  if (nodes.length === 1) {
+    const { full, label, base } = describeNode(nodes[0]);
+    const isTrigger = (nodes[0].data?.type || '').includes('trigger');
+    return (
+      `This workflow has a single ${isTrigger ? 'trigger' : 'action'} node: ${full}.\n\n` +
+      (isTrigger
+        ? `It waits for an event (${base}) and will pass data to the next node once connected.`
+        : `It has no trigger yet — connect a trigger to start the automation, and further nodes to do something with the output.`)
+    );
+  }
+
+  // ── Multi-node: walk the A* path ─────────────────────────────────────
+  const lines = ['Here\'s what this workflow does, step by step:\n'];
+
+  path.forEach((node, i) => {
+    if (!node) return;
+    const { full } = describeNode(node);
+    const isFirst = i === 0;
+    const isLast  = i === path.length - 1;
+    const prefix  = isFirst ? '🟢 **Starts with:**' : isLast ? `${i + 1}. **Ends with:**` : `${i + 1}.`;
+    lines.push(`${prefix} ${full}`);
+  });
+
+  // ── Branching nodes not on the main path ─────────────────────────────
+  const pathIds = new Set(path.filter(Boolean).map(n => n.id));
+  const branchNodes = nodes.filter(n => !pathIds.has(n.id) && !unreachable.includes(n.id));
+  if (branchNodes.length > 0) {
+    lines.push('\n**Parallel / branch steps:**');
+    branchNodes.forEach(n => lines.push(`• ${describeNode(n).full}`));
+  }
+
+  // ── Disconnected nodes ───────────────────────────────────────────────
+  if (unreachable.length > 0) {
+    const labels = unreachable
+      .map(id => nodes.find(n => n.id === id)?.data?.label || id)
+      .join(', ');
+    lines.push(`\n⚠️ These nodes are disconnected and won't run: **${labels}**`);
+  }
+
+  return lines.join('\n');
+}
+
 const HELP_TEXT =
   "I'm Freckles — your workflow copilot. Here's what I can do:\n" +
   "• **Build** — \"daily report from Postgres emailed at 9am\"\n" +
@@ -915,7 +994,15 @@ async function workflowChat({ message, history = [], workflow = {} }) {
     const msg = (message || '').trim();
     if (!msg) return { reply: 'Tell me what to build.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: [], metadata: {} };
 
-    const { intent, confidence } = classifyIntent(msg);
+    let { intent, confidence } = classifyIntent(msg);
+
+    // Hard-coded pattern overrides for phrases that lose too many tokens
+    // after stop-word removal to score correctly via TF-IDF alone
+    const lower = msg.toLowerCase();
+    if (/what does (this|it|the workflow|this workflow) (do|mean|actually do)/.test(lower)) intent = 'explain';
+    if (/what is (this|the workflow|it)/.test(lower))                                       intent = 'explain';
+    if (/^(explain|describe|tell me about|walk me through)/.test(lower))                    intent = 'explain';
+    if (/^(hi|hey|hello|sup|yo)\b/.test(lower))                                             intent = 'greeting';
     const entities = extractEntities(msg);
     const nodes = workflow.nodes || [];
     const edges = workflow.edges || [];
@@ -1058,16 +1145,11 @@ async function workflowChat({ message, history = [], workflow = {} }) {
     /* ── EXPLAIN ──────────────────────────────────────────────── */
     if (intent === 'explain') {
       if (!nodes.length) return { reply: 'The canvas is empty. Describe what you want to automate.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: ['Show help'], metadata: {} };
-      const { maxDepth, unreachable } = analyzeGraphDFS(nodes, edges);
-      const types = [...new Set(nodes.map(n => n.data?.type || n.type))];
-      const triggerNode = nodes.find(n => (n.data?.type || '').includes('trigger'));
-      const reply = `This workflow has **${nodes.length} nodes** and **${edges.length} connections**, reaching **${maxDepth + 1} steps** deep.\n\n`
-                  + (triggerNode ? `It starts with **${triggerNode.data?.label}**.\n` : '')
-                  + `Node types in use: ${types.join(', ')}.`
-                  + (unreachable.length ? `\n\n⚠️ ${unreachable.length} node(s) are disconnected.` : '');
+
+      const reply = buildWorkflowExplanation(nodes, edges);
       return {
         reply, toolCalls: [], updatedWorkflow: null, messageType: 'message',
-        suggestions: ['Check workflow health', 'Simulate execution'],
+        suggestions: ['Check workflow health', 'Simulate execution', 'Add error handling'],
         metadata: { explanation: nodes.map(n => `${n.data?.label} — ${n.data?.type}`) },
       };
     }
