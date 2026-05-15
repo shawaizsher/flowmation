@@ -585,6 +585,52 @@ function isMissingValue(value) {
   return false;
 }
 
+function getCredentialRequirement(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('hubspot')) {
+    return {
+      serviceId: 'hubspot',
+      serviceLabel: 'HubSpot',
+      envKeys: ['HUBSPOT_ACCESS_TOKEN'],
+      fields: ['HubSpot credential']
+    };
+  }
+  if (t.includes('slack')) {
+    return {
+      serviceId: 'slack',
+      serviceLabel: 'Slack',
+      envKeys: [],
+      fields: ['Slack webhook URL']
+    };
+  }
+  if (t.includes('ai_classify') || t.includes('ai_summar') || t.includes('anthropic')) {
+    return {
+      serviceId: 'anthropic',
+      serviceLabel: 'Anthropic',
+      envKeys: ['ANTHROPIC_API_KEY'],
+      fields: ['Anthropic API key']
+    };
+  }
+  if (t.includes('openai')) {
+    return {
+      serviceId: 'openai',
+      serviceLabel: 'OpenAI',
+      envKeys: ['OPENAI_API_KEY'],
+      fields: ['OpenAI API key']
+    };
+  }
+  return null;
+}
+
+function hasNodeLocalCredential(type, config) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('slack')) return !isMissingValue(config.webhookUrl) || !isMissingValue(config.webhook_url);
+  if (t.includes('hubspot')) return !isMissingValue(config.access_token) || !isMissingValue(config.accessToken);
+  if (t.includes('ai_classify') || t.includes('ai_summar') || t.includes('anthropic')) return !isMissingValue(config.apiKey) || !isMissingValue(config.api_key);
+  if (t.includes('openai')) return !isMissingValue(config.apiKey) || !isMissingValue(config.api_key);
+  return false;
+}
+
 function inferNodeOutputSchema(type) {
   const t = (type || '').toLowerCase();
   if (t.includes('webhook')) return ['body', 'headers', 'query', 'method'];
@@ -698,13 +744,25 @@ function findMissingConfig(nodes, registry) {
       .map(([key]) => key)
       .filter((key) => isMissingValue(config[key]));
 
-    if (missingFields.length === 0) return [];
+    const credentialRequirement = getCredentialRequirement(type);
+    const hasLinkedCredential = Boolean(node?.data?.credentialId || config.credentialId);
+    const hasEnvCredential = credentialRequirement?.envKeys?.some((key) => Boolean(process.env[key]));
+    const hasConfigCredential = hasNodeLocalCredential(type, config);
+    const needsCredential = credentialRequirement && !hasLinkedCredential && !hasEnvCredential && !hasConfigCredential;
+
+    if (missingFields.length === 0 && !needsCredential) return [];
 
     return [{
       nodeId: node.id,
       nodeLabel: getNodeLabel(node),
       nodeType: type,
-      fields: missingFields
+      fields: needsCredential ? [...missingFields, ...credentialRequirement.fields] : missingFields,
+      serviceId: credentialRequirement?.serviceId || null,
+      serviceLabel: credentialRequirement?.serviceLabel || null,
+      fixActions: [
+        { type: 'open_node', label: 'Open node' },
+        ...(needsCredential ? [{ type: 'add_credential', label: `Add ${credentialRequirement.serviceLabel} credential`, serviceId: credentialRequirement.serviceId }] : [])
+      ]
     }];
   });
 }

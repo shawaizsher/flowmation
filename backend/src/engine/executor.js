@@ -303,7 +303,7 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           // ── Inject per-user credentials into config ──
           // If the node has a credentialId, look up the credential values
           // from the credentials map sent by the frontend
-          const credentialId = node.data?.credentialId;
+          const credentialId = node.data?.credentialId || nodeConfig?.credentialId;
           if (credentialId && credentials[credentialId]) {
             resolvedConfig._credentials = credentials[credentialId].values;
             resolvedConfig._credentialServiceId = credentials[credentialId].serviceId;

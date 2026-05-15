@@ -800,11 +800,234 @@ registry.register('slackMessage', {
     message: { type: 'textarea', label: 'Message', required: true }
   },
   execute: async ({ config }) => {
-    const response = await axios.post(config.webhookUrl, {
+    const userCreds = config._credentials || {};
+    const webhookUrl = config.webhookUrl || userCreds.webhook_url || userCreds.webhookUrl;
+    if (!webhookUrl) {
+      throw new Error('Slack webhook URL not configured - add it in Credentials Manager or set it on the node.');
+    }
+
+    const response = await axios.post(webhookUrl, {
       channel: config.channel,
       text: config.message
     });
     return { success: true, statusCode: response.status };
+  }
+});
+
+function parseJsonConfig(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function getFirstInputPayload(input) {
+  const first = Object.values(input || {})[0] || {};
+  return first.body || first.data || first.result || first;
+}
+
+function getValueFromConfigOrPayload(config, payload, keys) {
+  for (const key of keys) {
+    if (config[key] !== undefined && config[key] !== null && String(config[key]).trim() !== '') return config[key];
+  }
+  for (const key of keys) {
+    if (payload?.[key] !== undefined && payload?.[key] !== null && String(payload[key]).trim() !== '') return payload[key];
+  }
+  return '';
+}
+
+function getHubSpotToken(config) {
+  const userCreds = config._credentials || {};
+  const token = userCreds.access_token || userCreds.accessToken || userCreds.token || config.access_token || config.accessToken || process.env.HUBSPOT_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('HubSpot access token not configured - add a HubSpot credential in Credentials Manager or set HUBSPOT_ACCESS_TOKEN in .env');
+  }
+  return token;
+}
+
+async function hubspotRequest(config, axiosConfig) {
+  const token = getHubSpotToken(config);
+  const response = await axios({
+    baseURL: 'https://api.hubapi.com',
+    timeout: 30000,
+    validateStatus: () => true,
+    ...axiosConfig,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(axiosConfig.headers || {})
+    }
+  });
+
+  if (response.status < 200 || response.status >= 300) {
+    const message = response.data?.message || response.data?.error || `HubSpot API returned ${response.status}`;
+    throw new Error(`HubSpot request failed: ${message}`);
+  }
+
+  return response.data;
+}
+
+async function searchHubSpotContactByEmail(config, email, properties) {
+  const data = await hubspotRequest(config, {
+    method: 'POST',
+    url: '/crm/v3/objects/contacts/search',
+    data: {
+      filterGroups: [{
+        filters: [{ propertyName: 'email', operator: 'EQ', value: email }]
+      }],
+      properties,
+      limit: 1
+    }
+  });
+  return data.results?.[0] || null;
+}
+
+registry.register('hubspotContact', {
+  label: 'HubSpot Contact',
+  description: 'Create, update, upsert, or fetch a HubSpot CRM contact',
+  category: 'crm',
+  icon: 'hubspot',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'contact', type: 'object' }, { name: 'success', type: 'boolean' }],
+  configSchema: {
+    action: { type: 'select', label: 'Action', options: ['upsert', 'create', 'update', 'get'], default: 'upsert' },
+    email: { type: 'text', label: 'Email' },
+    firstName: { type: 'text', label: 'First Name' },
+    lastName: { type: 'text', label: 'Last Name' },
+    contactId: { type: 'text', label: 'Contact ID' },
+    properties: { type: 'json', label: 'Extra Properties', default: '{}' },
+    returnProperties: { type: 'text', label: 'Return Properties', default: 'email,firstname,lastname,phone,company,website,lifecyclestage' }
+  },
+  execute: async ({ config, input }) => {
+    const payload = getFirstInputPayload(input);
+    const action = config.action || 'upsert';
+    const returnProperties = String(config.returnProperties || 'email,firstname,lastname,phone,company,website,lifecyclestage')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const email = getValueFromConfigOrPayload(config, payload, ['email']);
+    const firstName = getValueFromConfigOrPayload(config, payload, ['firstName', 'firstname', 'first_name']);
+    const lastName = getValueFromConfigOrPayload(config, payload, ['lastName', 'lastname', 'last_name']);
+    const contactId = getValueFromConfigOrPayload(config, payload, ['contactId', 'id', 'hs_object_id']);
+    const extraProperties = parseJsonConfig(config.properties, {});
+    const properties = {
+      ...extraProperties,
+      ...(email ? { email } : {}),
+      ...(firstName ? { firstname: firstName } : {}),
+      ...(lastName ? { lastname: lastName } : {})
+    };
+
+    if (action === 'get') {
+      if (!email && !contactId) throw new Error('HubSpot contact get requires either email or contactId.');
+      const identifier = email || contactId;
+      const data = await hubspotRequest(config, {
+        method: 'GET',
+        url: `/crm/v3/objects/contacts/${encodeURIComponent(identifier)}`,
+        params: {
+          properties: returnProperties.join(','),
+          ...(email ? { idProperty: 'email' } : {})
+        }
+      });
+      return { success: true, action, contact: data, properties: data.properties };
+    }
+
+    if (!email && !contactId) {
+      throw new Error('HubSpot contact create/update requires an email from node config or incoming data.');
+    }
+
+    if (action === 'create') {
+      const data = await hubspotRequest(config, {
+        method: 'POST',
+        url: '/crm/v3/objects/contacts',
+        data: { properties }
+      });
+      return { success: true, action, contact: data, properties: data.properties };
+    }
+
+    if (action === 'update') {
+      const identifier = contactId || email;
+      const data = await hubspotRequest(config, {
+        method: 'PATCH',
+        url: `/crm/v3/objects/contacts/${encodeURIComponent(identifier)}`,
+        params: email && !contactId ? { idProperty: 'email' } : undefined,
+        data: { properties }
+      });
+      return { success: true, action, contact: data, properties: data.properties };
+    }
+
+    const existing = email ? await searchHubSpotContactByEmail(config, email, returnProperties) : null;
+    if (existing) {
+      const data = await hubspotRequest(config, {
+        method: 'PATCH',
+        url: `/crm/v3/objects/contacts/${existing.id}`,
+        data: { properties }
+      });
+      return { success: true, action: 'updated', contact: data, properties: data.properties };
+    }
+
+    const data = await hubspotRequest(config, {
+      method: 'POST',
+      url: '/crm/v3/objects/contacts',
+      data: { properties }
+    });
+    return { success: true, action: 'created', contact: data, properties: data.properties };
+  }
+});
+
+registry.register('hubspotGetContacts', {
+  label: 'HubSpot Get Contacts',
+  description: 'List HubSpot CRM contacts',
+  category: 'crm',
+  icon: 'hubspot',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'contacts', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    limit: { type: 'number', label: 'Limit', default: 100 },
+    properties: { type: 'text', label: 'Properties', default: 'email,firstname,lastname' }
+  },
+  execute: async ({ config }) => {
+    const properties = String(config.properties || 'email,firstname,lastname');
+    const data = await hubspotRequest(config, {
+      method: 'GET',
+      url: '/crm/v3/objects/contacts',
+      params: { limit: Math.min(Number(config.limit) || 100, 100), properties }
+    });
+    return { success: true, contacts: data.results || [], count: data.results?.length || 0, paging: data.paging };
+  }
+});
+
+registry.register('hubspotCreateDeal', {
+  label: 'HubSpot Create Deal',
+  description: 'Create a HubSpot CRM deal',
+  category: 'crm',
+  icon: 'hubspot',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'deal', type: 'object' }, { name: 'success', type: 'boolean' }],
+  configSchema: {
+    dealName: { type: 'text', label: 'Deal Name', required: true },
+    amount: { type: 'number', label: 'Amount', default: 0 },
+    pipeline: { type: 'text', label: 'Pipeline ID' },
+    stage: { type: 'text', label: 'Stage ID' },
+    properties: { type: 'json', label: 'Extra Properties', default: '{}' }
+  },
+  execute: async ({ config }) => {
+    const extraProperties = parseJsonConfig(config.properties, {});
+    const properties = {
+      ...extraProperties,
+      dealname: config.dealName,
+      ...(config.amount ? { amount: String(config.amount) } : {}),
+      ...(config.pipeline ? { pipeline: config.pipeline } : {}),
+      ...(config.stage ? { dealstage: config.stage } : {})
+    };
+    const data = await hubspotRequest(config, {
+      method: 'POST',
+      url: '/crm/v3/objects/deals',
+      data: { properties }
+    });
+    return { success: true, deal: data, properties: data.properties };
   }
 });
 
@@ -1056,17 +1279,31 @@ registerAlias('ai_summarizer', 'aiSummarize');
 
 registerAlias('email_send', 'sendEmail');
 registerAlias('slack_send', 'slackMessage', {
+  configSchema: {
+    webhookUrl: { type: 'text', label: 'Slack Webhook URL' },
+    channel: { type: 'text', label: 'Channel' },
+    text: { type: 'textarea', label: 'Message', required: true }
+  },
   execute: withConfig('slackMessage', (config) => ({
     ...config,
     message: config.message || config.text || config.content || ''
   }))
 });
 registerAlias('slack_message', 'slackMessage', {
+  configSchema: {
+    webhookUrl: { type: 'text', label: 'Slack Webhook URL' },
+    channel: { type: 'text', label: 'Channel' },
+    text: { type: 'textarea', label: 'Message', required: true }
+  },
   execute: withConfig('slackMessage', (config) => ({
     ...config,
     message: config.message || config.text || config.content || ''
   }))
 });
+
+registerAlias('hubspot_contact', 'hubspotContact');
+registerAlias('hubspot_get_contacts', 'hubspotGetContacts');
+registerAlias('hubspot_create_deal', 'hubspotCreateDeal');
 
 registerAlias('postgres_query', 'readDatabase');
 registerAlias('mysql_query', 'readDatabase');
