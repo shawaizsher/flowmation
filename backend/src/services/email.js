@@ -44,53 +44,71 @@ async function initEmail() {
 }
 
 /**
- * Generate a secure random verification token.
+ * Generate a 6-digit OTP code for email verification.
  */
 function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+  // Cryptographically random 6-digit code (100000 – 999999)
+  const buf = crypto.randomBytes(4);
+  const num = buf.readUInt32BE(0) % 900000 + 100000;
+  return num.toString();
 }
 
 /**
- * Send a verification email to the user.
+ * Send a verification email containing a 6-digit OTP code.
+ * The `token` parameter is now a 6-digit string.
  */
 async function sendVerificationEmail(toEmail, userName, token) {
-  const baseUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
-  const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+  // Split digits for the visual "boxes" in the email template
+  const digits = token.split('');
+
+  const digitBoxStyle =
+    'display:inline-block;width:44px;height:52px;line-height:52px;text-align:center;' +
+    'font-size:28px;font-weight:700;letter-spacing:0;color:#111;' +
+    'background:#f4f4f5;border-radius:8px;margin:0 4px;';
 
   const mailOptions = {
     from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
     to: toEmail,
-    subject: 'Verify your Flowa account',
+    subject: `${token} is your Flowa verification code`,
     html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px;">
-        <div style="text-align: center; margin-bottom: 32px;">
-          <div style="display: inline-block; background: linear-gradient(135deg, #F63049, #E11D48); width: 48px; height: 48px; border-radius: 12px; line-height: 48px; font-size: 24px; color: white;">⚡</div>
-          <h1 style="margin: 12px 0 0; font-size: 24px; color: #111;">Flowa</h1>
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#fff;">
+        <!-- Logo -->
+        <div style="text-align:center;margin-bottom:32px;">
+          <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
         </div>
-        <h2 style="font-size: 20px; color: #111; margin-bottom: 8px;">Verify your email</h2>
-        <p style="color: #555; font-size: 15px; line-height: 1.6;">Hi ${userName},</p>
-        <p style="color: #555; font-size: 15px; line-height: 1.6;">Thanks for signing up! Please confirm your email address by clicking the button below.</p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${verifyUrl}" style="display: inline-block; background: linear-gradient(135deg, #F63049, #E11D48); color: white; text-decoration: none; padding: 14px 36px; border-radius: 10px; font-weight: 600; font-size: 15px;">
-            Verify Email Address
-          </a>
+
+        <!-- Heading -->
+        <h2 style="font-size:20px;color:#111;margin:0 0 8px;font-weight:700;">Your verification code</h2>
+        <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px;">
+          Hi ${userName}, enter the code below on the Flowa registration page to verify your email address.
+        </p>
+
+        <!-- OTP digits -->
+        <div style="text-align:center;margin:0 0 32px;">
+          ${digits.map(d => `<span style="${digitBoxStyle}">${d}</span>`).join('')}
         </div>
-        <p style="color: #888; font-size: 13px; line-height: 1.5;">This link expires in 24 hours. If you didn't create a Flowa account, you can safely ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-        <p style="color: #aaa; font-size: 12px;">Or copy and paste this URL into your browser:</p>
-        <p style="color: #F63049; font-size: 12px; word-break: break-all;">${verifyUrl}</p>
+
+        <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 8px;">
+          This code expires in <strong>15 minutes</strong>.
+        </p>
+        <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 28px;">
+          If you didn't create a Flowa account, you can safely ignore this email.
+        </p>
+
+        <hr style="border:none;border-top:1px solid #eee;margin:0 0 20px;" />
+        <p style="color:#bbb;font-size:12px;margin:0;">Flowa — AI-Native Workflow Automation</p>
       </div>
     `,
-    text: `Hi ${userName},\n\nVerify your Flowa account by visiting:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
+    text: `Hi ${userName},\n\nYour Flowa verification code is: ${token}\n\nThis code expires in 15 minutes.`,
   };
 
   const info = await transporter.sendMail(mailOptions);
-  logger.info(`Verification email sent to ${toEmail} (messageId: ${info.messageId})`);
+  logger.info(`OTP verification email sent to ${toEmail} (messageId: ${info.messageId})`);
 
-  // In dev mode, log the Ethereal preview URL
   const previewUrl = nodemailer.getTestMessageUrl(info);
   if (previewUrl) {
-    logger.info(`📧 Preview verification email: ${previewUrl}`);
+    logger.info(`📧 Preview OTP email: ${previewUrl}`);
   }
 
   return info;
