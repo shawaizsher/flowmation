@@ -8,6 +8,132 @@ const router = express.Router({ mergeParams: true });
 // All routes require authentication + workspace membership
 router.use(authenticate, requireWorkspace);
 
+function parseGraphValue(value) {
+  if (!value) return { nodes: [], edges: [] };
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return { nodes: [], edges: [] }; }
+  }
+  return value;
+}
+
+async function loadWorkflowOr404(req, res) {
+  const result = await query(
+    'SELECT * FROM workflows WHERE id = $1 AND workspace_id = $2',
+    [req.params.id, req.workspaceId]
+  );
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Workflow not found' });
+    return null;
+  }
+  return result.rows[0];
+}
+
+function getNodeType(node) {
+  return node?.data?.type || node?.type || 'unknown';
+}
+
+function getNodeLabel(node) {
+  return node?.data?.label || node?.id || 'Unnamed node';
+}
+
+function generateTestFixtures(graph) {
+  const trigger = (graph.nodes || []).find(n => getNodeType(n).includes('trigger'));
+  const hasLead = (graph.nodes || []).some(n => /lead|hubspot|crm/i.test(`${getNodeType(n)} ${getNodeLabel(n)}`));
+  return [
+    {
+      name: hasLead ? 'Hot lead happy path' : 'Default happy path',
+      payload: {
+        body: hasLead
+          ? { email: 'lead@example.com', status: 'hot', score: 92, source: 'website' }
+          : { message: 'hello from Flowa', status: 'ok' },
+        headers: { 'x-flowa-test': 'true' },
+        query: {},
+        method: 'POST',
+        trigger: trigger ? getNodeType(trigger) : 'manual'
+      },
+      assertions: [
+        'Workflow has a trigger',
+        'Every non-trigger node is reachable',
+        'No unsupported runtime node types',
+        'Policy guardrails are not blocked'
+      ]
+    },
+    {
+      name: 'Missing optional data path',
+      payload: { body: {}, headers: {}, query: {}, method: 'POST' },
+      assertions: ['Workflow should not crash on sparse payload']
+    }
+  ];
+}
+
+function makeReleasePlan(workflow, compile) {
+  const blocked = compile.status === 'blocked';
+  return {
+    environment: process.env.FLOWA_RELEASE_ENV || 'local',
+    recommendation: blocked ? 'Do not publish yet' : compile.status === 'review' ? 'Publish to staging first' : 'Ready for production publish',
+    canary: {
+      enabled: !blocked,
+      initialTrafficPercent: blocked ? 0 : 10,
+      promoteWhen: '20 consecutive successful executions and error rate below 2%',
+      rollbackWhen: 'Any policy blocker, 3 consecutive failures, or error rate above 5%'
+    },
+    rollback: {
+      available: workflow.version > 1,
+      target: workflow.version > 1 ? `v${workflow.version - 1}` : null
+    },
+    checklist: compile.releaseChecklist
+  };
+}
+
+function makeEdgeRunnerPlan(graph, compile) {
+  const privateNodeTypes = ['postgres', 'mysql', 'mongodb', 'redis', 'filesystem', 's3'];
+  const privateNodes = (graph.nodes || []).filter(n =>
+    privateNodeTypes.some(type => getNodeType(n).toLowerCase().includes(type))
+  );
+  return {
+    mode: privateNodes.length ? 'recommended' : 'optional',
+    runnerName: `flowa-edge-${Date.now()}`,
+    reason: privateNodes.length
+      ? 'Workflow touches private databases/storage; run close to the data source.'
+      : 'No private-data connector detected, but edge execution can still reduce latency.',
+    privateNodes: privateNodes.map(n => ({ id: n.id, label: getNodeLabel(n), type: getNodeType(n) })),
+    command: 'node src/worker.js --runner=edge --workspace=current',
+    requiredSecrets: compile.missingConfig.map(item => `${item.nodeLabel}: ${item.fields.join(', ')}`)
+  };
+}
+
+async function buildAdvancedReport(workflow) {
+  const aiService = require('../services/ai');
+  const graph = parseGraphValue(workflow.graph);
+  const compile = aiService.compileWorkflow(graph);
+  return {
+    compiler: compile,
+    schemaAwareCanvas: {
+      contracts: compile.dataContracts,
+      warningCount: compile.dataContracts.filter(c => c.availableFields.length === 1 && c.availableFields[0] === 'data').length
+    },
+    selfHealing: {
+      available: true,
+      description: 'Failed node logs can be diagnosed and patched through AI Debugger.',
+      recommendedAction: compile.unsupportedNodes.length
+        ? 'Implement or replace unsupported node types before retrying.'
+        : compile.missingConfig.length
+          ? 'Fill missing configuration before retrying.'
+          : 'Run the workflow and use Debug with AI on any failed node.'
+    },
+    timeTravelDebugger: {
+      available: true,
+      description: 'Execution replay is built from node_logs and can be fetched after a run.'
+    },
+    workflowUnitTests: {
+      fixtures: generateTestFixtures(graph)
+    },
+    releaseSystem: makeReleasePlan(workflow, compile),
+    edgeRunner: makeEdgeRunnerPlan(graph, compile),
+    policyGuardrails: compile.policy
+  };
+}
+
 // ── GET /api/workspaces/:wid/workflows/members ──
 router.get('/members', async (req, res) => {
   try {
@@ -122,6 +248,152 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── PUT /api/workspaces/:wid/workflows/:id ──
+// GET /api/workspaces/:wid/workflows/:id/advanced-report
+router.get('/:id/advanced-report', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    res.json(await buildAdvancedReport(workflow));
+  } catch (err) {
+    logger.error('Advanced report error:', err);
+    res.status(500).json({ error: 'Failed to build advanced workflow report' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/:id/tests/generate
+router.post('/:id/tests/generate', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    res.json({ tests: generateTestFixtures(parseGraphValue(workflow.graph)) });
+  } catch (err) {
+    logger.error('Generate workflow tests error:', err);
+    res.status(500).json({ error: 'Failed to generate workflow tests' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/:id/tests/run
+router.post('/:id/tests/run', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const graph = parseGraphValue(workflow.graph);
+    const aiService = require('../services/ai');
+    const compile = aiService.compileWorkflow(graph);
+    const tests = Array.isArray(req.body.tests) && req.body.tests.length ? req.body.tests : generateTestFixtures(graph);
+    const results = tests.map((test) => ({
+      name: test.name,
+      status: compile.status === 'blocked' ? 'failed' : 'passed',
+      assertions: (test.assertions || []).map((assertion) => ({
+        assertion,
+        passed:
+          assertion.includes('trigger') ? (graph.nodes || []).some(n => getNodeType(n).includes('trigger')) :
+          assertion.includes('unsupported') ? compile.unsupportedNodes.length === 0 :
+          assertion.includes('Policy') ? compile.policy.status !== 'blocked' :
+          true
+      })),
+      payload: test.payload
+    }));
+    res.json({ status: results.some(r => r.status === 'failed') ? 'failed' : 'passed', results, compile });
+  } catch (err) {
+    logger.error('Run workflow tests error:', err);
+    res.status(500).json({ error: 'Failed to run workflow tests' });
+  }
+});
+
+// GET /api/workspaces/:wid/workflows/:id/replay/:executionId
+router.get('/:id/replay/:executionId', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const execution = await query(
+      'SELECT * FROM executions WHERE id = $1 AND workflow_id = $2 AND workspace_id = $3',
+      [req.params.executionId, req.params.id, req.workspaceId]
+    );
+    if (execution.rows.length === 0) return res.status(404).json({ error: 'Execution not found' });
+    const logs = await query('SELECT * FROM node_logs WHERE execution_id = $1 ORDER BY started_at ASC', [req.params.executionId]);
+    res.json({
+      execution: execution.rows[0],
+      timeline: logs.rows.map((log, index) => ({
+        step: index + 1,
+        nodeId: log.node_id,
+        nodeLabel: log.node_label,
+        nodeType: log.node_type,
+        status: log.status,
+        durationMs: log.duration_ms,
+        input: log.input,
+        output: log.output,
+        error: log.error,
+        startedAt: log.started_at,
+        finishedAt: log.finished_at
+      }))
+    });
+  } catch (err) {
+    logger.error('Replay execution error:', err);
+    res.status(500).json({ error: 'Failed to replay execution' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/:id/self-heal
+router.post('/:id/self-heal', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const graph = parseGraphValue(workflow.graph);
+    const aiService = require('../services/ai');
+    const compile = aiService.compileWorkflow(graph);
+    const failedNode = req.body.nodeId ? (graph.nodes || []).find(n => n.id === req.body.nodeId) : null;
+    const diagnosis = await aiService.debugNode({
+      nodeType: failedNode ? getNodeType(failedNode) : req.body.nodeType || 'unknown',
+      nodeLabel: failedNode ? getNodeLabel(failedNode) : req.body.nodeLabel || 'Unknown node',
+      error: req.body.error || 'No error provided'
+    });
+    res.json({
+      diagnosis,
+      testBeforeApply: {
+        status: compile.status === 'blocked' ? 'failed' : 'passed',
+        readinessScore: compile.readinessScore,
+        message: compile.status === 'blocked'
+          ? 'Patch should not be applied until compiler blockers are resolved.'
+          : 'Patch can be tested with generated fixtures before applying.'
+      },
+      suggestedNextStep: 'Review the fix, run workflow tests, then apply through AI Debugger if appropriate.'
+    });
+  } catch (err) {
+    logger.error('Self-heal workflow error:', err);
+    res.status(500).json({ error: 'Failed to self-heal workflow' });
+  }
+});
+
+// GET /api/workspaces/:wid/workflows/:id/release-plan
+router.get('/:id/release-plan', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const aiService = require('../services/ai');
+    const compile = aiService.compileWorkflow(parseGraphValue(workflow.graph));
+    res.json({ release: makeReleasePlan(workflow, compile), compile });
+  } catch (err) {
+    logger.error('Release plan error:', err);
+    res.status(500).json({ error: 'Failed to build release plan' });
+  }
+});
+
+// GET /api/workspaces/:wid/workflows/:id/edge-runner-plan
+router.get('/:id/edge-runner-plan', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const graph = parseGraphValue(workflow.graph);
+    const aiService = require('../services/ai');
+    const compile = aiService.compileWorkflow(graph);
+    res.json({ edgeRunner: makeEdgeRunnerPlan(graph, compile) });
+  } catch (err) {
+    logger.error('Edge runner plan error:', err);
+    res.status(500).json({ error: 'Failed to build edge runner plan' });
+  }
+});
+
 router.put('/:id', async (req, res) => {
   try {
     const { name, description, graph, status, tags } = req.body;

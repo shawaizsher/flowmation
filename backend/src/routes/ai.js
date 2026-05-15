@@ -246,6 +246,22 @@ router.post('/suggest-nodes', async (req, res) => {
 });
 
 // ── POST /api/workspaces/:wid/ai/chat ──
+// POST /api/workspaces/:wid/ai/compile-workflow
+router.post('/compile-workflow', async (req, res) => {
+  try {
+    const { workflow } = req.body;
+
+    if (!workflow) {
+      return res.status(400).json({ error: 'workflow is required' });
+    }
+
+    res.json({ compile: aiService.compileWorkflow(workflow) });
+  } catch (err) {
+    logger.error('AI compile workflow error:', err);
+    res.status(500).json({ error: 'Failed to compile workflow' });
+  }
+});
+
 router.post('/chat', async (req, res) => {
   try {
     const { message, history, workflow } = req.body;

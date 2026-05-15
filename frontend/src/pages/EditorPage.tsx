@@ -41,6 +41,7 @@ import {
   Link2,
   Unlink,
   Upload,
+  ShieldCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
@@ -79,7 +80,7 @@ function EditorCanvas() {
 
   // Panels — both open by default for easier understanding
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
-  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'none'>('config');
+  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'advanced' | 'none'>('config');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // Node catalog (local)
@@ -115,6 +116,8 @@ function EditorCanvas() {
   // AI Debugger
   const [debugResult, setDebugResult] = useState<any>(null);
   const [debugging, setDebugging] = useState(false);
+  const [advancedReport, setAdvancedReport] = useState<any>(null);
+  const [advancedLoading, setAdvancedLoading] = useState(false);
 
   // I/O Panel
   const [ioVisible, setIoVisible] = useState(false);
@@ -824,6 +827,84 @@ function EditorCanvas() {
     }
   };
 
+  const loadAdvancedReport = async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setAdvancedLoading(true);
+      setRightPanel('advanced');
+      const res = await workflowApi.advancedReport(workspaceId, id);
+      setAdvancedReport(res.data);
+    } catch {
+      toast.error('Failed to load advanced report');
+    } finally {
+      setAdvancedLoading(false);
+    }
+  };
+
+  const runWorkflowTests = async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setAdvancedLoading(true);
+      const generated = await workflowApi.generateTests(workspaceId, id);
+      const result = await workflowApi.runTests(workspaceId, id, generated.data.tests);
+      setAdvancedReport((prev: any) => ({
+        ...(prev || {}),
+        workflowUnitTests: {
+          fixtures: generated.data.tests,
+          result: result.data,
+        },
+      }));
+      toast.success(result.data.status === 'passed' ? 'Workflow tests passed' : 'Workflow tests need attention');
+    } catch {
+      toast.error('Workflow tests failed to run');
+    } finally {
+      setAdvancedLoading(false);
+    }
+  };
+
+  const loadReplayForLatestExecution = async () => {
+    if (!workspaceId || !id || !executionId) {
+      toast.error('Run the workflow first to create an execution replay');
+      return;
+    }
+    try {
+      setAdvancedLoading(true);
+      const res = await workflowApi.replayExecution(workspaceId, id, executionId);
+      setAdvancedReport((prev: any) => ({
+        ...(prev || {}),
+        timeTravelDebugger: {
+          ...(prev?.timeTravelDebugger || {}),
+          replay: res.data,
+        },
+      }));
+    } catch {
+      toast.error('Failed to load replay timeline');
+    } finally {
+      setAdvancedLoading(false);
+    }
+  };
+
+  const loadReleaseAndEdgePlans = async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setAdvancedLoading(true);
+      const [release, edge] = await Promise.all([
+        workflowApi.releasePlan(workspaceId, id),
+        workflowApi.edgeRunnerPlan(workspaceId, id),
+      ]);
+      setAdvancedReport((prev: any) => ({
+        ...(prev || {}),
+        releaseSystem: release.data.release,
+        edgeRunner: edge.data.edgeRunner,
+      }));
+      toast.success('Release and edge runner plans updated');
+    } catch {
+      toast.error('Failed to load release/edge plans');
+    } finally {
+      setAdvancedLoading(false);
+    }
+  };
+
   // ── Filtered nodes for palette (local catalog) ──
   const filteredCatalog = searchNodes(nodeSearch);
   const totalNodeCount = allNodes.length;
@@ -920,6 +1001,13 @@ function EditorCanvas() {
             title="AI Workflow Assistant"
           >
             <Bot size={16} />
+          </button>
+          <button
+            onClick={loadAdvancedReport}
+            className={`rounded p-1.5 ${rightPanel === 'advanced' ? 'bg-brand-500/20 text-brand-400' : 'text-foreground-muted hover:text-foreground'}`}
+            title="Advanced engineering report"
+          >
+            <ShieldCheck size={16} />
           </button>
 
           <div className="mx-2 h-5 w-px bg-surface-border" />
@@ -1604,6 +1692,109 @@ function EditorCanvas() {
                   </div>
                 ) : (
                   <p className="text-sm text-foreground-muted">Select a failed node to debug.</p>
+                )}
+              </div>
+            )}
+
+            {/* Advanced engineering panel */}
+            {rightPanel === 'advanced' && (
+              <div className="p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-body text-base font-semibold text-foreground flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-brand-400" /> Advanced Engineering
+                  </h3>
+                  <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {advancedLoading && !advancedReport ? (
+                  <div className="flex flex-col items-center py-8">
+                    <BanterLoader label="Building advanced report..." />
+                  </div>
+                ) : !advancedReport ? (
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-4 text-sm text-foreground-muted">
+                    Click the shield icon again to generate compiler, policy, release, replay, and test insights.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">AI Compiler</span>
+                        <span className="text-sm font-bold text-brand-400">
+                          {advancedReport.compiler?.readinessScore}/100 {advancedReport.compiler?.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-foreground-muted">
+                        Missing config: {advancedReport.compiler?.missingConfig?.length || 0} · Unsupported nodes: {advancedReport.compiler?.unsupportedNodes?.length || 0}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-2 text-sm font-semibold text-foreground">Policy Guardrails</h4>
+                      {(advancedReport.policyGuardrails?.findings || []).length === 0 ? (
+                        <p className="text-xs text-green-400">No policy findings.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {advancedReport.policyGuardrails.findings.slice(0, 4).map((finding: any, i: number) => (
+                            <p key={i} className="text-xs text-foreground-muted">{finding.severity}: {finding.message}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-2 text-sm font-semibold text-foreground">Schema-Aware Connections</h4>
+                      {(advancedReport.schemaAwareCanvas?.contracts || []).slice(0, 4).map((contract: any, i: number) => (
+                        <p key={i} className="truncate text-xs font-mono text-foreground-muted">
+                          {contract.from} -&gt; {contract.to}: {contract.availableFields?.join(', ')}
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={runWorkflowTests} disabled={advancedLoading} className="rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-bold text-foreground hover:border-brand-500/40 disabled:opacity-50">
+                        Run Unit Tests
+                      </button>
+                      <button onClick={loadReplayForLatestExecution} disabled={advancedLoading} className="rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-bold text-foreground hover:border-brand-500/40 disabled:opacity-50">
+                        Load Replay
+                      </button>
+                      <button onClick={loadReleaseAndEdgePlans} disabled={advancedLoading} className="col-span-2 rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs font-bold text-foreground hover:border-brand-500/40 disabled:opacity-50">
+                        Refresh Release + Edge Plans
+                      </button>
+                    </div>
+
+                    {advancedReport.workflowUnitTests?.result && (
+                      <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                        <h4 className="mb-1 text-sm font-semibold text-foreground">Workflow Unit Tests</h4>
+                        <p className={`text-xs font-bold ${advancedReport.workflowUnitTests.result.status === 'passed' ? 'text-green-400' : 'text-red-400'}`}>
+                          {advancedReport.workflowUnitTests.result.status}
+                        </p>
+                      </div>
+                    )}
+
+                    {advancedReport.timeTravelDebugger?.replay && (
+                      <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">Time-Travel Replay</h4>
+                        {advancedReport.timeTravelDebugger.replay.timeline.slice(0, 5).map((step: any) => (
+                          <p key={step.step} className="text-xs text-foreground-muted">
+                            {step.step}. {step.nodeLabel} - {step.status} ({step.durationMs || 0}ms)
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-1 text-sm font-semibold text-foreground">Release System</h4>
+                      <p className="text-xs text-foreground-muted">{advancedReport.releaseSystem?.recommendation}</p>
+                      <p className="mt-1 text-xs text-foreground-muted">Canary: {advancedReport.releaseSystem?.canary?.initialTrafficPercent ?? 0}% initial traffic</p>
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-1 text-sm font-semibold text-foreground">Local Edge Runner</h4>
+                      <p className="text-xs text-foreground-muted">{advancedReport.edgeRunner?.mode}: {advancedReport.edgeRunner?.reason}</p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

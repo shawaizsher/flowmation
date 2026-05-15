@@ -984,4 +984,100 @@ registry.register('mathOperation', {
   }
 });
 
+// Frontend and AI-generated workflows use snake_case node ids, while the
+// original runtime used camelCase ids. Register aliases so canvas/catalog nodes
+// execute instead of failing with "Unknown node type".
+function registerAlias(alias, target, options = {}) {
+  const targetDefinition = registry.get(target);
+  if (!targetDefinition) return;
+
+  registry.register(alias, {
+    ...targetDefinition,
+    ...options,
+    execute: options.execute || targetDefinition.execute
+  });
+}
+
+function withConfig(target, normalizeConfig) {
+  const targetDefinition = registry.get(target);
+  return async ({ config, input, context }) => targetDefinition.execute({
+    config: normalizeConfig(config || {}),
+    input,
+    context
+  });
+}
+
+registerAlias('trigger_manual', 'manualTrigger');
+registerAlias('trigger_webhook', 'webhookTrigger');
+registerAlias('trigger_cron', 'scheduleTrigger');
+registerAlias('trigger_schedule', 'scheduleTrigger');
+registerAlias('schedule', 'scheduleTrigger');
+
+registerAlias('http_request', 'httpRequest');
+registerAlias('rest_get', 'httpRequest', {
+  execute: withConfig('httpRequest', (config) => ({ ...config, method: 'GET' }))
+});
+registerAlias('rest_post', 'httpRequest', {
+  execute: withConfig('httpRequest', (config) => ({ ...config, method: 'POST' }))
+});
+registerAlias('respond_webhook', 'respondWebhook');
+
+registerAlias('code_execute', 'codeBlock');
+registerAlias('transform_set', 'setVariable');
+registerAlias('json_parse', 'jsonParse');
+registerAlias('csv_parse', 'jsonParse');
+registerAlias('transform_split', 'splitArray');
+registerAlias('transform_merge', 'mergeData');
+registerAlias('transform_filter', 'filterData');
+registerAlias('logic_if', 'ifCondition');
+registerAlias('logic_switch', 'switchNode');
+registerAlias('loop_for_each', 'loop');
+
+registerAlias('openai_chat', 'aiPrompt', {
+  execute: withConfig('aiPrompt', (config) => ({
+    ...config,
+    model: config.model || 'gpt-4o-mini',
+    systemPrompt: config.systemPrompt || config.prompt || 'You are a helpful assistant.',
+    prompt: config.userMessage || config.message || config.input || config.prompt || ''
+  }))
+});
+registerAlias('anthropic_chat', 'aiPrompt', {
+  execute: withConfig('aiPrompt', (config) => ({
+    ...config,
+    model: config.model || 'claude-3-5-sonnet-20241022',
+    systemPrompt: config.systemPrompt || 'You are a helpful assistant.',
+    prompt: config.message || config.userMessage || config.prompt || ''
+  }))
+});
+registerAlias('ai_classify', 'aiClassify');
+registerAlias('ai_text_classifier', 'aiClassify');
+registerAlias('ai_summarize', 'aiSummarize');
+registerAlias('ai_summarizer', 'aiSummarize');
+
+registerAlias('email_send', 'sendEmail');
+registerAlias('slack_send', 'slackMessage', {
+  execute: withConfig('slackMessage', (config) => ({
+    ...config,
+    message: config.message || config.text || config.content || ''
+  }))
+});
+registerAlias('slack_message', 'slackMessage', {
+  execute: withConfig('slackMessage', (config) => ({
+    ...config,
+    message: config.message || config.text || config.content || ''
+  }))
+});
+
+registerAlias('postgres_query', 'readDatabase');
+registerAlias('mysql_query', 'readDatabase');
+registerAlias('database_query', 'readDatabase');
+registerAlias('postgres_insert', 'writeDatabase');
+registerAlias('database_insert', 'writeDatabase');
+
+registerAlias('console_log', 'consoleLog');
+registerAlias('error_handler', 'errorHandler');
+registerAlias('wait_approval', 'waitForApproval');
+registerAlias('date_time', 'dateTime');
+registerAlias('math_operation', 'mathOperation');
+
 module.exports = registry;
