@@ -754,6 +754,10 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
+      // Save the latest graph before executing so credentialId and config changes
+      // are reflected in the DB graph the executor loads.
+      await workflowApi.update(workspaceId, id, { name: workflowName, graph: toPersistedGraph() });
+
       // ── Collect per-user credentials for all nodes that have a credentialId ──
       const credentialsMap: Record<string, { serviceId: string; values: Record<string, string> }> = {};
       for (const n of nodes) {

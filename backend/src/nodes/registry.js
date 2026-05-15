@@ -664,7 +664,20 @@ registry.register('gemini_chat', {
     const res = await axios.post(url, body, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 60000,
+      validateStatus: () => true,
     });
+
+    if (res.status === 429) {
+      throw new Error('Gemini API rate limit exceeded — wait a moment and try again, or upgrade your Google AI quota at aistudio.google.com');
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Gemini API key is invalid or lacks permissions — check your key at aistudio.google.com');
+    }
+
+    if (res.status !== 200) {
+      throw new Error(res.data?.error?.message || `Gemini API error (HTTP ${res.status})`);
+    }
 
     const candidate = res.data.candidates?.[0];
     if (!candidate) {
