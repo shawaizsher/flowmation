@@ -5,7 +5,11 @@ import { useStore } from '../store';
 /*  Base Axios instance                                                */
 /* ------------------------------------------------------------------ */
 
-const api = axios.create({ baseURL: '/api' });
+// In production VITE_API_URL points to the deployed backend (e.g. Railway).
+// In development the Vite proxy handles /api → localhost:4000.
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
+});
 
 // Attach JWT token to every request
 api.interceptors.request.use((config) => {
