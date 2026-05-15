@@ -943,10 +943,13 @@ export const nodeCatalog: NodeDefinition[] = [
     icon: '🟠',
     color: 'text-orange-400',
     configSchema: {
+      action: { type: 'select', label: 'Action', default: 'upsert', options: ['upsert', 'create', 'update', 'get'] },
       email: { type: 'string', label: 'Email', default: '' },
       firstName: { type: 'string', label: 'First Name', default: '' },
       lastName: { type: 'string', label: 'Last Name', default: '' },
+      contactId: { type: 'string', label: 'Contact ID', default: '' },
       properties: { type: 'json', label: 'Extra Properties', default: '{}' },
+      returnProperties: { type: 'string', label: 'Return Properties', default: 'email,firstname,lastname,phone,company,website,lifecyclestage' },
     },
   },
   {

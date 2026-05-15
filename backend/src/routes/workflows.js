@@ -102,6 +102,43 @@ function makeEdgeRunnerPlan(graph, compile) {
   };
 }
 
+function buildTestFailureReasons(compile) {
+  const reasons = [];
+  for (const node of compile.unsupportedNodes || []) {
+    reasons.push({
+      severity: 'error',
+      nodeId: node.nodeId,
+      nodeLabel: node.nodeLabel,
+      nodeType: node.nodeType,
+      message: `Unsupported node type "${node.nodeType}" cannot run on the backend yet.`,
+      fix: 'Replace this node with a supported runtime node or implement its backend handler.'
+    });
+  }
+  for (const item of compile.missingConfig || []) {
+    reasons.push({
+      severity: 'warning',
+      nodeId: item.nodeId,
+      nodeLabel: item.nodeLabel,
+      nodeType: item.nodeType,
+      message: `${item.nodeLabel} is missing: ${item.fields.join(', ')}.`,
+      fix: item.serviceId
+        ? `Add/link a ${item.serviceLabel} credential, then re-run tests.`
+        : 'Open the node and fill the required fields.'
+    });
+  }
+  for (const finding of compile.policy?.findings || []) {
+    reasons.push({
+      severity: finding.severity,
+      nodeId: finding.nodeId,
+      nodeLabel: finding.nodeLabel,
+      nodeType: finding.type,
+      message: finding.message,
+      fix: 'Review the policy finding before publishing.'
+    });
+  }
+  return reasons;
+}
+
 async function buildAdvancedReport(workflow) {
   const aiService = require('../services/ai');
   const graph = parseGraphValue(workflow.graph);
@@ -281,20 +318,43 @@ router.post('/:id/tests/run', async (req, res) => {
     const aiService = require('../services/ai');
     const compile = aiService.compileWorkflow(graph);
     const tests = Array.isArray(req.body.tests) && req.body.tests.length ? req.body.tests : generateTestFixtures(graph);
-    const results = tests.map((test) => ({
-      name: test.name,
-      status: compile.status === 'blocked' ? 'failed' : 'passed',
-      assertions: (test.assertions || []).map((assertion) => ({
-        assertion,
-        passed:
+    const failureReasons = buildTestFailureReasons(compile);
+    const results = tests.map((test) => {
+      const assertions = (test.assertions || []).map((assertion) => {
+        const passed =
           assertion.includes('trigger') ? (graph.nodes || []).some(n => getNodeType(n).includes('trigger')) :
           assertion.includes('unsupported') ? compile.unsupportedNodes.length === 0 :
           assertion.includes('Policy') ? compile.policy.status !== 'blocked' :
-          true
-      })),
-      payload: test.payload
-    }));
-    res.json({ status: results.some(r => r.status === 'failed') ? 'failed' : 'passed', results, compile });
+          assertion.includes('crash') ? compile.status !== 'blocked' :
+          true;
+        return {
+          assertion,
+          passed,
+          reason: passed ? null : (
+            assertion.includes('unsupported') ? 'One or more workflow nodes do not have backend runtime support.' :
+            assertion.includes('Policy') ? 'Policy guardrails found a blocking issue.' :
+            assertion.includes('crash') ? 'Compiler blockers must be resolved before this fixture is safe to execute.' :
+            'This assertion failed.'
+          )
+        };
+      });
+      return {
+        name: test.name,
+        status: assertions.some(a => !a.passed) || failureReasons.some(r => r.severity === 'error') ? 'failed' : 'passed',
+        assertions,
+        failureReasons,
+        payload: test.payload
+      };
+    });
+    res.json({
+      status: results.some(r => r.status === 'failed') ? 'failed' : 'passed',
+      summary: failureReasons.length
+        ? `${failureReasons.length} item(s) need attention before this workflow is production-ready.`
+        : 'All generated workflow tests passed.',
+      failureReasons,
+      results,
+      compile
+    });
   } catch (err) {
     logger.error('Run workflow tests error:', err);
     res.status(500).json({ error: 'Failed to run workflow tests' });
