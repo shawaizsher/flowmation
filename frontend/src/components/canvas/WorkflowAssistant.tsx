@@ -11,6 +11,15 @@ interface HealthData {
   tips: string[];
 }
 
+interface CompileData {
+  status: 'ready' | 'review' | 'blocked';
+  readinessScore: number;
+  unsupportedNodes: { nodeLabel: string; nodeType: string }[];
+  missingConfig: { nodeLabel: string; nodeType: string; fields: string[] }[];
+  dataContracts: { from: string; to: string; availableFields: string[] }[];
+  releaseChecklist: string[];
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -23,6 +32,7 @@ interface ChatMessage {
     confidence?: string;
     changes?: string[];
     health?: HealthData;
+    compile?: CompileData;
     simulation?: string[];
     issues?: { type: string; msg: string }[];
   };
