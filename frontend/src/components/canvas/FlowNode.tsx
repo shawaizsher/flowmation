@@ -156,9 +156,11 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         >
           {data.label}
         </div>
-        <div className="mt-[3px] truncate text-[10.5px] leading-snug text-white/35">
-          {summaryMap[data.type || ''] ? data.type : data.type || ''}
-        </div>
+        {summaryMap[data.type || ''] && (
+          <div className="mt-[3px] truncate text-[10.5px] leading-snug text-white/35">
+            {summaryMap[data.type || '']}
+          </div>
+        )}
 
         {/* Status badge — inline, minimal */}
         {status && statusBadge[status] && (
