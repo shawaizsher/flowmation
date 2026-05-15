@@ -58,9 +58,9 @@ router.post('/register', async (req, res) => {
 
       let verificationToken = null;
       if (!autoVerify) {
-        // Generate email verification token (valid 24h)
+        // Generate 6-digit OTP (valid 15 minutes)
         verificationToken = generateToken();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
         await client.query(
           'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
           [user.id, verificationToken, expiresAt]
@@ -182,6 +182,84 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// ── POST /api/auth/verify-otp ──
+// Verifies the 6-digit OTP code entered inline on the register page.
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and code are required' });
+    }
+
+    const normalizedCode = String(code).trim();
+    if (!/^\d{6}$/.test(normalizedCode)) {
+      return res.status(400).json({ error: 'Code must be 6 digits' });
+    }
+
+    // Look up user
+    const userResult = await query(
+      'SELECT id, name, email, email_verified, role FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ error: 'No account found for this email' });
+    }
+    const user = userResult.rows[0];
+
+    if (user.email_verified) {
+      // Already verified — just return a JWT so the frontend can log in
+      const workspaces = await query(
+        `SELECT w.id, w.name, w.slug, wm.role FROM workspaces w
+         JOIN workspace_members wm ON w.id = wm.workspace_id
+         WHERE wm.user_id = $1 ORDER BY w.created_at ASC`,
+        [user.id]
+      );
+      const jwtToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ message: 'Email already verified.', token: jwtToken, user, workspace: workspaces.rows[0] || null });
+    }
+
+    // Find matching OTP token
+    const tokenResult = await query(
+      'SELECT * FROM email_verification_tokens WHERE user_id = $1 AND token = $2',
+      [user.id, normalizedCode]
+    );
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid code. Please check the email and try again.' });
+    }
+
+    const record = tokenResult.rows[0];
+    if (new Date(record.expires_at) < new Date()) {
+      await query('DELETE FROM email_verification_tokens WHERE id = $1', [record.id]);
+      return res.status(400).json({ error: 'Code has expired. Please request a new one.' });
+    }
+
+    // Mark user verified and clean up tokens
+    await query('UPDATE users SET email_verified = 1, updated_at = GETDATE() WHERE id = $1', [user.id]);
+    await query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
+
+    const workspaces = await query(
+      `SELECT w.id, w.name, w.slug, wm.role FROM workspaces w
+       JOIN workspace_members wm ON w.id = wm.workspace_id
+       WHERE wm.user_id = $1 ORDER BY w.created_at ASC`,
+      [user.id]
+    );
+    const jwtToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    logger.info(`Email verified via OTP: ${user.email}`);
+
+    res.json({
+      message: 'Email verified! Welcome to Flowa.',
+      token: jwtToken,
+      user,
+      workspace: workspaces.rows[0] || null,
+    });
+  } catch (err) {
+    logger.error('OTP verification error:', err);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
 // ── POST /api/auth/resend-verification ──
 router.post('/resend-verification', async (req, res) => {
   try {
@@ -219,9 +297,9 @@ router.post('/resend-verification', async (req, res) => {
     // Delete old tokens
     await query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
 
-    // Create new token
+    // Create new OTP code (15 min expiry)
     const token = generateToken();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await query(
       'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, token, expiresAt]
