@@ -733,7 +733,7 @@ function EditorCanvas() {
 
     // Position: to the right of source node, or at viewport centre
     const position = sourceNode
-      ? { x: sourceNode.position.x + 280, y: sourceNode.position.y }
+      ? { x: sourceNode.position.x + 160, y: sourceNode.position.y }
       : (() => {
           const viewport = reactFlowInstance.getViewport();
           return { x: (-viewport.x + 400) / viewport.zoom, y: (-viewport.y + 300) / viewport.zoom };
