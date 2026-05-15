@@ -88,6 +88,27 @@ export const workflowApi = {
       credentials,
     }),
 
+  advancedReport: (workspaceId: string, id: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/${id}/advanced-report`),
+
+  generateTests: (workspaceId: string, id: string) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/tests/generate`),
+
+  runTests: (workspaceId: string, id: string, tests?: unknown[]) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/tests/run`, { tests }),
+
+  replayExecution: (workspaceId: string, id: string, executionId: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/${id}/replay/${executionId}`),
+
+  selfHeal: (workspaceId: string, id: string, data: { nodeId?: string; nodeType?: string; nodeLabel?: string; error?: string }) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/self-heal`, data),
+
+  releasePlan: (workspaceId: string, id: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/${id}/release-plan`),
+
+  edgeRunnerPlan: (workspaceId: string, id: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/${id}/edge-runner-plan`),
+
   getPresence: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}/presence`),
 };
@@ -147,6 +168,9 @@ export const aiApi = {
 
   suggestNodes: (workspaceId: string, data: { currentNodes: unknown[]; goal?: string }) =>
     api.post(`/workspaces/${workspaceId}/ai/suggest-nodes`, data),
+
+  compileWorkflow: (workspaceId: string, workflow: { nodes: unknown[]; edges: unknown[] }) =>
+    api.post(`/workspaces/${workspaceId}/ai/compile-workflow`, { workflow }),
 
   documentWorkflow: (workspaceId: string, workflowId: string) =>
     api.post(`/workspaces/${workspaceId}/ai/document-workflow`, { workflowId }),
