@@ -8,7 +8,7 @@ import { nodeCatalog } from '../../data/nodeCatalog';
 const summaryMap: Record<string, string> = {};
 for (const n of nodeCatalog) summaryMap[n.type] = n.description;
 
-// ── Category → solid accent colour (used for left strip + handle) ──────────
+// ── Category → solid accent colour ────────────────────────────────────────
 const categoryColor: Record<string, string> = {
   triggers:  '#f59e0b',
   google:    '#3b82f6',
@@ -27,24 +27,24 @@ const categoryColor: Record<string, string> = {
   utilities: '#6b7280',
 };
 
-// ── Status ring colours ────────────────────────────────────────────────────
+// ── Status styles ──────────────────────────────────────────────────────────
 const statusRing: Record<string, string> = {
   running: 'border-yellow-400 shadow-[0_0_0_1px_rgba(250,204,21,0.3)]',
   success: 'border-emerald-400 shadow-[0_0_0_1px_rgba(52,211,153,0.25)]',
   failed:  'border-red-400   shadow-[0_0_0_1px_rgba(248,113,113,0.3)]',
-  skipped: 'border-slate-500',
+  skipped: 'border-slate-400',
 };
 
 const statusBadge: Record<string, { bg: string; dot: string; text: string; label: string }> = {
-  running: { bg: 'bg-yellow-400/10',  dot: 'bg-yellow-400',  text: 'text-yellow-300',  label: 'Running' },
-  success: { bg: 'bg-emerald-400/10', dot: 'bg-emerald-400', text: 'text-emerald-300', label: 'Done'    },
-  failed:  { bg: 'bg-red-400/10',     dot: 'bg-red-400',     text: 'text-red-300',     label: 'Failed'  },
-  skipped: { bg: 'bg-slate-500/10',   dot: 'bg-slate-400',   text: 'text-slate-400',   label: 'Skipped' },
+  running: { bg: 'bg-yellow-400/10',  dot: 'bg-yellow-400',  text: 'text-yellow-500',  label: 'Running' },
+  success: { bg: 'bg-emerald-400/10', dot: 'bg-emerald-400', text: 'text-emerald-600', label: 'Done'    },
+  failed:  { bg: 'bg-red-400/10',     dot: 'bg-red-400',     text: 'text-red-500',     label: 'Failed'  },
+  skipped: { bg: 'bg-slate-400/10',   dot: 'bg-slate-400',   text: 'text-slate-500',   label: 'Skipped' },
 };
 
 function getCategoryFromType(type: string): string {
-  if (type.startsWith('trigger_'))                                                                             return 'triggers';
-  if (type.startsWith('google_') || type.startsWith('youtube_'))                                              return 'google';
+  if (type.startsWith('trigger_'))                                                                  return 'triggers';
+  if (type.startsWith('google_') || type.startsWith('youtube_'))                                   return 'google';
   if (type.startsWith('openai_') || type.startsWith('anthropic_') || type.startsWith('ai_') || type.startsWith('whisper_') || type.startsWith('huggingface_')) return 'ai';
   if (type.startsWith('twitter_') || type.startsWith('instagram_') || type.startsWith('linkedin_') || type.startsWith('reddit_')) return 'social';
   if (type.startsWith('slack_') || type.startsWith('discord_') || type.startsWith('telegram_') || type.startsWith('whatsapp_') || type.startsWith('email_') || type.startsWith('twilio_')) return 'messaging';
@@ -53,10 +53,10 @@ function getCategoryFromType(type: string): string {
   if (type.startsWith('http_') || type.startsWith('graphql_') || type.startsWith('rest_') || type.startsWith('soap_')) return 'http';
   if (type.startsWith('file_') || type.startsWith('csv_') || type.startsWith('pdf_') || type.startsWith('ftp_')) return 'files';
   if (type.startsWith('transform_') || type.startsWith('json_') || type.startsWith('xml_') || type.startsWith('code_')) return 'transform';
-  if (type.startsWith('logic_') || type.startsWith('error_'))                                                 return 'logic';
+  if (type.startsWith('logic_') || type.startsWith('error_'))                                      return 'logic';
   if (type.startsWith('salesforce_') || type.startsWith('hubspot_') || type.startsWith('airtable_') || type.startsWith('notion_')) return 'crm';
-  if (type.startsWith('stripe_') || type.startsWith('paypal_'))                                               return 'payments';
-  if (type.startsWith('google_analytics') || type.startsWith('mixpanel_') || type.startsWith('segment_'))    return 'analytics';
+  if (type.startsWith('stripe_') || type.startsWith('paypal_'))                                    return 'payments';
+  if (type.startsWith('google_analytics') || type.startsWith('mixpanel_') || type.startsWith('segment_')) return 'analytics';
   return 'utilities';
 }
 
@@ -74,25 +74,24 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
 
   return (
     <div
-      className={`group relative flex w-[230px] overflow-hidden rounded-xl border transition-all duration-150 ${
+      className={`group relative flex w-[230px] overflow-hidden rounded-xl border bg-surface-card transition-all duration-150 ${
         selected
-          ? 'border-white/25 shadow-[0_0_0_2px_rgba(255,255,255,0.12),0_12px_32px_rgba(0,0,0,0.5)]'
+          ? 'border-brand-500/60 shadow-[0_0_0_2px_rgba(var(--brand-500-rgb),0.15),0_8px_24px_rgba(0,0,0,0.15)]'
           : status && statusRing[status]
           ? statusRing[status]
-          : 'border-white/[0.07] hover:border-white/[0.14] hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
-      } ${dragging ? 'scale-[1.02] shadow-[0_16px_40px_rgba(0,0,0,0.5)]' : ''}`}
-      style={{ background: '#1a1f2e' }}
+          : 'border-surface-border hover:border-surface-border hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)]'
+      } ${dragging ? 'scale-[1.02] shadow-[0_12px_32px_rgba(0,0,0,0.18)]' : ''}`}
     >
-      {/* ── Delete button ───────────────────────────────────────────────── */}
+      {/* ── Delete button ─────────────────────────────────────────────── */}
       <button
         onClick={handleDelete}
-        className="absolute right-1.5 top-1.5 z-20 hidden h-5 w-5 items-center justify-center rounded-md text-white/30 transition hover:bg-red-500/20 hover:text-red-300 group-hover:flex"
+        className="absolute right-1.5 top-1.5 z-20 hidden h-5 w-5 items-center justify-center rounded-md text-foreground-muted/50 transition hover:bg-red-500/15 hover:text-red-500 group-hover:flex"
         title="Delete node"
       >
         <X size={11} />
       </button>
 
-      {/* ── INPUT handle ────────────────────────────────────────────────── */}
+      {/* ── INPUT handle ──────────────────────────────────────────────── */}
       <Handle
         type="target"
         id="in"
@@ -105,15 +104,15 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
           width: 12,
           height: 12,
           borderRadius: '50%',
-          background: '#1a1f2e',
+          background: 'var(--surface-card)',
           border: `2px solid ${accent}`,
-          boxShadow: `0 0 0 2px #1a1f2e`,
+          boxShadow: '0 0 0 2px var(--surface-card)',
           zIndex: 20,
         }}
         className="!border-2 transition-transform group-hover:scale-110"
       />
 
-      {/* ── OUTPUT handle ───────────────────────────────────────────────── */}
+      {/* ── OUTPUT handle ─────────────────────────────────────────────── */}
       <Handle
         type="source"
         id="out"
@@ -128,41 +127,37 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
           borderRadius: '50%',
           background: accent,
           border: `2px solid ${accent}`,
-          boxShadow: `0 0 0 2px #1a1f2e, 0 0 8px ${accent}55`,
+          boxShadow: `0 0 0 2px var(--surface-card), 0 0 8px ${accent}55`,
           zIndex: 20,
         }}
         className="transition-transform group-hover:scale-110"
       />
 
-      {/* ── Left coloured icon section ──────────────────────────────────── */}
+      {/* ── Left coloured icon section ────────────────────────────────── */}
       <div
-        className="flex w-[60px] shrink-0 items-center justify-center"
-        style={{ background: `${accent}1a` /* 10% opacity */ }}
+        className="flex w-[60px] shrink-0 items-center justify-center relative"
+        style={{ background: `${accent}18` }}
       >
-        {/* Thin left-edge colour stripe */}
         <div className="absolute left-0 top-0 h-full w-[3px]" style={{ background: accent }} />
-        <NodeIcon
-          nodeType={data.type || ''}
-          size="md"
-          className="!h-8 !w-8 !rounded-lg"
-        />
+        <NodeIcon nodeType={data.type || ''} size="md" className="!h-8 !w-8 !rounded-lg" />
       </div>
 
-      {/* ── Main content ────────────────────────────────────────────────── */}
+      {/* ── Main content ──────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3">
         <div
-          className="truncate text-[13px] font-semibold leading-snug text-white/90 pr-4"
+          className="truncate text-[13px] font-semibold leading-snug text-foreground pr-4"
           title={data.label}
         >
           {data.label}
         </div>
+
         {summaryMap[data.type || ''] && (
-          <div className="mt-[3px] truncate text-[10.5px] leading-snug text-white/35">
+          <div className="mt-[3px] truncate text-[10.5px] leading-snug text-foreground-muted">
             {summaryMap[data.type || '']}
           </div>
         )}
 
-        {/* Status badge — inline, minimal */}
+        {/* Status badge */}
         {status && statusBadge[status] && (
           <div className={`mt-1.5 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 ${statusBadge[status].bg}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${statusBadge[status].dot} ${status === 'running' ? 'animate-pulse' : ''}`} />
@@ -173,7 +168,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         )}
       </div>
 
-      {/* ── Running pulse dot (top-right corner) ────────────────────────── */}
+      {/* ── Running pulse ─────────────────────────────────────────────── */}
       {status === 'running' && (
         <div className="absolute -right-1 -top-1 h-2.5 w-2.5 z-30">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-70" />
