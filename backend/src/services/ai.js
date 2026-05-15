@@ -696,7 +696,7 @@ function isExplicitlyOffTopic(message) {
 
 function isOnTopic(message, intent) {
   if (isExplicitlyOffTopic(message)) return false;
-  if (['generate','add_node','remove_node','connect','clear','explain','health','simulate','debug','greeting','help'].includes(intent)) return true;
+  if (['generate','add_node','remove_node','connect','clear','explain','health','simulate','debug','suggest','greeting','help'].includes(intent)) return true;
   // Unknown intent — allow only if some workflow vocabulary present
   return cosineSim(tfidfVector(message), TOPIC_VOCAB) >= 0.10;
 }
@@ -1003,6 +1003,10 @@ async function workflowChat({ message, history = [], workflow = {} }) {
     if (/what is (this|the workflow|it)/.test(lower))                                       intent = 'explain';
     if (/^(explain|describe|tell me about|walk me through)/.test(lower))                    intent = 'explain';
     if (/^(hi|hey|hello|sup|yo)\b/.test(lower))                                             intent = 'greeting';
+    if (/any (suggestions?|ideas?|recommendations?|advice|tips?)/.test(lower))              intent = 'suggest';
+    if (/what (should i|can i|could i) (add|improve|do next|change)/.test(lower))          intent = 'suggest';
+    if (/what('s| is) (missing|next|wrong|needed)/.test(lower))                             intent = 'suggest';
+    if (/how (can i|do i|should i) (improve|optimise|optimize|fix|enhance)/.test(lower))   intent = 'suggest';
     const entities = extractEntities(msg);
     const nodes = workflow.nodes || [];
     const edges = workflow.edges || [];
@@ -1169,6 +1173,41 @@ async function workflowChat({ message, history = [], workflow = {} }) {
         reply, toolCalls: [], updatedWorkflow: null, messageType: 'debug',
         suggestions: health.tips.slice(0, 3),
         metadata: { issues: health.issues, health },
+      };
+    }
+
+    /* ── SUGGEST ──────────────────────────────────────────────── */
+    if (intent === 'suggest') {
+      if (!nodes.length) {
+        return {
+          reply: "Your canvas is empty — nothing to suggest improvements for yet.\n\nTell me what you want to automate and I'll build it for you!",
+          toolCalls: [], updatedWorkflow: null, messageType: 'message',
+          suggestions: ['Build a Slack notification', 'Daily report from database', 'Show help'],
+          metadata: {},
+        };
+      }
+
+      const nodeSuggestions = await suggestNodes({ nodes, edges });
+      const health = analyzeWorkflowHealth({ nodes, edges });
+
+      let reply = '';
+      if (nodeSuggestions.length > 0) {
+        reply += '**Suggested improvements:**\n';
+        nodeSuggestions.forEach((s, i) => {
+          reply += `${i + 1}. **${NODE_INDEX.find(n => n.type === s.type)?.desc || s.type}** — ${s.reason}\n`;
+        });
+      }
+      if (health.tips.length > 0) {
+        reply += '\n**Best practices:**\n';
+        health.tips.slice(0, 2).forEach(t => { reply += `• ${t}\n`; });
+      }
+      if (!reply) reply = 'The workflow looks solid! No immediate suggestions.';
+
+      return {
+        reply: reply.trim(),
+        toolCalls: [], updatedWorkflow: null, messageType: 'message',
+        suggestions: nodeSuggestions.map(s => `Add a ${NODE_INDEX.find(n => n.type === s.type)?.desc || s.type}`).slice(0, 3),
+        metadata: {},
       };
     }
 
