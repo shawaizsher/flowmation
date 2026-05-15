@@ -61,6 +61,17 @@ import { useTheme } from '../hooks/useTheme';
 const nodeTypes = { flowNode: FlowNode };
 const edgeTypes = { animatedEdge: AnimatedEdge };
 
+// Returns true only when a payload carries real data worth displaying.
+// Filters out null, undefined, empty strings, empty arrays, and empty objects
+// so we never replace a useful value (e.g. node config) with an empty shell.
+function hasPayload(v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'string') return v.trim().length > 0 && v !== '-';
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v as object).length > 0;
+  return true;
+}
+
 // ── Node def type alias ──
 type NodeDef = NodeDefinition;
 
@@ -386,13 +397,23 @@ function EditorCanvas() {
 
           logs.forEach((log: any) => {
             const existing = entries.get(log.node_id);
+
+            // Only replace input when the DB has a non-empty payload.
+            // An empty '{}' means the backend didn't capture runtime input yet
+            // (old executor), so we keep whatever was already shown (e.g. node config).
+            const parsedInput = parseLogPayload(log.input);
+            const finalInput = hasPayload(parsedInput) ? parsedInput : existing?.input;
+
+            const parsedOutput = parseLogPayload(log.output);
+            const finalOutput = hasPayload(parsedOutput) ? parsedOutput : existing?.output;
+
             entries.set(log.node_id, {
               nodeId: log.node_id,
               nodeLabel: log.node_label || existing?.nodeLabel || log.node_id,
               nodeType: log.node_type || existing?.nodeType || '',
               status: toEntryStatus(log.status),
-              input: parseLogPayload(log.input) ?? existing?.input,
-              output: parseLogPayload(log.output) ?? existing?.output,
+              input: finalInput,
+              output: finalOutput,
               error: log.error || existing?.error,
               durationMs: log.duration_ms ?? existing?.durationMs,
             });
@@ -560,9 +581,11 @@ function EditorCanvas() {
               nodeLabel: msg.nodeLabel || existing?.nodeLabel || msg.nodeId,
               nodeType: msg.nodeType  || existing?.nodeType  || '',
               status: 'running',
-              // If the WS message doesn't carry input, fall back to the config
-              // that handleExecute pre-populated so the INPUT tab always shows something
-              input: msg.input ?? existing?.input,
+              // Only use msg.input when it's a non-empty payload.
+              // Old backend sends {} (upstream-only, no config); new backend sends
+              // the full { config, incomingData } object. Keep existing (node config)
+              // if the WS message carries nothing useful.
+              input: hasPayload(msg.input) ? msg.input : existing?.input,
             },
           ];
         });
@@ -717,15 +740,16 @@ function EditorCanvas() {
       setNodeStatuses({});
       setRightPanel('logs');
 
-      // Populate I/O entries from current nodes (as pending).
-      // input is intentionally undefined here — the INPUT tab should only show
-      // runtime data returned by the backend, not the node's own config object.
+      // Pre-populate INPUT with the node's own config so the tab shows
+      // something useful immediately. Once execution finishes the polling
+      // path replaces this with the resolved runtime payload from the backend
+      // (but only if the backend actually returned a non-empty value).
       const initialEntries: NodeIOEntry[] = nodes.map((n) => ({
         nodeId: n.id,
         nodeLabel: n.data.label || n.id,
         nodeType: n.data.type || '',
         status: 'pending' as const,
-        input: undefined,
+        input: n.data.config || {},
       }));
       setIoEntries(initialEntries);
       setIoVisible(true);
