@@ -328,6 +328,32 @@ body {
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
+@keyframes node-running-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1.5px rgba(59, 130, 246, 0.35),
+      0 0 16px rgba(59, 130, 246, 0.18),
+      0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(59, 130, 246, 0.62),
+      0 0 34px rgba(59, 130, 246, 0.38),
+      0 4px 24px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@keyframes node-shake {
+  0%, 100% { transform: translateX(0); }
+  12%  { transform: translateX(-5px); }
+  25%  { transform: translateX(5px); }
+  37%  { transform: translateX(-4px); }
+  50%  { transform: translateX(4px); }
+  62%  { transform: translateX(-2px); }
+  75%  { transform: translateX(2px); }
+  87%  { transform: translateX(-1px); }
+}
+
 /* ── Landing page animations ── */
 @keyframes gradientShift {
   0% { background-position: 0% 50%; }
@@ -493,6 +519,14 @@ body {
 
 .node-error-flash {
   animation: node-error-flash 1s ease-out;
+}
+
+.animate-node-running {
+  animation: node-running-pulse 1.8s ease-in-out infinite;
+}
+
+.animate-node-shake {
+  animation: node-shake 0.45s ease-in-out;
 }
 
 /* Landing-specific animation utilities */

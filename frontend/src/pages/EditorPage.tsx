@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background,
   Controls,
+  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -47,6 +48,7 @@ import toast from 'react-hot-toast';
 import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
 import { useStore } from '../store';
 import FlowNode from '../components/canvas/FlowNode';
+import AnimatedEdge from '../components/canvas/AnimatedEdge';
 import BanterLoader from '../components/BanterLoader';
 import NodeIcon from '../components/canvas/NodeIcon';
 import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
@@ -56,6 +58,7 @@ import { useCredentialStore, getServiceForNodeType, type SavedCredential } from 
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
 
 const nodeTypes = { flowNode: FlowNode };
+const edgeTypes = { animatedEdge: AnimatedEdge };
 
 // ── Node def type alias ──
 type NodeDef = NodeDefinition;
@@ -205,7 +208,11 @@ function EditorCanvas() {
         }));
         suppressGraphSyncRef.current = true;
         setNodes(flowNodes);
-        setEdges(graph.edges || []);
+        setEdges((graph.edges || []).map((e: Edge) => ({
+          ...e,
+          type: 'animatedEdge',
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(148,163,184,0.45)', width: 14, height: 14 },
+        })));
         setTimeout(() => {
           suppressGraphSyncRef.current = false;
           initialGraphLoadedRef.current = true;
@@ -499,7 +506,11 @@ function EditorCanvas() {
 
         suppressGraphSyncRef.current = true;
         setNodes(flowNodes);
-        setEdges(graph.edges || []);
+        setEdges((graph.edges || []).map((e: Edge) => ({
+          ...e,
+          type: 'animatedEdge',
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(148,163,184,0.45)', width: 14, height: 14 },
+        })));
 
         if (typeof incoming.workflowName === 'string' && incoming.workflowName.trim().length > 0) {
           setWorkflowName(incoming.workflowName);
@@ -587,12 +598,12 @@ function EditorCanvas() {
         {
           ...connection,
           id: edgeId,
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#334155', strokeWidth: 1.6 },
+          type: 'animatedEdge',
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#334155',
+            color: 'rgba(148,163,184,0.45)',
+            width: 14,
+            height: 14,
           },
         },
         eds
@@ -757,9 +768,13 @@ function EditorCanvas() {
           id: edgeId,
           source: sourceId!,
           target: newId,
-          type: 'smoothstep',
-          animated: false,
-          style: { stroke: '#374151', strokeWidth: 1.5 },
+          type: 'animatedEdge',
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: 'rgba(148,163,184,0.45)',
+            width: 14,
+            height: 14,
+          },
         },
       ]);
     }
@@ -859,7 +874,11 @@ function EditorCanvas() {
         data: { ...n.data, type: n.data?.type || n.type },
       }));
       setNodes(flowNodes);
-      setEdges(graph.edges || []);
+      setEdges((graph.edges || []).map((e: Edge) => ({
+        ...e,
+        type: 'animatedEdge',
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(148,163,184,0.45)', width: 14, height: 14 },
+      })));
       setWorkflowVersion(wf.version);
       toast.success(`Restored to v${version}`);
     } catch (err: any) {
@@ -1250,25 +1269,53 @@ function EditorCanvas() {
             onPaneClick={onPaneClick}
             onNodesDelete={onNodesDelete}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             nodesConnectable
+            snapToGrid
+            snapGrid={[16, 16]}
             className="bg-surface-base"
             deleteKeyCode={['Backspace', 'Delete']}
-            connectionLineStyle={{ stroke: '#4b5563', strokeWidth: 1.5, strokeDasharray: '5 4' }}
+            connectionLineStyle={{
+              stroke: 'rgba(129,140,248,0.55)',
+              strokeWidth: 2,
+              strokeDasharray: '6 4',
+            }}
             defaultEdgeOptions={{
-              type: 'smoothstep',
-              animated: false,
-              style: { stroke: '#374151', strokeWidth: 1.5 },
+              type: 'animatedEdge',
               markerEnd: {
                 type: MarkerType.ArrowClosed,
-                color: '#4b5563',
-                width: 16,
-                height: 16,
+                color: 'rgba(148,163,184,0.45)',
+                width: 14,
+                height: 14,
               },
             }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} />
-            <Controls className="!rounded-lg !bg-[#1a1f2e] !border-white/[0.07] !shadow-xl [&>button]:!bg-[#1a1f2e] [&>button]:!border-white/[0.07] [&>button]:!text-white/50 [&>button:hover]:!bg-white/[0.06] [&>button:hover]:!text-white/80" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={24}
+              size={1.3}
+              color="rgba(148,163,184,0.12)"
+            />
+            <Controls className="!rounded-xl !bg-[#0d1220]/90 !border-white/[0.07] !shadow-xl !backdrop-blur-sm [&>button]:!bg-transparent [&>button]:!border-white/[0.06] [&>button]:!text-white/40 [&>button:hover]:!bg-white/[0.05] [&>button:hover]:!text-white/75" />
+            <MiniMap
+              nodeColor={(node) => {
+                const t = (node.data as any)?.type || '';
+                if (t.startsWith('trigger_')) return '#F59E0B';
+                if (['openai_chat','anthropic_chat','gemini_chat','ai_text_classifier','ai_summarizer'].includes(t)) return '#A78BFA';
+                if (['logic_if','logic_switch','logic_loop','error_handler'].includes(t)) return '#94A3B8';
+                if (['postgres_query','mongodb_find','redis_command','supabase_query'].includes(t)) return '#60A5FA';
+                if (['slack_message','discord_message','email_send','twilio_sms'].includes(t)) return '#34D399';
+                return '#818CF8';
+              }}
+              maskColor="rgba(6,10,20,0.82)"
+              style={{
+                backgroundColor: 'rgba(10,14,26,0.92)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 12,
+              }}
+              className="!rounded-xl !shadow-xl !bottom-4 !right-4"
+            />
           </ReactFlow>
 
           {/* ── Floating quick-add button ── */}
