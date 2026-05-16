@@ -373,11 +373,17 @@ registry.register('code_python', {
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
-      // Try 'python' first, fall back to 'python3', then 'py' (Windows)
+      // Resolve Python binary — try common names and Windows-specific paths
       const pythonBin = (() => {
-        for (const bin of ['python', 'python3', 'py']) {
-          try { require('child_process').execFileSync(bin, ['--version'], { timeout: 3000, env: process.env }); return bin; }
-          catch { continue; }
+        const candidates = [
+          'python', 'python3', 'py',
+          'C:\\Users\\SHER\\AppData\\Local\\Programs\\Python\\Python313\\python.exe',
+        ];
+        for (const bin of candidates) {
+          try {
+            require('child_process').execFileSync(bin, ['--version'], { timeout: 3000, env: process.env, stdio: 'pipe' });
+            return bin;
+          } catch { continue; }
         }
         throw new Error('Python is not installed or not in PATH');
       })();
