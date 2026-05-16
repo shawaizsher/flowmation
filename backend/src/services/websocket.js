@@ -176,10 +176,25 @@ class WebSocketManager {
       const result = await query(
         `SELECT 1
          FROM workflows w
-         JOIN workspace_members wm ON wm.workspace_id = w.workspace_id
          WHERE w.id = $1
            AND w.workspace_id = $2
-           AND wm.user_id = $3`,
+           AND (
+             EXISTS (
+               SELECT 1
+               FROM workspace_members workspace_member
+               WHERE workspace_member.workspace_id = w.workspace_id
+                 AND workspace_member.user_id = $3
+                 AND workspace_member.role IN ('owner', 'admin')
+             )
+             OR NOT EXISTS (SELECT 1 FROM workflow_members workflow_member WHERE workflow_member.workflow_id = w.id)
+             OR EXISTS (
+               SELECT 1
+               FROM workflow_members workflow_member
+               WHERE workflow_member.workflow_id = w.id
+                 AND workflow_member.user_id = $3
+             )
+             OR w.created_by = $3
+           )`,
         [workflowId, client.workspaceId, client.userId]
       );
 

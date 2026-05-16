@@ -156,4 +156,34 @@ async function sendPasswordResetEmail(toEmail, userName, token) {
   return info;
 }
 
-module.exports = { initEmail, generateToken, sendVerificationEmail, sendPasswordResetEmail };
+async function sendWorkspaceInviteEmail({ toEmail, inviterName, workspaceName, role, message, inviteToken }) {
+  const mailOptions = {
+    from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
+    to: toEmail,
+    subject: `${inviterName} invited you to ${workspaceName} on Flowa`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#fff;">
+        <div style="text-align:center;margin-bottom:28px;">
+          <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
+        </div>
+        <h2 style="font-size:20px;color:#111;margin:0 0 10px;font-weight:700;">You're invited to collaborate</h2>
+        <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 18px;">
+          <strong>${inviterName}</strong> invited you to join <strong>${workspaceName}</strong> as <strong>${role}</strong>.
+        </p>
+        ${message ? `<div style="border:1px solid #f1d3d9;background:#fff5f7;border-radius:12px;padding:14px 16px;color:#6b2133;font-size:14px;line-height:1.6;margin-bottom:18px;">${message}</div>` : ''}
+        <div style="border:1px solid #eee;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
+          <p style="margin:0;color:#444;font-size:14px;line-height:1.6;">Sign in to Flowa with <strong>${toEmail}</strong> to accept or reject the invitation from your notifications center.</p>
+        </div>
+        <p style="color:#999;font-size:12px;line-height:1.6;margin:0;">Invite token: ${inviteToken}</p>
+      </div>
+    `,
+    text: `${inviterName} invited you to join ${workspaceName} on Flowa as ${role}.${message ? ` Message: ${message}` : ''}`,
+  };
+
+  const info = await transporter.sendMail(mailOptions);
+  logger.info(`Workspace invite email sent to ${toEmail}`);
+  return info;
+}
+
+module.exports = { initEmail, generateToken, sendVerificationEmail, sendPasswordResetEmail, sendWorkspaceInviteEmail };

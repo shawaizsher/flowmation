@@ -4,6 +4,7 @@ const { authenticate, requireWorkspace } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const registry = require('../nodes/registry');
 const { Client } = require('pg');
+const { createNotification, logWorkflowActivity } = require('../services/collaboration');
 
 const router = express.Router({ mergeParams: true });
 
@@ -20,8 +21,17 @@ function parseGraphValue(value) {
 
 async function loadWorkflowOr404(req, res) {
   const result = await query(
-    'SELECT * FROM workflows WHERE id = $1 AND workspace_id = $2',
-    [req.params.id, req.workspaceId]
+    `SELECT w.*
+     FROM workflows w
+     WHERE w.id = $1
+       AND w.workspace_id = $2
+       AND (
+         $3 IN ('owner', 'admin')
+         OR NOT EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id)
+         OR EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id AND wm.user_id = $4)
+         OR w.created_by = $4
+       )`,
+    [req.params.id, req.workspaceId, req.workspaceRole, req.user.id]
   );
   if (result.rows.length === 0) {
     res.status(404).json({ error: 'Workflow not found' });
@@ -773,16 +783,35 @@ async function buildAdvancedReport(workflow) {
 router.get('/members', async (req, res) => {
   try {
     const result = await query(
-      `SELECT u.id, u.name, u.email, wm.role
+      `SELECT u.id, u.name, u.email, u.settings, wm.role
        FROM workspace_members wm
        JOIN users u ON wm.user_id = u.id
-       WHERE wm.workspace_id = $1 AND u.is_active = 1
+       WHERE wm.workspace_id = $1 AND u.is_active = TRUE
        ORDER BY CASE WHEN wm.user_id = $2 THEN 0 ELSE 1 END, u.name ASC`,
       [req.workspaceId, req.user.id]
     );
 
     const members = result.rows.map((m) => ({
-      ...m,
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      avatar: (() => {
+        try {
+          const settings = m.settings ? JSON.parse(m.settings) : {};
+          return settings.avatar || null;
+        } catch {
+          return null;
+        }
+      })(),
+      headline: (() => {
+        try {
+          const settings = m.settings ? JSON.parse(m.settings) : {};
+          return typeof settings.headline === 'string' ? settings.headline : '';
+        } catch {
+          return '';
+        }
+      })(),
       isCurrentUser: m.id === req.user.id,
     }));
 
@@ -802,8 +831,14 @@ router.get('/', async (req, res) => {
       FROM workflows w
       LEFT JOIN users u ON w.created_by = u.id
       WHERE w.workspace_id = $1
+        AND (
+          $2 IN ('owner', 'admin')
+          OR NOT EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id)
+          OR EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id AND wm.user_id = $3)
+          OR w.created_by = $3
+        )
     `;
-    const params = [req.workspaceId];
+    const params = [req.workspaceId, req.workspaceRole, req.user.id];
 
     if (search) {
       params.push(`%${search}%`);
@@ -828,7 +863,7 @@ router.get('/', async (req, res) => {
 // ── POST /api/workspaces/:wid/workflows ──
 router.post('/', async (req, res) => {
   try {
-    const { name, description, graph, tags } = req.body;
+    const { name, description, graph, tags, collaborators } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Workflow name is required' });
@@ -838,22 +873,72 @@ router.post('/', async (req, res) => {
       ? tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0).slice(0, 100)
       : [];
 
-    const result = await query(
-      `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [
-        req.workspaceId,
-        name,
-        description || '',
-        JSON.stringify(graph || { nodes: [], edges: [] }),
-        JSON.stringify(normalizedTags),
-        req.user.id
-      ]
-    );
+    const collaboratorEntries = Array.isArray(collaborators) ? collaborators : [];
+    const workflow = await transaction(async (client) => {
+      const created = await client.query(
+        `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          req.workspaceId,
+          name,
+          description || '',
+          JSON.stringify(graph || { nodes: [], edges: [] }),
+          JSON.stringify(normalizedTags),
+          req.user.id
+        ]
+      );
 
-    logger.info(`Workflow created: ${result.rows[0].id} by ${req.user.email}`);
-    res.status(201).json({ workflow: result.rows[0] });
+      await client.query(
+        `INSERT INTO workflow_members (workflow_id, user_id, access_role, invited_by, last_seen)
+         VALUES ($1, $2, 'owner', $2, NOW())
+         ON CONFLICT (workflow_id, user_id) DO NOTHING`,
+        [created.rows[0].id, req.user.id]
+      );
+
+      for (const entry of collaboratorEntries) {
+        const accessRole = ['owner', 'edit', 'run', 'approve', 'view'].includes(entry?.accessRole)
+          ? entry.accessRole
+          : 'edit';
+        if (!entry?.userId || entry.userId === req.user.id) continue;
+        await client.query(
+          `INSERT INTO workflow_members (workflow_id, user_id, access_role, invited_by, last_seen)
+           VALUES ($1, $2, $3, $4, NOW())
+           ON CONFLICT (workflow_id, user_id)
+           DO UPDATE SET access_role = EXCLUDED.access_role, invited_by = EXCLUDED.invited_by, last_seen = NOW()`,
+          [created.rows[0].id, entry.userId, accessRole, req.user.id]
+        );
+      }
+
+      return created.rows[0];
+    });
+
+    for (const entry of collaboratorEntries) {
+      if (!entry?.userId || entry.userId === req.user.id) continue;
+      await createNotification(entry.userId, {
+        type: 'workflow_invite',
+        title: 'New workflow access',
+        body: `${req.user.name} invited you to collaborate on "${workflow.name}".`,
+        data: {
+          workspaceId: req.workspaceId,
+          workflowId: workflow.id,
+          accessRole: entry.accessRole || 'edit',
+        }
+      });
+    }
+
+    await logWorkflowActivity({
+      workflowId: workflow.id,
+      workspaceId: req.workspaceId,
+      actorId: req.user.id,
+      type: 'workflow_created',
+      title: 'Workflow created',
+      body: `${req.user.name} created this workflow.`,
+      metadata: { collaboratorCount: collaboratorEntries.length },
+    });
+
+    logger.info(`Workflow created: ${workflow.id} by ${req.user.email}`);
+    res.status(201).json({ workflow });
   } catch (err) {
     logger.error('Create workflow error:', err);
     res.status(500).json({ error: 'Failed to create workflow' });
@@ -867,8 +952,15 @@ router.get('/:id', async (req, res) => {
       `SELECT w.*, u.name as created_by_name
        FROM workflows w
        LEFT JOIN users u ON w.created_by = u.id
-       WHERE w.id = $1 AND w.workspace_id = $2`,
-      [req.params.id, req.workspaceId]
+       WHERE w.id = $1
+         AND w.workspace_id = $2
+         AND (
+           $3 IN ('owner', 'admin')
+           OR NOT EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id)
+           OR EXISTS (SELECT 1 FROM workflow_members wm WHERE wm.workflow_id = w.id AND wm.user_id = $4)
+           OR w.created_by = $4
+         )`,
+      [req.params.id, req.workspaceId, req.workspaceRole, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -929,19 +1021,38 @@ router.post('/templates/:templateId/install', async (req, res) => {
       ? req.body.name.trim()
       : template.name;
 
-    const result = await query(
-      `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [
-        req.workspaceId,
-        name,
-        template.description,
-        JSON.stringify(template.graph),
-        JSON.stringify(template.tags || []),
-        req.user.id
-      ]
-    );
+    const result = await transaction(async (client) => {
+      const created = await client.query(
+        `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          req.workspaceId,
+          name,
+          template.description,
+          JSON.stringify(template.graph),
+          JSON.stringify(template.tags || []),
+          req.user.id
+        ]
+      );
+      await client.query(
+        `INSERT INTO workflow_members (workflow_id, user_id, access_role, invited_by, last_seen)
+         VALUES ($1, $2, 'owner', $2, NOW())
+         ON CONFLICT (workflow_id, user_id) DO NOTHING`,
+        [created.rows[0].id, req.user.id]
+      );
+      return created;
+    });
+
+    await logWorkflowActivity({
+      workflowId: result.rows[0].id,
+      workspaceId: req.workspaceId,
+      actorId: req.user.id,
+      type: 'template_installed',
+      title: 'Template installed',
+      body: `${req.user.name} installed the ${template.name} template.`,
+      metadata: { templateId: template.id, templateName: template.name },
+    });
 
     res.status(201).json({
       workflow: result.rows[0],
@@ -1245,6 +1356,16 @@ router.put('/:id', async (req, res) => {
 
     const updatedWorkflow = result.rows[0];
 
+    await logWorkflowActivity({
+      workflowId: req.params.id,
+      workspaceId: req.workspaceId,
+      actorId: req.user.id,
+      type: 'workflow_saved',
+      title: 'Draft saved',
+      body: `${req.user.name} saved workflow changes.`,
+      metadata: { version: updatedWorkflow.version },
+    });
+
     // Broadcast save event via WebSocket
     try {
       const { broadcast } = require('../services/websocket');
@@ -1322,6 +1443,15 @@ router.post('/:id/publish', async (req, res) => {
     } catch (e) { /* non-critical */ }
 
     logger.info(`Workflow ${req.params.id} published as v${newVersion} by ${req.user.email}`);
+    await logWorkflowActivity({
+      workflowId: req.params.id,
+      workspaceId: req.workspaceId,
+      actorId: req.user.id,
+      type: 'workflow_published',
+      title: 'Workflow published',
+      body: `${req.user.name} published version ${newVersion}.`,
+      metadata: { version: newVersion, label: label || `v${newVersion}` },
+    });
     res.json({ workflow: result, version: newVersion });
   } catch (err) {
     if (err.code === '23505') {
@@ -1367,8 +1497,8 @@ router.post('/:id/duplicate', async (req, res) => {
     const wf = original.rows[0];
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       RETURNING *
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
       [
         req.workspaceId,
         `${wf.name} (copy)`,
@@ -1408,6 +1538,16 @@ router.post('/:id/execute', async (req, res) => {
       triggerType: 'manual',
       triggerPayload: executionPayload,
       credentials: req.body.credentials || {}
+    });
+
+    await logWorkflowActivity({
+      workflowId: req.params.id,
+      workspaceId: req.workspaceId,
+      actorId: req.user.id,
+      type: 'workflow_executed',
+      title: 'Workflow run started',
+      body: `${req.user.name} started a manual run.`,
+      metadata: { executionId },
     });
 
     res.json({ executionId });

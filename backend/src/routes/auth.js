@@ -6,6 +6,7 @@ const { query, transaction } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require('../services/email');
 const logger = require('../utils/logger');
+const { formatNotification } = require('../services/collaboration');
 
 const router = express.Router();
 
@@ -63,6 +64,16 @@ function sanitizeAvatar(avatar) {
   }
 
   return null;
+}
+
+function parseNotificationData(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
 }
 
 // ── POST /api/auth/register ──
@@ -471,6 +482,166 @@ router.put('/profile', authenticate, async (req, res) => {
   } catch (err) {
     logger.error('Update profile error:', err);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+router.get('/notifications', authenticate, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT * FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [req.user.id]
+    );
+    res.json({
+      notifications: result.rows.map(formatNotification),
+      unreadCount: result.rows.filter((row) => !row.is_read).length,
+    });
+  } catch (err) {
+    logger.error('Notifications error:', err);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+router.post('/notifications/read-all', authenticate, async (req, res) => {
+  try {
+    await query(
+      `UPDATE notifications
+       SET is_read = TRUE, read_at = NOW()
+       WHERE user_id = $1 AND is_read = FALSE`,
+      [req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Read all notifications error:', err);
+    res.status(500).json({ error: 'Failed to update notifications' });
+  }
+});
+
+router.post('/notifications/:id/read', authenticate, async (req, res) => {
+  try {
+    await query(
+      `UPDATE notifications
+       SET is_read = TRUE, read_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Read notification error:', err);
+    res.status(500).json({ error: 'Failed to update notification' });
+  }
+});
+
+router.get('/invitations', authenticate, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT wi.*, w.name AS workspace_name, inviter.name AS inviter_name, inviter.email AS inviter_email
+       FROM workspace_invitations wi
+       JOIN workspaces w ON w.id = wi.workspace_id
+       LEFT JOIN users inviter ON inviter.id = wi.invited_by
+       WHERE wi.email = $1
+       ORDER BY wi.created_at DESC`,
+      [req.user.email.toLowerCase()]
+    );
+    res.json({
+      invitations: result.rows.map((row) => ({
+        id: row.id,
+        workspaceId: row.workspace_id,
+        workspaceName: row.workspace_name,
+        role: row.role,
+        status: row.status,
+        message: row.message || '',
+        invitedAt: row.created_at,
+        respondedAt: row.responded_at || null,
+        token: row.token,
+        inviter: row.inviter_name ? {
+          name: row.inviter_name,
+          email: row.inviter_email,
+        } : null,
+      })),
+    });
+  } catch (err) {
+    logger.error('List invitations error:', err);
+    res.status(500).json({ error: 'Failed to load invitations' });
+  }
+});
+
+router.post('/invitations/:id/respond', authenticate, async (req, res) => {
+  try {
+    const action = req.body.action === 'accept' ? 'accept' : req.body.action === 'reject' ? 'reject' : null;
+    if (!action) {
+      return res.status(400).json({ error: 'Action must be accept or reject' });
+    }
+
+    const invitationResult = await query(
+      `SELECT wi.*, w.name AS workspace_name
+       FROM workspace_invitations wi
+       JOIN workspaces w ON w.id = wi.workspace_id
+       WHERE wi.id = $1 AND wi.email = $2`,
+      [req.params.id, req.user.email.toLowerCase()]
+    );
+    if (invitationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    const invitation = invitationResult.rows[0];
+    if (invitation.status !== 'pending') {
+      return res.status(409).json({ error: `Invitation already ${invitation.status}` });
+    }
+
+    if (action === 'accept') {
+      await transaction(async (client) => {
+        await client.query(
+          `INSERT INTO workspace_members (workspace_id, user_id, role)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+          [invitation.workspace_id, req.user.id, invitation.role]
+        );
+        await client.query(
+          `UPDATE workspace_invitations
+           SET status = 'accepted', invited_user_id = $1, responded_at = NOW()
+           WHERE id = $2`,
+          [req.user.id, invitation.id]
+        );
+        await client.query(
+          `INSERT INTO notifications (user_id, type, title, body, data)
+           VALUES ($1, 'invite_response', $2, $3, $4)`,
+          [
+            invitation.invited_by,
+            'Workspace invite accepted',
+            `${req.user.name} accepted the invite to ${invitation.workspace_name}.`,
+            JSON.stringify({ workspaceId: invitation.workspace_id, inviteId: invitation.id, action: 'accepted' }),
+          ]
+        );
+      });
+      return res.json({ success: true, status: 'accepted' });
+    }
+
+    await query(
+      `UPDATE workspace_invitations
+       SET status = 'rejected', invited_user_id = $1, responded_at = NOW()
+       WHERE id = $2`,
+      [req.user.id, invitation.id]
+    );
+    if (invitation.invited_by) {
+      await query(
+        `INSERT INTO notifications (user_id, type, title, body, data)
+         VALUES ($1, 'invite_response', $2, $3, $4)`,
+        [
+          invitation.invited_by,
+          'Workspace invite declined',
+          `${req.user.name} declined the invite to ${invitation.workspace_name}.`,
+          JSON.stringify({ workspaceId: invitation.workspace_id, inviteId: invitation.id, action: 'rejected' }),
+        ]
+      );
+    }
+
+    res.json({ success: true, status: 'rejected' });
+  } catch (err) {
+    logger.error('Respond invitation error:', err);
+    res.status(500).json({ error: 'Failed to respond to invitation' });
   }
 });
 

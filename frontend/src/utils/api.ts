@@ -63,6 +63,21 @@ export const authApi = {
 
   updateProfile: (data: { name: string; avatar?: AvatarData | null; headline?: string }) =>
     api.put('/auth/profile', data),
+
+  notifications: () =>
+    api.get('/auth/notifications'),
+
+  markNotificationRead: (id: string) =>
+    api.post(`/auth/notifications/${id}/read`),
+
+  markAllNotificationsRead: () =>
+    api.post('/auth/notifications/read-all'),
+
+  invitations: () =>
+    api.get('/auth/invitations'),
+
+  respondInvitation: (id: string, action: 'accept' | 'reject') =>
+    api.post(`/auth/invitations/${id}/respond`, { action }),
 };
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +100,16 @@ export const workflowApi = {
   get: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}`),
 
-  create: (workspaceId: string, data: { name: string; description?: string; graph?: unknown; tags?: string[] }) =>
+  create: (
+    workspaceId: string,
+    data: {
+      name: string;
+      description?: string;
+      graph?: unknown;
+      tags?: string[];
+      collaborators?: Array<{ userId: string; accessRole?: 'owner' | 'edit' | 'run' | 'approve' | 'view' }>;
+    }
+  ) =>
     api.post(`/workspaces/${workspaceId}/workflows`, data),
 
   update: (workspaceId: string, id: string, data: Record<string, unknown>) =>
@@ -140,6 +164,49 @@ export const workflowApi = {
 
   getPresence: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}/presence`),
+};
+
+export const collaborationApi = {
+  listInvites: (workspaceId: string) =>
+    api.get(`/workspaces/${workspaceId}/collaboration/invites`),
+
+  createInvite: (workspaceId: string, data: { email: string; role?: 'owner' | 'admin' | 'editor' | 'viewer'; message?: string }) =>
+    api.post(`/workspaces/${workspaceId}/collaboration/invites`, data),
+
+  workflowMembers: (workspaceId: string, workflowId: string) =>
+    api.get(`/workspaces/${workspaceId}/collaboration/workflow/${workflowId}/members`),
+
+  addWorkflowMember: (
+    workspaceId: string,
+    workflowId: string,
+    data: { userId: string; accessRole?: 'owner' | 'edit' | 'run' | 'approve' | 'view' }
+  ) => api.post(`/workspaces/${workspaceId}/collaboration/workflow/${workflowId}/members`, data),
+
+  removeWorkflowMember: (workspaceId: string, workflowId: string, userId: string) =>
+    api.delete(`/workspaces/${workspaceId}/collaboration/workflow/${workflowId}/members/${userId}`),
+
+  workflowActivity: (workspaceId: string, workflowId: string) =>
+    api.get(`/workspaces/${workspaceId}/collaboration/workflow/${workflowId}/activity`),
+
+  logWorkflowActivity: (
+    workspaceId: string,
+    workflowId: string,
+    data: { type?: string; title: string; body?: string; metadata?: Record<string, unknown> }
+  ) => api.post(`/workspaces/${workspaceId}/collaboration/workflow/${workflowId}/activity`, data),
+
+  inboxThreads: (workspaceId: string) =>
+    api.get(`/workspaces/${workspaceId}/collaboration/inbox/threads`),
+
+  createInboxThread: (
+    workspaceId: string,
+    data: { title: string; workflowId?: string | null; participantIds?: string[] }
+  ) => api.post(`/workspaces/${workspaceId}/collaboration/inbox/threads`, data),
+
+  inboxMessages: (workspaceId: string, threadId: string) =>
+    api.get(`/workspaces/${workspaceId}/collaboration/inbox/threads/${threadId}/messages`),
+
+  sendInboxMessage: (workspaceId: string, threadId: string, body: string) =>
+    api.post(`/workspaces/${workspaceId}/collaboration/inbox/threads/${threadId}/messages`, { body }),
 };
 
 /* ------------------------------------------------------------------ */
