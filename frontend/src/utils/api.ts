@@ -66,6 +66,12 @@ export const authApi = {
 /* ------------------------------------------------------------------ */
 
 export const workflowApi = {
+  templatesMarketplace: (workspaceId: string) =>
+    api.get(`/workspaces/${workspaceId}/workflows/templates/marketplace`),
+
+  installTemplate: (workspaceId: string, templateId: string, data?: { name?: string }) =>
+    api.post(`/workspaces/${workspaceId}/workflows/templates/${templateId}/install`, data),
+
   list: (workspaceId: string, params?: Record<string, string>) =>
     api.get(`/workspaces/${workspaceId}/workflows`, { params }),
 

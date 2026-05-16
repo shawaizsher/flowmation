@@ -38,6 +38,102 @@ function getNodeLabel(node) {
   return node?.data?.label || node?.id || 'Unnamed node';
 }
 
+const WORKFLOW_TEMPLATES = [
+  {
+    id: 'lead-triage-demo',
+    name: 'Lead Triage Demo',
+    category: 'Sales',
+    description: 'Webhook intake, lead filtering, summary generation, approval, and notification.',
+    tags: ['demo', 'sales', 'approval'],
+    setupGuide: [
+      'Send a sample webhook payload with body.email, body.message, and body.priority.',
+      'Review the filter condition and message templates in the editor.',
+      'Optionally connect an email credential for production delivery.'
+    ],
+    requiredCredentials: [
+      { serviceId: 'email', label: 'Email/SMTP', required: false, reason: 'Only needed if you want live external delivery instead of dev mail.' }
+    ],
+    graph: {
+      nodes: [
+        { id: 'trigger-webhook-1', type: 'trigger_webhook', position: { x: 40, y: 120 }, data: { label: 'Webhook Trigger', type: 'trigger_webhook', config: { path: '/lead-triage', method: 'POST' } } },
+        { id: 'filter-high-priority', type: 'transform_filter', position: { x: 320, y: 120 }, data: { label: 'Filter High Priority', type: 'transform_filter', config: { field: 'body.priority', operator: 'equals', value: 'high' } } },
+        { id: 'transform-summary', type: 'transform_set', position: { x: 600, y: 120 }, data: { label: 'Prepare Summary', type: 'transform_set', config: { field: 'summary', value: 'Urgent lead from {{body.email}}: {{body.message}}' } } },
+        { id: 'console-log', type: 'console_log', position: { x: 860, y: 120 }, data: { label: 'Log Summary', type: 'console_log', config: { message: 'Lead summary ready for review' } } },
+        { id: 'wait-approval', type: 'wait_approval', position: { x: 1120, y: 120 }, data: { label: 'Wait for Approval', type: 'wait_approval', config: { message: 'Review urgent lead before sending', timeout: 60 } } },
+        { id: 'send-email', type: 'email_send', position: { x: 1380, y: 120 }, data: { label: 'Send Email', type: 'email_send', config: { to: 'ops@example.com', subject: 'Urgent lead alert', body: '{{summary}}' } } }
+      ],
+      edges: [
+        { id: 'lead-1', source: 'trigger-webhook-1', target: 'filter-high-priority' },
+        { id: 'lead-2', source: 'filter-high-priority', target: 'transform-summary' },
+        { id: 'lead-3', source: 'transform-summary', target: 'console-log' },
+        { id: 'lead-4', source: 'console-log', target: 'wait-approval' },
+        { id: 'lead-5', source: 'wait-approval', target: 'send-email' }
+      ],
+      comments: []
+    }
+  },
+  {
+    id: 'incident-response',
+    name: 'Incident Response Workflow',
+    category: 'Operations',
+    description: 'Escalate critical incidents through logging, approval, and follow-up messaging.',
+    tags: ['ops', 'incident', 'collaboration'],
+    setupGuide: [
+      'Trigger it with a webhook payload containing body.service, body.severity, and body.message.',
+      'Use collaboration comments to discuss remediation steps on each node.',
+      'Open the Advanced panel to review privacy and release guidance.'
+    ],
+    requiredCredentials: [
+      { serviceId: 'slack', label: 'Slack', required: false, reason: 'Optional if you want live channel notifications.' }
+    ],
+    graph: {
+      nodes: [
+        { id: 'trigger-webhook-ir', type: 'trigger_webhook', position: { x: 60, y: 180 }, data: { label: 'Incident Webhook', type: 'trigger_webhook', config: { path: '/incident', method: 'POST' } } },
+        { id: 'transform-incident', type: 'transform_set', position: { x: 360, y: 180 }, data: { label: 'Prepare Incident Brief', type: 'transform_set', config: { field: 'incidentBrief', value: 'Service {{body.service}} is {{body.severity}}: {{body.message}}' } } },
+        { id: 'wait-ir-approval', type: 'wait_approval', position: { x: 660, y: 180 }, data: { label: 'Ops Approval', type: 'wait_approval', config: { message: 'Approve remediation plan', timeout: 30 } } },
+        { id: 'notify-email-ir', type: 'email_send', position: { x: 960, y: 180 }, data: { label: 'Notify Team', type: 'email_send', config: { to: 'incident@example.com', subject: 'Incident alert', body: '{{incidentBrief}}' } } }
+      ],
+      edges: [
+        { id: 'ir-1', source: 'trigger-webhook-ir', target: 'transform-incident' },
+        { id: 'ir-2', source: 'transform-incident', target: 'wait-ir-approval' },
+        { id: 'ir-3', source: 'wait-ir-approval', target: 'notify-email-ir' }
+      ],
+      comments: []
+    }
+  },
+  {
+    id: 'no-code-audit-trail',
+    name: 'Audit Trail Starter',
+    category: 'Governance',
+    description: 'A collaboration-friendly starter template for approvals, logging, and safe release review.',
+    tags: ['audit', 'governance', 'safe-demo'],
+    setupGuide: [
+      'Use this as a team review template while testing comments and shared debugging.',
+      'Create comments on nodes and watch them sync live with collaborators.',
+      'Run the workflow to populate replay and observability sections.'
+    ],
+    requiredCredentials: [],
+    graph: {
+      nodes: [
+        { id: 'audit-manual', type: 'trigger_manual', position: { x: 80, y: 100 }, data: { label: 'Manual Trigger', type: 'trigger_manual', config: {} } },
+        { id: 'audit-log', type: 'console_log', position: { x: 360, y: 100 }, data: { label: 'Record Input', type: 'console_log', config: { message: 'Audit workflow started' } } },
+        { id: 'audit-approval', type: 'wait_approval', position: { x: 640, y: 100 }, data: { label: 'Reviewer Sign-off', type: 'wait_approval', config: { message: 'Approve workflow release', timeout: 45 } } },
+        { id: 'audit-email', type: 'email_send', position: { x: 920, y: 100 }, data: { label: 'Send Confirmation', type: 'email_send', config: { to: 'audit@example.com', subject: 'Audit approved', body: 'Workflow approved and logged.' } } }
+      ],
+      edges: [
+        { id: 'audit-1', source: 'audit-manual', target: 'audit-log' },
+        { id: 'audit-2', source: 'audit-log', target: 'audit-approval' },
+        { id: 'audit-3', source: 'audit-approval', target: 'audit-email' }
+      ],
+      comments: []
+    }
+  }
+];
+
+function getTemplateById(templateId) {
+  return WORKFLOW_TEMPLATES.find((template) => template.id === templateId) || null;
+}
+
 function getNodeConfig(node) {
   return node?.data?.config || {};
 }
@@ -796,6 +892,69 @@ router.get('/:id/advanced-report', async (req, res) => {
   } catch (err) {
     logger.error('Advanced report error:', err);
     res.status(500).json({ error: 'Failed to build advanced workflow report' });
+  }
+});
+
+// GET /api/workspaces/:wid/workflows/templates/marketplace
+router.get('/templates/marketplace', async (req, res) => {
+  try {
+    res.json({
+      templates: WORKFLOW_TEMPLATES.map((template) => ({
+        id: template.id,
+        name: template.name,
+        category: template.category,
+        description: template.description,
+        tags: template.tags,
+        setupGuide: template.setupGuide,
+        requiredCredentials: template.requiredCredentials,
+        nodeCount: template.graph.nodes.length,
+        edgeCount: template.graph.edges.length
+      }))
+    });
+  } catch (err) {
+    logger.error('Templates marketplace error:', err);
+    res.status(500).json({ error: 'Failed to load workflow templates marketplace' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/templates/:templateId/install
+router.post('/templates/:templateId/install', async (req, res) => {
+  try {
+    const template = getTemplateById(req.params.templateId);
+    if (!template) {
+      return res.status(404).json({ error: 'Workflow template not found' });
+    }
+
+    const name = typeof req.body.name === 'string' && req.body.name.trim()
+      ? req.body.name.trim()
+      : template.name;
+
+    const result = await query(
+      `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        req.workspaceId,
+        name,
+        template.description,
+        JSON.stringify(template.graph),
+        JSON.stringify(template.tags || []),
+        req.user.id
+      ]
+    );
+
+    res.status(201).json({
+      workflow: result.rows[0],
+      template: {
+        id: template.id,
+        name: template.name,
+        setupGuide: template.setupGuide,
+        requiredCredentials: template.requiredCredentials
+      }
+    });
+  } catch (err) {
+    logger.error('Install workflow template error:', err);
+    res.status(500).json({ error: 'Failed to install workflow template' });
   }
 });
 

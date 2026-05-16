@@ -42,6 +42,8 @@ import {
   Unlink,
   Upload,
   ShieldCheck,
+  Store,
+  MessageSquare,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
@@ -80,7 +82,7 @@ function EditorCanvas() {
 
   // Panels — both open by default for easier understanding
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
-  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'advanced' | 'none'>('config');
+  const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'advanced' | 'templates' | 'collaboration' | 'none'>('config');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // Node catalog (local)
@@ -132,6 +134,12 @@ function EditorCanvas() {
   const [debugging, setDebugging] = useState(false);
   const [advancedReport, setAdvancedReport] = useState<any>(null);
   const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState('');
+  const [nodeComments, setNodeComments] = useState<any[]>([]);
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [sharedDebugFeed, setSharedDebugFeed] = useState<any[]>([]);
   const [promptSandboxNodeId, setPromptSandboxNodeId] = useState('');
   const [promptSandboxInput, setPromptSandboxInput] = useState('{\n  "body": {\n    "email": "lead@example.com",\n    "message": "Customer wants a product demo",\n    "priority": "high"\n  }\n}');
   const [promptSandboxResult, setPromptSandboxResult] = useState<any>(null);
@@ -154,6 +162,7 @@ function EditorCanvas() {
   const graphSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialGraphLoadedRef = useRef(false);
   const lastRemoteChangeTsRef = useRef(0);
+  const pendingChangeSummaryRef = useRef<{ summary: string; changedNodeId?: string; changedField?: string } | null>(null);
   const executeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const executionPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const executionPollInFlightRef = useRef(false);
@@ -161,20 +170,21 @@ function EditorCanvas() {
   const workspaceId = workspace?.id;
 
   const normalizeGraph = useCallback((rawGraph: any) => {
-    if (!rawGraph) return { nodes: [], edges: [] };
+    if (!rawGraph) return { nodes: [], edges: [], comments: [] };
 
     let parsed = rawGraph;
     if (typeof rawGraph === 'string') {
       try {
         parsed = JSON.parse(rawGraph);
       } catch {
-        return { nodes: [], edges: [] };
+        return { nodes: [], edges: [], comments: [] };
       }
     }
 
     return {
       nodes: Array.isArray(parsed?.nodes) ? parsed.nodes : [],
       edges: Array.isArray(parsed?.edges) ? parsed.edges : [],
+      comments: Array.isArray(parsed?.comments) ? parsed.comments : [],
     };
   }, []);
 
@@ -186,8 +196,8 @@ function EditorCanvas() {
       data: n.data,
     }));
 
-    return { nodes: graphNodes, edges: nextEdges };
-  }, [nodes, edges]);
+    return { nodes: graphNodes, edges: nextEdges, comments: nodeComments };
+  }, [nodes, edges, nodeComments]);
 
   // ── Load workflow ──
   useEffect(() => {
@@ -211,6 +221,7 @@ function EditorCanvas() {
         suppressGraphSyncRef.current = true;
         setNodes(flowNodes);
         setEdges(graph.edges || []);
+        setNodeComments(graph.comments || []);
         setTimeout(() => {
           suppressGraphSyncRef.current = false;
           initialGraphLoadedRef.current = true;
@@ -297,8 +308,12 @@ function EditorCanvas() {
           workflowName,
           graph: toPersistedGraph(),
           changedAt: Date.now(),
+          summary: pendingChangeSummaryRef.current?.summary,
+          changedNodeId: pendingChangeSummaryRef.current?.changedNodeId,
+          changedField: pendingChangeSummaryRef.current?.changedField,
         },
       }));
+      pendingChangeSummaryRef.current = null;
     }, 250);
 
     return () => {
@@ -494,6 +509,35 @@ function EditorCanvas() {
       case 'user_left':
         setCollaborators((prev) => prev.filter((c) => c.userId !== msg.userId));
         break;
+      case 'node_comment':
+        if (msg.comment) {
+          setNodeComments((prev) => {
+            if (prev.some((item) => item.id === msg.comment.id)) return prev;
+            return [...prev, msg.comment];
+          });
+          setActivityFeed((prev) => [{
+            id: `comment-${msg.comment.id}`,
+            type: 'comment',
+            actorName: msg.comment.authorName,
+            summary: `commented on ${msg.comment.nodeLabel || msg.comment.nodeId}`,
+            nodeId: msg.comment.nodeId,
+            createdAt: msg.comment.createdAt,
+          }, ...prev].slice(0, 25));
+        }
+        break;
+      case 'shared_debug':
+        if (msg.debug) {
+          setSharedDebugFeed((prev) => [msg.debug, ...prev].slice(0, 20));
+          setActivityFeed((prev) => [{
+            id: `debug-${msg.debug.id}`,
+            type: 'debug',
+            actorName: msg.debug.actorName,
+            summary: msg.debug.summary,
+            nodeId: msg.debug.nodeId,
+            createdAt: msg.debug.createdAt,
+          }, ...prev].slice(0, 25));
+        }
+        break;
       case 'workflow_saved':
         if (msg.savedBy !== user?.name) {
           toast(`${msg.savedBy} saved a draft`, { icon: '💾', duration: 3000 });
@@ -523,9 +567,22 @@ function EditorCanvas() {
         suppressGraphSyncRef.current = true;
         setNodes(flowNodes);
         setEdges(graph.edges || []);
+        setNodeComments(graph.comments || []);
 
         if (typeof incoming.workflowName === 'string' && incoming.workflowName.trim().length > 0) {
           setWorkflowName(incoming.workflowName);
+        }
+
+        if (msg.userName && incoming.summary) {
+          setActivityFeed((prev) => [{
+            id: `activity-${changedAt || Date.now()}`,
+            type: 'change',
+            actorName: msg.userName,
+            summary: incoming.summary,
+            nodeId: incoming.changedNodeId,
+            changedField: incoming.changedField,
+            createdAt: new Date((changedAt || Date.now())).toISOString(),
+          }, ...prev].slice(0, 25));
         }
 
         setSelectedNode((prev) => {
@@ -603,6 +660,14 @@ function EditorCanvas() {
     if (!connection.source || !connection.target) return;
     if (connection.source === connection.target) return;
 
+    const sourceNode = nodes.find((node) => node.id === connection.source);
+    const targetNode = nodes.find((node) => node.id === connection.target);
+    pendingChangeSummaryRef.current = {
+      summary: `connected ${sourceNode?.data?.label || connection.source} to ${targetNode?.data?.label || connection.target}`,
+      changedNodeId: connection.target,
+      changedField: 'connection',
+    };
+
     const edgeId = `e-${connection.source}-${connection.sourceHandle || 'out'}-${connection.target}-${connection.targetHandle || 'in'}-${Date.now()}`;
 
     setEdges((eds) =>
@@ -621,7 +686,7 @@ function EditorCanvas() {
         eds
       )
     );
-  }, [setEdges]);
+  }, [nodes, setEdges]);
 
   const onNodeClick = useCallback((_: any, node: Node) => {
     setSelectedNode(node);
@@ -638,6 +703,13 @@ function EditorCanvas() {
   }, []);
 
   const onNodesDelete = useCallback((deleted: Node[]) => {
+    if (deleted.length > 0) {
+      pendingChangeSummaryRef.current = {
+        summary: `deleted ${deleted.map((node) => node.data?.label || node.id).join(', ')}`,
+        changedNodeId: deleted[0].id,
+        changedField: 'delete',
+      };
+    }
     setSelectedNode((prev) => prev && deleted.some((n) => n.id === prev.id) ? null : prev);
   }, []);
 
@@ -750,6 +822,11 @@ function EditorCanvas() {
       },
     };
 
+    pendingChangeSummaryRef.current = {
+      summary: `added ${def.label}`,
+      changedNodeId: newId,
+      changedField: 'add_node',
+    };
     setNodes((nds) => [...nds, newNode]);
 
     // Auto-connect if triggered from a node's + button
@@ -773,6 +850,11 @@ function EditorCanvas() {
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
     if (!selectedNode) return;
+    pendingChangeSummaryRef.current = {
+      summary: `updated ${selectedNode.data.label || selectedNode.id}`,
+      changedNodeId: selectedNode.id,
+      changedField: key,
+    };
     if (key === 'credentialId') {
       setNodes((nds) =>
         nds.map((n) =>
@@ -877,6 +959,19 @@ function EditorCanvas() {
     try {
       setDebugging(true);
       setRightPanel('debug');
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'shared_debug',
+          workflowId: id,
+          debug: {
+            id: `debug-${Date.now()}`,
+            nodeId: log.nodeId,
+            summary: `${user?.name || 'A collaborator'} started debugging ${log.nodeId}`,
+            error: log.error || 'Unknown error',
+            createdAt: new Date().toISOString(),
+          }
+        }));
+      }
       const res = await aiApi.debugNode(workspaceId, {
         nodeId: log.nodeId,
         nodeType: log.nodeType || 'unknown',
@@ -899,6 +994,18 @@ function EditorCanvas() {
         nodeId: selectedNode.id,
         fix: debugResult.fix,
       });
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'shared_debug',
+          workflowId: id,
+          debug: {
+            id: `debug-fix-${Date.now()}`,
+            nodeId: selectedNode.id,
+            summary: `${user?.name || 'A collaborator'} applied an AI fix to ${selectedNode.data.label || selectedNode.id}`,
+            createdAt: new Date().toISOString(),
+          }
+        }));
+      }
       toast.success('Fix applied!');
       // Reload workflow
       const res = await workflowApi.get(workspaceId, id);
@@ -1001,6 +1108,67 @@ function EditorCanvas() {
     } finally {
       setAdvancedLoading(false);
     }
+  };
+
+  const loadTemplatesMarketplace = async () => {
+    if (!workspaceId) return;
+    try {
+      setTemplatesLoading(true);
+      setRightPanel('templates');
+      const res = await workflowApi.templatesMarketplace(workspaceId);
+      setTemplates(res.data.templates || []);
+    } catch {
+      toast.error('Failed to load workflow templates');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleInstallTemplate = async (templateId: string, templateName: string) => {
+    if (!workspaceId) return;
+    try {
+      const res = await workflowApi.installTemplate(workspaceId, templateId, { name: templateName });
+      toast.success(`${templateName} installed`);
+      navigate(`/workflows/${res.data.workflow.id}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to install template');
+    }
+  };
+
+  const addNodeComment = () => {
+    if (!selectedNode || !commentInput.trim() || !user?.id) {
+      if (!selectedNode) toast.error('Select a node first');
+      return;
+    }
+
+    const comment = {
+      id: `comment-${Date.now()}`,
+      nodeId: selectedNode.id,
+      nodeLabel: selectedNode.data.label || selectedNode.id,
+      authorId: user.id,
+      authorName: user.name,
+      text: commentInput.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setNodeComments((prev) => [...prev, comment]);
+    setActivityFeed((prev) => [{
+      id: `activity-${comment.id}`,
+      type: 'comment',
+      actorName: user.name,
+      summary: `commented on ${comment.nodeLabel}`,
+      nodeId: comment.nodeId,
+      createdAt: comment.createdAt,
+    }, ...prev].slice(0, 25));
+    pendingChangeSummaryRef.current = {
+      summary: `commented on ${comment.nodeLabel}`,
+      changedNodeId: comment.nodeId,
+      changedField: 'comment',
+    };
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'node_comment', workflowId: id, comment }));
+    }
+    setCommentInput('');
   };
 
   const applySuggestedMapping = useCallback((suggestion: any) => {
@@ -1129,6 +1297,7 @@ function EditorCanvas() {
 
   // ── Filtered nodes for palette (local catalog) ──
   const aiSandboxNodes = nodes.filter((node) => /ai_|anthropic|openai/i.test(String(node.data?.type || '')));
+  const selectedNodeComments = selectedNode ? nodeComments.filter((comment) => comment.nodeId === selectedNode.id) : [];
   const filteredCatalog = searchNodes(nodeSearch);
   const totalNodeCount = allNodes.length;
 
@@ -1217,6 +1386,20 @@ function EditorCanvas() {
             title="Manage credentials"
           >
             <Key size={16} />
+          </button>
+          <button
+            onClick={loadTemplatesMarketplace}
+            className={`rounded p-1.5 ${rightPanel === 'templates' ? 'bg-brand-500/20 text-brand-400' : 'text-foreground-muted hover:text-foreground'}`}
+            title="Workflow templates marketplace"
+          >
+            <Store size={16} />
+          </button>
+          <button
+            onClick={() => setRightPanel(rightPanel === 'collaboration' ? 'none' : 'collaboration')}
+            className={`rounded p-1.5 ${rightPanel === 'collaboration' ? 'bg-brand-500/20 text-brand-400' : 'text-foreground-muted hover:text-foreground'}`}
+            title="Live collaboration"
+          >
+            <Users size={16} />
           </button>
           <button
             onClick={() => setRightPanel(rightPanel === 'ai' ? 'none' : 'ai')}
@@ -1852,6 +2035,169 @@ function EditorCanvas() {
                       </p>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {rightPanel === 'templates' && (
+              <div className="p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-body text-base font-semibold text-foreground flex items-center gap-2">
+                    <Store size={18} className="text-brand-400" /> Workflow Templates Marketplace
+                  </h3>
+                  <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {templatesLoading ? (
+                  <div className="flex flex-col items-center py-8">
+                    <BanterLoader label="Loading templates..." />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {templates.map((template) => (
+                      <div key={template.id} className="rounded-lg border border-surface-border bg-surface-input p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{template.name}</p>
+                            <p className="mt-1 text-xs text-foreground-muted">{template.description}</p>
+                          </div>
+                          <span className="rounded bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-400">
+                            {template.category}
+                          </span>
+                        </div>
+                        <div className="mt-3 rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-xs font-semibold text-foreground">Setup guide</p>
+                          {template.setupGuide?.map((step: string, index: number) => (
+                            <p key={`${template.id}-step-${index}`} className="mt-1 text-xs text-foreground-muted">
+                              {index + 1}. {step}
+                            </p>
+                          ))}
+                        </div>
+                        <div className="mt-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-xs font-semibold text-foreground">Credential checklist</p>
+                          {(template.requiredCredentials || []).length === 0 ? (
+                            <p className="mt-1 text-xs text-green-400">No external credentials required.</p>
+                          ) : (
+                            template.requiredCredentials.map((item: any) => (
+                              <p key={`${template.id}-${item.serviceId}`} className="mt-1 text-xs text-foreground-muted">
+                                {item.label} · {item.required ? 'Required' : 'Optional'} · {item.reason}
+                              </p>
+                            ))
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleInstallTemplate(template.id, template.name)}
+                          className="mt-3 w-full rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-2 text-xs font-bold text-brand-400 hover:bg-brand-500/20"
+                        >
+                          Install Template
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {rightPanel === 'collaboration' && (
+              <div className="p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-body text-base font-semibold text-foreground flex items-center gap-2">
+                    <Users size={18} className="text-brand-400" /> Live Collaboration
+                  </h3>
+                  <button onClick={() => setRightPanel('none')} className="text-foreground-muted hover:text-foreground">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">Presence</h4>
+                    {collaborators.length === 0 ? (
+                      <p className="text-xs text-foreground-muted">No other collaborators are currently in this workflow.</p>
+                    ) : (
+                      collaborators.map((person) => (
+                        <div key={person.userId} className="mb-2 flex items-center gap-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <div className="h-7 w-7 rounded-full" style={{ backgroundColor: person.color }} />
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">{person.userName}</p>
+                            <p className="text-[11px] text-foreground-muted">
+                              {person.selectedNode ? `Focused on ${person.selectedNode}` : 'Browsing the canvas'}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-foreground">Node Comments</h4>
+                      <span className="text-[11px] text-foreground-muted">
+                        {selectedNode ? selectedNode.data.label : 'Select a node'}
+                      </span>
+                    </div>
+                    {selectedNode ? (
+                      <>
+                        <div className="max-h-40 space-y-2 overflow-auto pr-1">
+                          {selectedNodeComments.length === 0 ? (
+                            <p className="text-xs text-foreground-muted">No comments on this node yet.</p>
+                          ) : (
+                            selectedNodeComments.map((comment) => (
+                              <div key={comment.id} className="rounded-md border border-surface-border bg-surface-card p-2">
+                                <p className="text-xs font-semibold text-foreground">{comment.authorName}</p>
+                                <p className="mt-1 text-xs text-foreground-muted">{comment.text}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <textarea
+                          value={commentInput}
+                          onChange={(e) => setCommentInput(e.target.value)}
+                          rows={3}
+                          placeholder="Leave a note for collaborators..."
+                          className="mt-2 w-full rounded-lg border border-surface-border bg-surface-card p-3 text-sm text-foreground outline-none focus:border-brand-500/40"
+                        />
+                        <button
+                          onClick={addNodeComment}
+                          className="mt-2 w-full rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-2 text-xs font-bold text-brand-400 hover:bg-brand-500/20"
+                        >
+                          <MessageSquare size={13} className="mr-1 inline" /> Add Comment
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-foreground-muted">Click a node first to review or add comments.</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">Shared Debugging</h4>
+                    {sharedDebugFeed.length === 0 ? (
+                      <p className="text-xs text-foreground-muted">No shared debug sessions yet.</p>
+                    ) : (
+                      sharedDebugFeed.slice(0, 5).map((item) => (
+                        <div key={item.id} className="mb-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-xs font-semibold text-foreground">{item.summary}</p>
+                          {item.error && <p className="mt-1 text-xs text-red-300">{item.error}</p>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">Change Feed</h4>
+                    {activityFeed.length === 0 ? (
+                      <p className="text-xs text-foreground-muted">No recent collaborative activity.</p>
+                    ) : (
+                      activityFeed.slice(0, 8).map((item) => (
+                        <div key={item.id} className="mb-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-xs font-semibold text-foreground">{item.actorName}</p>
+                          <p className="mt-1 text-xs text-foreground-muted">{item.summary}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             )}

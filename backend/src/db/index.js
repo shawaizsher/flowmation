@@ -1,9 +1,15 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
 
+const connectionString = process.env.DATABASE_URL;
+const wantsSsl =
+  process.env.DB_SSL === 'true' ||
+  process.env.NODE_ENV === 'production' ||
+  /supabase\.com/i.test(connectionString || '');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString,
+  ssl: wantsSsl ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,
