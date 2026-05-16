@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, transaction } = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { generateToken, sendVerificationEmail } = require('../services/email');
+const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require('../services/email');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -377,6 +377,108 @@ router.get('/me', authenticate, async (req, res) => {
   } catch (err) {
     logger.error('Get me error:', err);
     res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+// ── POST /api/auth/forgot-password ──
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const userResult = await query(
+      'SELECT id, name, email_verified FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+
+    // Always return success to prevent email enumeration
+    if (userResult.rows.length === 0) {
+      return res.json({ message: 'If an account exists, a reset code has been sent.' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Rate limit — 60 seconds between requests
+    const recent = await query(
+      "SELECT id FROM password_reset_tokens WHERE user_id = $1 AND created_at > NOW() - INTERVAL '60 seconds'",
+      [user.id]
+    );
+    if (recent.rows.length > 0) {
+      return res.status(429).json({ error: 'Please wait 60 seconds before requesting another reset code.' });
+    }
+
+    // Delete old tokens
+    await query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+
+    // Create new 6-digit OTP
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await query(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
+    );
+
+    sendPasswordResetEmail(email.toLowerCase(), user.name, token).catch((err) => {
+      logger.error('Failed to send password reset email:', err);
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      logger.debug(`[DEV] Password reset OTP for ${email}: ${token}`);
+    }
+
+    res.json({ message: 'If an account exists, a reset code has been sent.' });
+  } catch (err) {
+    logger.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to send reset email' });
+  }
+});
+
+// ── POST /api/auth/reset-password ──
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'Email, code, and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const userResult = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired code' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    const tokenResult = await query(
+      'SELECT * FROM password_reset_tokens WHERE user_id = $1 AND token = $2',
+      [userId, String(code).trim()]
+    );
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired code' });
+    }
+
+    const record = tokenResult.rows[0];
+    if (new Date(record.expires_at) < new Date()) {
+      await query('DELETE FROM password_reset_tokens WHERE id = $1', [record.id]);
+      return res.status(400).json({ error: 'Code has expired. Please request a new one.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, userId]);
+    await query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+
+    logger.info(`Password reset successful for user ${userId}`);
+    res.json({ message: 'Password reset successfully. You can now sign in.' });
+  } catch (err) {
+    logger.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

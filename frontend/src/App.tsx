@@ -8,6 +8,7 @@ import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
 import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { useTheme, useAccentTheme } from './hooks/useTheme';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/" element={<GuestRoute><LandingPage /></GuestRoute>} />
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
