@@ -615,6 +615,53 @@ router.post('/invitations/:id/respond', authenticate, async (req, res) => {
             JSON.stringify({ workspaceId: invitation.workspace_id, inviteId: invitation.id, action: 'accepted' }),
           ]
         );
+
+        // Repair older solo-created direct chats that were opened before the invitee had joined.
+        await client.query(
+          `INSERT INTO inbox_thread_members (thread_id, user_id, joined_at)
+           SELECT t.id, $1, NOW()
+           FROM inbox_threads t
+           LEFT JOIN inbox_thread_members existing_member
+             ON existing_member.thread_id = t.id AND existing_member.user_id = $1
+           WHERE t.workspace_id = $2
+             AND t.type = 'direct'
+             AND t.created_by = $3
+             AND existing_member.user_id IS NULL
+             AND (
+               SELECT COUNT(*)
+               FROM inbox_thread_members tm
+               WHERE tm.thread_id = t.id
+             ) = 1`,
+          [req.user.id, invitation.workspace_id, invitation.invited_by]
+        );
+
+        const welcomeThread = await client.query(
+          `INSERT INTO inbox_threads (workspace_id, workflow_id, type, title, created_by)
+           VALUES ($1, NULL, 'direct', $2, $3)
+           RETURNING id`,
+          [
+            invitation.workspace_id,
+            `${invitation.workspace_name} team chat`,
+            invitation.invited_by || req.user.id,
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO inbox_thread_members (thread_id, user_id, joined_at)
+           VALUES ($1, $2, NOW()), ($1, $3, NOW())
+           ON CONFLICT (thread_id, user_id) DO NOTHING`,
+          [welcomeThread.rows[0].id, invitation.invited_by || req.user.id, req.user.id]
+        );
+
+        await client.query(
+          `INSERT INTO inbox_messages (thread_id, sender_id, body, message_type)
+           VALUES ($1, $2, $3, 'system')`,
+          [
+            welcomeThread.rows[0].id,
+            req.user.id,
+            `${req.user.name} joined ${invitation.workspace_name}. You can coordinate here.`,
+          ]
+        );
       });
       return res.json({ success: true, status: 'accepted' });
     }
