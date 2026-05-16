@@ -298,8 +298,8 @@ export default function DashboardPage() {
     } catch (err: any) {
       const errorData = err.response?.data;
 
-      if (errorData?.type === 'invalid_input') {
-        setAiError({ message: errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
+      if (errorData?.type === 'invalid_input' || errorData?.type === 'invalid_prompt') {
+        setAiError({ message: errorData.message || errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
         return;
       }
       if (errorData?.type === 'unsafe_request') {
