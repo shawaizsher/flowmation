@@ -66,7 +66,7 @@ async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPa
   // Create execution record first
   const result = await query(
     `INSERT INTO executions (workflow_id, workspace_id, trigger_type, trigger_payload, status)
-     OUTPUT INSERTED.id
+     RETURNING id
      VALUES ($1, $2, $3, $4, 'pending')`,
     [workflowId, workspaceId, triggerType, JSON.stringify(triggerPayload || {})]
   );

@@ -242,7 +242,7 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       OUTPUT INSERTED.*
+       RETURNING *
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         req.workspaceId,
@@ -479,8 +479,8 @@ router.put('/:id', async (req, res) => {
            graph = COALESCE($3, graph),
            status = COALESCE($4, status),
            tags = COALESCE($5, tags),
-           updated_at = GETDATE()
-       OUTPUT INSERTED.*
+           updated_at = NOW()
+       RETURNING *
        WHERE id = $6 AND workspace_id = $7`,
       [
         name || null,
@@ -550,8 +550,8 @@ router.post('/:id/publish', async (req, res) => {
 
       // Bump the workflow version number
       const updated = await client.query(
-        `UPDATE workflows SET version = $1, updated_at = GETDATE()
-         OUTPUT INSERTED.*
+        `UPDATE workflows SET version = $1, updated_at = NOW()
+         RETURNING *
          WHERE id = $2`,
         [newVersion, workflow.id]
       );
@@ -586,7 +586,7 @@ router.post('/:id/publish', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM workflows OUTPUT DELETED.id WHERE id = $1 AND workspace_id = $2',
+      'DELETE FROM workflows RETURNING id WHERE id = $1 AND workspace_id = $2',
       [req.params.id, req.workspaceId]
     );
 
@@ -617,7 +617,7 @@ router.post('/:id/duplicate', async (req, res) => {
     const wf = original.rows[0];
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       OUTPUT INSERTED.*
+       RETURNING *
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         req.workspaceId,
@@ -674,7 +674,7 @@ router.get('/:id/presence', async (req, res) => {
       `SELECT we.user_id, u.name, u.email, we.last_seen
        FROM workflow_editors we
        JOIN users u ON we.user_id = u.id
-       WHERE we.workflow_id = $1 AND we.last_seen > DATEADD(minute, -5, GETDATE())`,
+       WHERE we.workflow_id = $1 AND we.last_seen > NOW() - INTERVAL '5 minutes'`,
       [req.params.id]
     );
 

@@ -33,14 +33,14 @@ router.post('/register', async (req, res) => {
 
     const result = await transaction(async (client) => {
       const userResult = await client.query(
-        'INSERT INTO users (email, password_hash, name, email_verified) OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role VALUES ($1, $2, $3, $4)',
-        [email.toLowerCase(), passwordHash, name, 0]
+        'INSERT INTO users (email, password_hash, name, email_verified) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
+        [email.toLowerCase(), passwordHash, name, false]
       );
       const user = userResult.rows[0];
 
       const slug = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
       const workspaceResult = await client.query(
-        'INSERT INTO workspaces (name, slug, owner_id) OUTPUT INSERTED.id, INSERTED.name, INSERTED.slug VALUES ($1, $2, $3)',
+        'INSERT INTO workspaces (name, slug, owner_id) VALUES ($1, $2, $3) RETURNING id, name, slug',
         [`${name}'s Workspace`, slug, user.id]
       );
       const workspace = workspaceResult.rows[0];
@@ -117,7 +117,7 @@ router.get('/verify-email', async (req, res) => {
     }
 
     // Mark user as verified
-    await query('UPDATE users SET email_verified = 1, updated_at = GETDATE() WHERE id = $1', [record.user_id]);
+    await query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [record.user_id]);
 
     // Delete all verification tokens for this user
     await query('DELETE FROM email_verification_tokens WHERE user_id = $1', [record.user_id]);
@@ -211,7 +211,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     // Mark user verified and clean up tokens
-    await query('UPDATE users SET email_verified = 1, updated_at = GETDATE() WHERE id = $1', [user.id]);
+    await query('UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1', [user.id]);
     await query('DELETE FROM email_verification_tokens WHERE user_id = $1', [user.id]);
 
     const workspaces = await query(
@@ -263,7 +263,7 @@ router.post('/resend-verification', async (req, res) => {
 
     // Rate limit — don't send if a token was created less than 60s ago
     const recent = await query(
-      "SELECT id FROM email_verification_tokens WHERE user_id = $1 AND created_at > DATEADD(second, -60, GETDATE())",
+      "SELECT id FROM email_verification_tokens WHERE user_id = $1 AND created_at > NOW() - INTERVAL '60 seconds'",
       [user.id]
     );
     if (recent.rows.length > 0) {
