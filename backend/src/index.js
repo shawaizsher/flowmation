@@ -2,12 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const logger = require('./utils/logger');
 const { initDb } = require('./db');
 const { initRedis } = require('./db/redis');
 const { initWebSocket } = require('./services/websocket');
 const { initEmail } = require('./services/email');
+const { authenticate } = require('./middleware/auth');
 
 const authRoutes = require('./routes/auth');
 const workflowRoutes = require('./routes/workflows');
@@ -16,17 +19,79 @@ const versionRoutes = require('./routes/versions');
 const aiRoutes = require('./routes/ai');
 const nodeRoutes = require('./routes/nodes');
 
+// ── Startup secret validation — fail fast if defaults are used in production ──
+if (process.env.NODE_ENV === 'production') {
+  const BAD_SECRETS = ['change-me', 'secret', 'password', 'flowa-jwt', 'flowa-encryption'];
+  const jwtSecret = process.env.JWT_SECRET || '';
+  const encKey = process.env.ENCRYPTION_KEY || '';
+  if (!jwtSecret || BAD_SECRETS.some(s => jwtSecret.toLowerCase().includes(s))) {
+    logger.error('FATAL: JWT_SECRET must be set to a cryptographically random value in production');
+    process.exit(1);
+  }
+  if (!encKey || BAD_SECRETS.some(s => encKey.toLowerCase().includes(s))) {
+    logger.error('FATAL: ENCRYPTION_KEY must be set to a cryptographically random value in production');
+    process.exit(1);
+  }
+  if (jwtSecret.length < 32) {
+    logger.error('FATAL: JWT_SECRET must be at least 32 characters');
+    process.exit(1);
+  }
+}
+
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
-// ── Middleware ──
+// ── Security headers ──
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false, // Managed by frontend nginx
+}));
+
+// ── CORS ──
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+
+// ── Body parsing — reduced limit, no urlencoded (API is JSON-only) ──
+app.use(express.json({ limit: '1mb' }));
+
+// ── Rate limiters ──
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again in 15 minutes.' },
+});
+
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many OTP attempts, please try again in 15 minutes.' },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests.' },
+});
+
+// Apply auth rate limiting
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/resend-verification', authLimiter);
+app.use('/api/auth/verify-otp', otpLimiter);
+
+// Apply general API rate limiting
+app.use('/api/', apiLimiter);
 
 // ── Request logging ──
 app.use((req, res, next) => {
@@ -40,7 +105,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Health checks ──
+// ── Health checks — public liveness/readiness, protected metrics ──
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
 app.get('/health/ready', async (req, res) => {
   try {
@@ -51,7 +116,11 @@ app.get('/health/ready', async (req, res) => {
     res.status(503).json({ status: 'not ready', error: err.message });
   }
 });
-app.get('/health/metrics', async (req, res) => {
+// Metrics endpoint — admin only
+app.get('/health/metrics', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
   const { query } = require('./db');
   try {
     const [users, workflows, executions] = await Promise.all([
@@ -66,7 +135,7 @@ app.get('/health/metrics', async (req, res) => {
       uptime: process.uptime()
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Metrics unavailable' });
   }
 });
 
@@ -118,7 +187,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// ── Error handler ──
+// ── Error handler — never leak stack traces in production ──
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({
@@ -130,7 +199,6 @@ app.use((err, req, res, next) => {
 
 // ── Start server ──
 async function start() {
-  // Database is required — fail fast if unavailable
   try {
     await initDb();
   } catch (err) {
@@ -138,7 +206,6 @@ async function start() {
     process.exit(1);
   }
 
-  // Redis is optional — server functions without it (WebSocket pub/sub disabled)
   let redisOk = false;
   try {
     await initRedis();
@@ -148,14 +215,12 @@ async function start() {
     logger.warn('Start Redis to enable these features.');
   }
 
-  // Email is optional — log but continue
   try {
     await initEmail();
   } catch (err) {
     logger.warn('Email service unavailable:', err.message);
   }
 
-  // WebSocket init — only subscribe to Redis if it connected
   const wsManager = initWebSocket(server);
   if (redisOk) {
     try {

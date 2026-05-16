@@ -139,6 +139,41 @@ registry.register('httpRequest', {
     proxyUrl: { type: 'text', label: 'Proxy URL', description: 'e.g., http://proxy.example.com:8080' }
   },
   execute: async ({ config }) => {
+    // SSRF protection — block requests to internal/private IP ranges and metadata endpoints
+    const { URL: URLP } = require('url');
+    const dns = require('dns').promises;
+    try {
+      const parsed = new URLP(config.url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(`Protocol "${parsed.protocol}" is not allowed`);
+      }
+      const host = parsed.hostname;
+      const blockedPatterns = [
+        /^localhost$/i, /^127\./, /^0\.0\.0\.0$/, /^::1$/,
+        /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
+        /^169\.254\./, /^fc00:/i, /^fe80:/i,
+        /metadata\.google\.internal/i, /metadata\.azure\.com/i,
+      ];
+      if (blockedPatterns.some(p => p.test(host))) {
+        throw new Error('Requests to internal or private IP ranges are not allowed');
+      }
+      // Also resolve DNS and check the resolved IP
+      try {
+        const addresses = await dns.lookup(host, { all: true });
+        for (const { address } of addresses) {
+          if (blockedPatterns.some(p => p.test(address))) {
+            throw new Error('Requests to internal or private IP ranges are not allowed');
+          }
+        }
+      } catch (dnsErr) {
+        if (dnsErr.message.includes('not allowed')) throw dnsErr;
+        // DNS lookup failed — let axios handle the error naturally
+      }
+    } catch (err) {
+      if (err.message.includes('not allowed') || err.message.includes('Protocol')) throw err;
+      throw new Error(`Invalid URL: ${err.message}`);
+    }
+
     let headers = config.headers;
     if (typeof headers === 'string') {
       try { headers = JSON.parse(headers); } catch { headers = {}; }
@@ -195,8 +230,8 @@ registry.register('httpRequest', {
       axiosConfig.httpsAgent = new (require('https').Agent)({ proxy: config.proxyUrl });
     }
 
-    // Handle SSL verification
-    if (!config.verifySSL) {
+    // SSL verification — only allow disabling in non-production environments
+    if (!config.verifySSL && process.env.NODE_ENV !== 'production') {
       axiosConfig.httpsAgent = new (require('https').Agent)({ rejectUnauthorized: false });
     }
 
@@ -260,9 +295,12 @@ registry.register('codeBlock', {
       default: '// input contains data from previous nodes\n// return the transformed data\nreturn input;' }
   },
   execute: async ({ config, input }) => {
-    // Safe function execution (sandboxed)
-    const fn = new Function('input', config.code || 'return input;');
-    return fn(input);
+    const vm = require('vm');
+    const sandbox = Object.freeze({ input: JSON.parse(JSON.stringify(input || {})) });
+    const ctx = vm.createContext(sandbox);
+    const wrapped = `(function(input) { ${config.code || 'return input;'} })(input)`;
+    const result = vm.runInContext(wrapped, ctx, { timeout: 5000, displayErrors: true });
+    return result;
   }
 });
 
@@ -278,8 +316,12 @@ registry.register('code_javascript', {
       default: '// Access input via `data`\nreturn data;' }
   },
   execute: async ({ config, input }) => {
-    const fn = new Function('data', config.code || 'return data;');
-    const result = fn(input);
+    const vm = require('vm');
+    const data = JSON.parse(JSON.stringify(Object.values(input || {})[0] || input || {}));
+    const sandbox = Object.freeze({ data });
+    const ctx = vm.createContext(sandbox);
+    const wrapped = `(function(data) { ${config.code || 'return data;'} })(data)`;
+    const result = vm.runInContext(wrapped, ctx, { timeout: 5000, displayErrors: true });
     return { result };
   }
 });
@@ -331,10 +373,17 @@ registry.register('code_python', {
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
-      const output = execFileSync('python', [tmpFile, inputJson], {
-        timeout: 30000,
+      // Run Python with restricted flags: no user site packages, isolated mode
+      const output = execFileSync('python', ['-I', '-B', tmpFile, inputJson], {
+        timeout: 10000,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          // Minimal safe environment — no PATH tricks, no proxy vars
+          PATH: '/usr/bin:/bin',
+          PYTHONDONTWRITEBYTECODE: '1',
+          PYTHONIOENCODING: 'utf-8',
+        }
       });
       // Parse the last line as JSON (in case there's print() output before)
       const lines = output.trim().split(/\r?\n/);
@@ -1060,12 +1109,18 @@ registry.register('readDatabase', {
     connectionString: { type: 'text', label: 'Connection String' }
   },
   execute: async ({ config }) => {
-    // For security, only allow SELECT queries
-    const sql = config.query.trim();
-    if (!sql.toUpperCase().startsWith('SELECT')) {
+    const sql = (config.query || '').trim();
+    // Strict allowlist: only simple SELECT, no stacked queries or DDL
+    if (!/^SELECT\s/i.test(sql)) {
       throw new Error('Only SELECT queries are allowed');
     }
-    // Use internal DB for demo, or external connection in production
+    if (/;\s*\S/i.test(sql)) {
+      throw new Error('Stacked queries are not allowed');
+    }
+    const forbidden = /\b(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|EXEC|EXECUTE|TRUNCATE|GRANT|REVOKE)\b/i;
+    if (forbidden.test(sql)) {
+      throw new Error('Query contains forbidden SQL keywords');
+    }
     const { query: dbQuery } = require('../db');
     const result = await dbQuery(sql);
     return { rows: result.rows, count: result.rows.length };
@@ -1083,10 +1138,10 @@ registry.register('writeDatabase', {
     query: { type: 'textarea', label: 'SQL Query', required: true },
     connectionString: { type: 'text', label: 'Connection String' }
   },
-  execute: async ({ config }) => {
-    const { query: dbQuery } = require('../db');
-    const result = await dbQuery(config.query);
-    return { rowCount: result.rowCount, command: result.command };
+  execute: async () => {
+    // Direct SQL write execution is disabled for security.
+    // Use parameterized queries via the HTTP Request node to a dedicated API endpoint instead.
+    throw new Error('The Write Database node is disabled. Use the HTTP Request node to call a dedicated API endpoint instead.');
   }
 });
 

@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,
@@ -23,7 +23,7 @@ async function query(text, params = []) {
     }
     return { rows: result.rows, rowCount: result.rowCount };
   } catch (err) {
-    logger.error('Query error:', { query: text, params, error: err.message });
+    logger.error('Query error:', { query: text.substring(0, 100), paramCount: params.length, error: err.message });
     throw err;
   }
 }

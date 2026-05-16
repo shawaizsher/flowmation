@@ -284,12 +284,12 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         const logId = logResult.rows[0].id;
 
         // Build the input snapshot that will be persisted and surfaced in the INPUT tab.
-        // Starts with the raw (unresolved) config so something is always captured;
-        // gets upgraded to the fully-resolved config once variables are interpolated.
+        // Strip _credentials so API keys never appear in logs or the database.
+        const { _credentials: _c1, ...safeConfig } = nodeConfig;
         let nodeInputData = {
           nodeId: node.id,
           nodeType,
-          config: nodeConfig,
+          config: safeConfig,
           incomingData: input,
         };
 
@@ -317,11 +317,12 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
             resolvedConfig._credentialServiceId = credentials[credentialId].serviceId;
           }
 
-          // Upgrade the input snapshot to the fully-resolved config
+          // Upgrade the input snapshot to the fully-resolved config — strip credentials
+          const { _credentials: _c2, _credentialServiceId: _cs, ...safeResolved } = resolvedConfig;
           nodeInputData = {
             nodeId: node.id,
             nodeType,
-            config: resolvedConfig,
+            config: safeResolved,
             incomingData: input,
           };
 

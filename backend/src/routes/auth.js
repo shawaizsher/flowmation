@@ -18,8 +18,8 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     // Check if email already exists
@@ -28,8 +28,8 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const isDev = !process.env.SMTP_HOST; // true when running without real SMTP
+    const passwordHash = await bcrypt.hash(password, 12);
+    const isDev = process.env.NODE_ENV !== 'production';
 
     const result = await transaction(async (client) => {
       const userResult = await client.query(
@@ -66,11 +66,9 @@ router.post('/register', async (req, res) => {
       logger.error('Failed to send OTP email:', err);
     });
 
-    // In dev mode: print the OTP code to the terminal so it can be used without checking Ethereal
+    // Dev only: print OTP to terminal at debug level — never in production
     if (isDev) {
-      logger.info(`\n${'─'.repeat(50)}`);
-      logger.info(`🔑  OTP CODE for ${email}: ${result.verificationToken}`);
-      logger.info(`${'─'.repeat(50)}\n`);
+      logger.debug(`[DEV] OTP for ${email}: ${result.verificationToken}`);
     }
 
     logger.info(`User registered (OTP sent): ${result.user.email}`);
@@ -79,8 +77,6 @@ router.post('/register', async (req, res) => {
       message: 'Account created! Enter the 6-digit code we sent to your email.',
       user: { id: result.user.id, email: result.user.email, name: result.user.name },
       emailVerificationRequired: true,
-      // Expose code only in dev so frontend can show a hint (never in production)
-      devOtp: isDev ? result.verificationToken : undefined,
     });
   } catch (err) {
     logger.error('Registration error:', err);
@@ -141,7 +137,7 @@ router.get('/verify-email', async (req, res) => {
     const jwtToken = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     logger.info(`Email verified: ${user.email}`);
@@ -341,7 +337,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     logger.info(`User logged in: ${user.email}`);
