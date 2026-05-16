@@ -129,7 +129,8 @@ const NODE_INDEX = [
   { type: 'discord_send',    cat: 'MESSAGING', kw: 'discord send message channel bot notify', desc: 'Send a message to Discord' },
   { type: 'telegram_send',   cat: 'MESSAGING', kw: 'telegram send message bot notify', desc: 'Send a message via Telegram' },
   { type: 'email_send',      cat: 'MESSAGING', kw: 'email send smtp notify alert message mail', desc: 'Send an email via SMTP' },
-  { type: 'twilio_sms',      cat: 'MESSAGING', kw: 'twilio sms text message phone notify', desc: 'Send SMS via Twilio' },
+  { type: 'twilio_sms',       cat: 'MESSAGING', kw: 'twilio sms text message phone notify', desc: 'Send SMS via Twilio' },
+  { type: 'twilio_whatsapp',  cat: 'MESSAGING', kw: 'twilio whatsapp whatsapp message wa business api send whatsapp via twilio', desc: 'Send WhatsApp message via Twilio' },
 
   { type: 'postgres_query',  cat: 'DATABASES', kw: 'postgres postgresql sql database query select read', desc: 'Run a SQL query on PostgreSQL' },
   { type: 'postgres_insert', cat: 'DATABASES', kw: 'postgres postgresql sql insert write database store', desc: 'Insert rows into PostgreSQL' },
@@ -261,7 +262,8 @@ const ENTITY_PATTERNS = {
     discord:       ['discord'],
     telegram:      ['telegram'],
     email:         ['email', 'mail', 'smtp', 'gmail send', 'send email'],
-    sms:           ['sms', 'text message', 'twilio'],
+    whatsapp:      ['whatsapp', 'whats app', 'wa message', 'whatsapp message'],
+    sms:           ['sms', 'text message', 'twilio sms', 'twilio text'],
     database:      ['database', 'db', 'postgres', 'mysql', 'mongodb'],
     google_sheets: ['google sheets', 'spreadsheet'],
     file:          ['csv', 'file', 'pdf'],
@@ -312,6 +314,24 @@ function extractEntities(prompt) {
   e.sources      = [...new Set(e.sources)];
   e.actions      = [...new Set(e.actions)];
   e.destinations = [...new Set(e.destinations)];
+
+  // Co-occurrence overrides: resolve ambiguous service+channel combos
+  const hasTwilio    = lower.includes('twilio');
+  const hasWhatsApp  = lower.includes('whatsapp') || lower.includes('whats app');
+  const hasSendGrid  = lower.includes('sendgrid');
+  const hasMailgun   = lower.includes('mailgun');
+
+  if (hasTwilio && hasWhatsApp) {
+    // "twilio" alone would match sms; override to whatsapp when both are explicit
+    e.destinations = e.destinations.filter(d => d !== 'sms');
+    if (!e.destinations.includes('whatsapp')) e.destinations.push('whatsapp');
+  } else if (hasTwilio && !hasWhatsApp && !e.destinations.includes('sms')) {
+    e.destinations.push('sms');
+  }
+  if ((hasSendGrid || hasMailgun) && !e.destinations.includes('email')) {
+    e.destinations.push('email');
+  }
+
   return e;
 }
 
@@ -354,6 +374,7 @@ const NODE_SPECS = {
     discord:       { type: 'discord_send',       label: 'Send to Discord',   config: { channel: '', message: '{{data}}' } },
     telegram:      { type: 'telegram_send',      label: 'Send to Telegram',  config: { chatId: '', message: '{{data}}' } },
     email:         { type: 'email_send',         label: 'Send Email',        config: { to: '', subject: 'Notification', body: '{{data}}' } },
+    whatsapp:      { type: 'twilio_whatsapp',     label: 'Send WhatsApp (Twilio)', config: { to: 'whatsapp:+1234567890', from: 'whatsapp:+14155238886', message: '{{data}}' } },
     sms:           { type: 'twilio_sms',         label: 'Send SMS',          config: { to: '', message: '{{data}}' } },
     database:      { type: 'postgres_insert',    label: 'Insert to DB',      config: { table: '', data: '{{data}}' } },
     google_sheets: { type: 'google_sheets_write',label: 'Append to Sheet',   config: { spreadsheetId: '', values: '{{data}}' } },
