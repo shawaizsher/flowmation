@@ -76,6 +76,19 @@ export const workflowApi = {
   installTemplate: (workspaceId: string, templateId: string, data?: { name?: string }) =>
     api.post(`/workspaces/${workspaceId}/workflows/templates/${templateId}/install`, data),
 
+  rateTemplate: (workspaceId: string, templateId: string, rating: number) =>
+    api.post(`/workspaces/${workspaceId}/workflows/templates/${templateId}/rate`, { rating }),
+
+  publishTemplate: (
+    workspaceId: string,
+    data: {
+      workflowId: string;
+      category: string;
+      setupGuide: string[];
+      requiredCredentials: { label: string; required: boolean; reason: string; serviceId: string }[];
+    }
+  ) => api.post(`/workspaces/${workspaceId}/workflows/templates/publish`, data),
+
   list: (workspaceId: string, params?: Record<string, string>) =>
     api.get(`/workspaces/${workspaceId}/workflows`, { params }),
 
