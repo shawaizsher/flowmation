@@ -260,9 +260,54 @@ export default function DashboardPage() {
     setAiConfidence(null);
   };
 
+  // Automation-related vocabulary — any prompt containing at least one of these
+  // words is allowed through; short prompts with zero matches are rejected immediately.
+  const AUTOMATION_WORDS = new Set([
+    'fetch','send','get','post','webhook','trigger','schedule','cron',
+    'email','slack','discord','telegram','whatsapp','sms','database','db',
+    'api','http','https','notify','alert','store','save','insert','filter',
+    'transform','parse','classify','summarize','github','twilio','stripe',
+    'daily','weekly','hourly','every','when','report','data','workflow',
+    'automate','automation','request','response','message','notification',
+    'event','run','execute','query','read','write','create','update','delete',
+    'upload','download','push','pull','connect','monitor','check','watch',
+    'receive','process','make','build','integrate','log','google','postgres',
+    'mysql','mongodb','redis','aws','s3','jira','notion','airtable','hubspot',
+    'salesforce','openai','anthropic','price','stock','payment','invoice',
+    'form','file','csv','pdf','add','import','export','new','if','action',
+    'source','destination','pipeline','node','step','flow','send',
+  ]);
+
+  const clientValidatePrompt = (text: string): string | null => {
+    if (text.length < 5) return 'Please describe a workflow to generate.';
+    const tokens = text.toLowerCase().split(/\W+/).filter(t => t.length > 1);
+    if (tokens.length === 0) return 'Please describe a workflow to generate.';
+    // If the prompt is short AND contains zero known automation words → gibberish
+    const hasKnownWord = tokens.some(t => AUTOMATION_WORDS.has(t));
+    if (!hasKnownWord && text.length < 30) {
+      return "That doesn't look like a workflow description. Try: \"Send a Slack alert when a new GitHub PR is opened.\"";
+    }
+    return null;
+  };
+
   const handleAiGenerate = async (promptOverride?: string) => {
     const prompt = (promptOverride ?? aiPrompt).trim();
     if (!workspaceId || !prompt) return;
+
+    // Client-side gate — catches obvious gibberish without a round-trip to the server
+    const clientError = clientValidatePrompt(prompt);
+    if (clientError) {
+      setAiError({
+        message: clientError,
+        suggestions: [
+          'Fetch gold prices via HTTP and send a WhatsApp message via Twilio',
+          'Send a Slack alert when a new GitHub PR is opened',
+          'Daily report from Postgres emailed at 9am',
+          'When a webhook fires, transform the data and insert it into a database',
+        ],
+      });
+      return;
+    }
 
     resetAiModal();
 
