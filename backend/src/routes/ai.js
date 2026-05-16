@@ -26,7 +26,7 @@ router.post('/generate-workflow', async (req, res) => {
     }
 
     // Truly invalid input (gibberish, greetings, etc.) → 400
-    if (result.type === 'invalid_input') {
+    if (result.type === 'invalid_input' || result.type === 'invalid_prompt') {
       return res.status(400).json(result);
     }
 

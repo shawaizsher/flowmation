@@ -8,6 +8,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Store,
 } from 'lucide-react';
 import FlowaLogo from './FlowaLogo';
 import { useEffect, useState } from 'react';
@@ -17,11 +18,17 @@ import { UserAvatar } from './UserAvatar';
 import { authApi } from '../utils/api';
 
 const navItems = [
+<<<<<<< HEAD
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/team', icon: UserPlus, label: 'Team' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/inbox', icon: MessagesSquare, label: 'Inbox' },
   { to: '/settings', icon: Settings, label: 'Settings' },
+=======
+  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/marketplace', icon: Store,           label: 'Marketplace' },
+  { to: '/settings',    icon: Settings,        label: 'Settings' },
+>>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 ];
 
 export default function AppShell() {
