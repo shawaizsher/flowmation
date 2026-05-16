@@ -22,6 +22,8 @@ import {
   Users,
   Store,
   Download,
+  Upload,
+  ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, aiApi } from '../utils/api';
@@ -74,6 +76,45 @@ export default function DashboardPage() {
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [selectedCollaboratorIds, setSelectedCollaboratorIds] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Publish to Marketplace modal
+  const [showPublishModal, setShowPublishModal]     = useState(false);
+  const [publishingWfId, setPublishingWfId]         = useState<string | null>(null);
+  const [publishCategory, setPublishCategory]       = useState('General');
+  const [publishSetupGuide, setPublishSetupGuide]   = useState('');
+  const [publishing, setPublishing]                 = useState(false);
+
+  const PUBLISH_CATEGORIES = ['General','Sales','Marketing','Data','Finance','Productivity','AI','DevOps','Operations','Governance','Social'];
+
+  const openPublishModal = (wfId: string) => {
+    setPublishingWfId(wfId);
+    setPublishCategory('General');
+    setPublishSetupGuide('');
+    setShowPublishModal(true);
+  };
+
+  const handlePublish = async () => {
+    if (!workspaceId || !publishingWfId) return;
+    try {
+      setPublishing(true);
+      const setupGuide = publishSetupGuide
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await workflowApi.publishTemplate(workspaceId, {
+        workflowId: publishingWfId,
+        category: publishCategory,
+        setupGuide,
+        requiredCredentials: [],
+      });
+      toast.success('Workflow published to Marketplace!');
+      setShowPublishModal(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to publish');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   // AI Generate modal
   const [showAiModal, setShowAiModal] = useState(false);
@@ -642,6 +683,12 @@ export default function DashboardPage() {
                 >
                   <Trash2 size={14} /> Delete
                 </button>
+                <button
+                  onClick={() => openPublishModal(selectedWorkflow.id)}
+                  className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-sm font-medium hover:bg-brand-500/20 border border-brand-500/20 transition"
+                >
+                  <Upload size={14} /> Publish to Marketplace
+                </button>
               </div>
             </div>
           ) : (
@@ -1033,6 +1080,90 @@ export default function DashboardPage() {
                 </>
               )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════ Publish to Marketplace Modal ═══════════ */}
+      {showPublishModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card mx-4 w-full max-w-lg p-6 animate-scale-in">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                <Upload size={18} className="text-brand-400" />
+                Publish to Marketplace
+              </h2>
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="text-foreground-muted hover:text-foreground transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-foreground-muted mb-5">
+              Publishing makes this workflow available as a template in the Marketplace so anyone in your workspace can install it.
+            </p>
+
+            <div className="space-y-4">
+              {/* Category */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Category
+                </label>
+                <div className="relative">
+                  <select
+                    value={publishCategory}
+                    onChange={(e) => setPublishCategory(e.target.value)}
+                    className="input-field w-full appearance-none pr-8"
+                  >
+                    {PUBLISH_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+                </div>
+              </div>
+
+              {/* Setup guide */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Setup Guide <span className="text-foreground-muted font-normal">(one step per line, optional)</span>
+                </label>
+                <textarea
+                  value={publishSetupGuide}
+                  onChange={(e) => setPublishSetupGuide(e.target.value)}
+                  placeholder={"Configure your webhook URL in the trigger node.\nAdd your API credentials in Settings.\nTest with a sample payload."}
+                  className="input-field min-h-28 resize-none w-full"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishing}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50"
+              >
+                {publishing ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Publishing…
+                  </>
+                ) : (
+                  <>
+                    <Store size={15} />
+                    Publish Template
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
