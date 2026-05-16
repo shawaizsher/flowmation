@@ -373,18 +373,20 @@ registry.register('code_python', {
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
-      // Try 'python' first, fall back to 'python3'
+      // Try 'python' first, fall back to 'python3', then 'py' (Windows)
       const pythonBin = (() => {
-        try { require('child_process').execFileSync('python', ['--version'], { timeout: 3000 }); return 'python'; }
-        catch { return 'python3'; }
+        for (const bin of ['python', 'python3', 'py']) {
+          try { require('child_process').execFileSync(bin, ['--version'], { timeout: 3000, env: process.env }); return bin; }
+          catch { continue; }
+        }
+        throw new Error('Python is not installed or not in PATH');
       })();
       const output = execFileSync(pythonBin, ['-I', '-B', tmpFile, inputJson], {
         timeout: 10000,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
-          // Minimal safe environment — no PATH tricks, no proxy vars
-          PATH: '/usr/bin:/bin',
+          ...process.env,  // Inherit full environment including PATH
           PYTHONDONTWRITEBYTECODE: '1',
           PYTHONIOENCODING: 'utf-8',
         }
