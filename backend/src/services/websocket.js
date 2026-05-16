@@ -24,11 +24,18 @@ class WebSocketManager {
       path: '/ws',
       verifyClient: async (info, done) => {
         try {
+          // Origin check — block cross-site WebSocket hijacking
+          const origin = info.origin || info.req.headers.origin;
+          const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+          if (origin && process.env.NODE_ENV === 'production' && origin !== allowedOrigin) {
+            return done(false, 403, 'Origin not allowed');
+          }
+
           const url = new URL(info.req.url, 'http://localhost');
           const token = url.searchParams.get('token');
           if (!token) return done(false, 401, 'Token required');
 
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
           info.req.userId = decoded.userId;
           done(true);
         } catch (err) {
@@ -107,10 +114,25 @@ class WebSocketManager {
     }
   }
 
-  handleSubscribe(socketId, client, message) {
+  async handleSubscribe(socketId, client, message) {
     const { workspaceId } = message;
     if (!workspaceId) {
       this.send(client.ws, { type: 'error', code: 'workspace_required', message: 'Workspace ID is required to subscribe.' });
+      return;
+    }
+
+    // Verify the user is actually a member of this workspace
+    try {
+      const result = await query(
+        'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+        [workspaceId, client.userId]
+      );
+      if (result.rows.length === 0) {
+        this.send(client.ws, { type: 'error', code: 'unauthorized', message: 'Not a member of this workspace.' });
+        return;
+      }
+    } catch (e) {
+      this.send(client.ws, { type: 'error', code: 'server_error', message: 'Could not verify workspace membership.' });
       return;
     }
 
@@ -203,12 +225,10 @@ class WebSocketManager {
     // Update DB
     try {
       await query(
-        `MERGE INTO workflow_editors AS target
-         USING (SELECT $1 AS workflow_id, $2 AS user_id, $3 AS socket_id) AS source
-         ON target.workflow_id = source.workflow_id AND target.user_id = source.user_id
-         WHEN MATCHED THEN UPDATE SET socket_id = source.socket_id, last_seen = GETDATE()
-         WHEN NOT MATCHED THEN INSERT (workflow_id, user_id, socket_id, last_seen) 
-         VALUES (source.workflow_id, source.user_id, source.socket_id, GETDATE());`,
+        `INSERT INTO workflow_editors (workflow_id, user_id, socket_id, last_seen)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (workflow_id, user_id)
+         DO UPDATE SET socket_id = EXCLUDED.socket_id, last_seen = NOW()`,
         [workflowId, client.userId, socketId]
       );
     } catch (e) { /* non-critical */ }
@@ -299,12 +319,13 @@ class WebSocketManager {
           `UPDATE workflows
            SET graph = COALESCE($1, graph),
                name = COALESCE($2, name),
-               updated_at = GETDATE()
-           WHERE id = $3`,
+               updated_at = NOW()
+           WHERE id = $3 AND workspace_id = $4`,
           [
             normalizedChange.graph ? JSON.stringify(normalizedChange.graph) : null,
             typeof normalizedChange.workflowName === 'string' ? normalizedChange.workflowName : null,
-            workflowId
+            workflowId,
+            client.workspaceId
           ]
         );
       } catch (err) {

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Build, automate, and orchestrate complex workflows visually — powered by AI.
+  Build and automate, and orchestrate complex workflows visually — powered by AI.
 </p>
 
 <p align="center">

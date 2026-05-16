@@ -7,6 +7,8 @@ import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
 import AppShell from './components/AppShell';
+import ErrorBoundary from './components/ErrorBoundary';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { useTheme, useAccentTheme } from './hooks/useTheme';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -26,12 +28,13 @@ export default function App() {
   useAccentTheme();
 
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<GuestRoute><LandingPage /></GuestRoute>} />
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-      {/* App shell with sidebar for authenticated pages */}
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/settings" element={<SettingsPage />} />
@@ -40,5 +43,6 @@ export default function App() {
       <Route path="/workflows/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }

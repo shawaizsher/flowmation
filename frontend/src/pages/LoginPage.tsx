@@ -105,6 +105,15 @@ export default function LoginPage() {
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
+
+            <div className="text-center">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-foreground-muted hover:text-brand-500 transition-colors"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </form>
 
           <p className="text-sm text-foreground-muted text-center mt-6">
@@ -114,10 +123,6 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-
-        <p className="text-xs text-foreground-muted text-center mt-4">
-          Default: admin@flowa.dev / admin123
-        </p>
       </div>
     </div>
   );
