@@ -373,8 +373,12 @@ registry.register('code_python', {
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
-      // Run Python with restricted flags: no user site packages, isolated mode
-      const output = execFileSync('python', ['-I', '-B', tmpFile, inputJson], {
+      // Try 'python' first, fall back to 'python3'
+      const pythonBin = (() => {
+        try { require('child_process').execFileSync('python', ['--version'], { timeout: 3000 }); return 'python'; }
+        catch { return 'python3'; }
+      })();
+      const output = execFileSync(pythonBin, ['-I', '-B', tmpFile, inputJson], {
         timeout: 10000,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
