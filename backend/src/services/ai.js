@@ -1354,6 +1354,103 @@ function buildWorkflowExplanation(nodes, edges) {
   return lines.join('\n');
 }
 
+/* ┌──────────────────────────────────────────────────────────────────────┐
+ * │ 11. CONVERSATION CONTEXT & PENDING ACTION SYSTEM                      │
+ * └──────────────────────────────────────────────────────────────────────┘ */
+
+function buildConversationContext(history, nodes) {
+  const ctx = {
+    lastBotMsg: '',
+    lastUserMsg: '',
+    lastAction: null,
+    lastAddedNodeType: null,
+    lastSuggestedNodes: [],
+    pendingQuestion: false,
+    nodeLabels: nodes.map(n => (n.data?.label || n.data?.type || '').toLowerCase()),
+  };
+  if (!history || !history.length) return ctx;
+
+  const botMsgs  = history.filter(h => h.role === 'assistant');
+  const userMsgs = history.filter(h => h.role === 'user');
+  ctx.lastBotMsg  = botMsgs[botMsgs.length - 1]?.content  || '';
+  ctx.lastUserMsg = userMsgs[userMsgs.length - 1]?.content || '';
+
+  const lb = ctx.lastBotMsg.toLowerCase();
+  if (lb.includes('built') && lb.includes('workflow'))      ctx.lastAction = 'generated';
+  else if (lb.includes('added a') || lb.includes('added an')) ctx.lastAction = 'added_node';
+  else if (lb.includes('removed'))                           ctx.lastAction = 'removed_node';
+  else if (lb.includes('connected'))                         ctx.lastAction = 'connected';
+  else if (lb.includes('cleared'))                           ctx.lastAction = 'cleared';
+  else if (lb.includes('suggest') || lb.includes('improve')) ctx.lastAction = 'suggested';
+  else if (lb.includes('schedule') || lb.includes('daily') || lb.includes('weekly')) ctx.lastAction = 'scheduled';
+
+  ctx.pendingQuestion = ctx.lastBotMsg.includes('?');
+
+  // Extract nodes Freckles last suggested ("1. **Error Handler**")
+  for (const m of ctx.lastBotMsg.matchAll(/\d+\.\s+\*\*([^*]+)\*\*/g)) {
+    const desc = m[1].trim();
+    const found = NODE_INDEX.find(n =>
+      desc.toLowerCase().includes(n.desc.toLowerCase().split(' ').slice(0,2).join(' ')) ||
+      n.desc.toLowerCase().includes(desc.toLowerCase())
+    );
+    if (found) ctx.lastSuggestedNodes.push(found);
+  }
+
+  return ctx;
+}
+
+// Runs a pending action that was stored by a previous turn
+function executePendingAction(pendingAction, nodes, edges) {
+  if (!pendingAction || !pendingAction.type) return null;
+  switch (pendingAction.type) {
+    case 'add_node': {
+      const spec = NODE_INDEX.find(n => n.type === pendingAction.nodeType);
+      if (!spec) return null;
+      const id = `${spec.type}-${Date.now()}`;
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      let wf = applyWorkflowTool({ nodes, edges }, 'add_node', {
+        id, nodeType: spec.type, label: spec.desc, position: { x: lastX + 280, y: 220 }, config: {},
+      });
+      if (nodes.length > 0) {
+        wf = applyWorkflowTool(wf, 'add_edge', { source: nodes[nodes.length - 1].id, target: id });
+      }
+      return { wf, label: spec.desc };
+    }
+    case 'add_nodes': {
+      let wf = { nodes: [...nodes], edges: [...edges] };
+      const added = [];
+      for (const nodeType of (pendingAction.nodeTypes || [])) {
+        const spec = NODE_INDEX.find(n => n.type === nodeType);
+        if (!spec) continue;
+        const id = `${spec.type}-${Date.now()}-${added.length}`;
+        const lastX = wf.nodes.length ? Math.max(...wf.nodes.map(n => n.position?.x || 0)) : 100;
+        const prevId = wf.nodes.length ? wf.nodes[wf.nodes.length - 1].id : null;
+        wf = applyWorkflowTool(wf, 'add_node', { id, nodeType: spec.type, label: spec.desc, position: { x: lastX + 280, y: 220 }, config: {} });
+        if (prevId) wf = applyWorkflowTool(wf, 'add_edge', { source: prevId, target: id });
+        added.push(spec.desc);
+      }
+      return added.length ? { wf, label: added.join(' + ') } : null;
+    }
+    default: return null;
+  }
+}
+
+// Resolve schedule shorthand to cron expression
+function resolveSchedule(text) {
+  const t = text.toLowerCase();
+  if (/every\s*minute|each\s*minute/.test(t))   return { cron: '* * * * *',    label: 'every minute' };
+  if (/every\s*5\s*min/.test(t))                return { cron: '*/5 * * * *',  label: 'every 5 minutes' };
+  if (/every\s*15\s*min/.test(t))               return { cron: '*/15 * * * *', label: 'every 15 minutes' };
+  if (/hour/.test(t))                           return { cron: '0 * * * *',    label: 'every hour' };
+  if (/noon|12\s*pm|midday/.test(t))            return { cron: '0 12 * * *',   label: 'daily at noon' };
+  if (/evening|6\s*pm/.test(t))                 return { cron: '0 18 * * *',   label: 'daily at 6pm' };
+  if (/night|midnight/.test(t))                 return { cron: '0 0 * * *',    label: 'every midnight' };
+  if (/daily|every\s*day|each\s*day|morning/.test(t)) return { cron: '0 9 * * *', label: 'daily at 9am' };
+  if (/week|monday/.test(t))                    return { cron: '0 9 * * 1',    label: 'every Monday 9am' };
+  if (/month/.test(t))                          return { cron: '0 9 1 * *',    label: 'first of the month' };
+  return null;
+}
+
 const HELP_TEXT =
   "Here's what I can do:\n\n" +
   "**Build** — describe any automation in plain English\n" +
@@ -1378,59 +1475,83 @@ const OFFTOPIC_REPLIES = [
   "That's a bit outside my area. I specialise in workflow automation. Want me to build something, or need help?",
 ];
 
-async function workflowChat({ message, history = [], workflow = {} }) {
+async function workflowChat({ message, history = [], workflow = {}, pendingAction = null }) {
   try {
     const msg = (message || '').trim();
     if (!msg) return { reply: 'Tell me what to build.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: [], metadata: {} };
 
     let { intent, confidence } = classifyIntent(msg);
 
-    // Pattern overrides — catch natural phrasings TF-IDF misses after stop-word removal
+    // ── Pattern overrides: comprehensive natural language recognition ────────
     const lower = msg.toLowerCase();
+    const ctx   = buildConversationContext(history, nodes);
 
     // Greetings
-    if (/^(hi|hey|hello|sup|yo|howdy|hiya|greetings)\b/.test(lower))                                                       intent = 'greeting';
-    if (/^(good\s)?(morning|afternoon|evening|day)\b/.test(lower))                                                          intent = 'greeting';
+    if (/^(hi|hey|hello|sup|yo|howdy|hiya|greetings|good\s?(morning|afternoon|evening|day))\b/.test(lower)) intent = 'greeting';
+
+    // Confirmations — "yes", "do it", "add both", "go ahead", etc.
+    const IS_CONFIRM = /^(yes|yep|yeah|sure|ok|okay|do it|go ahead|apply( it)?|add (it|them|both|all)|please( do)?|proceed|confirm|sounds good|perfect|great|absolutely|definitely|let'?s? do it|make it so|that'?s? (fine|good|great)|👍)\s*[!.]?\s*$/.test(lower);
+    const IS_REJECT  = /^(no|nope|nah|cancel|stop|don'?t|never mind|nevermind|forget it|skip|discard|not now|ignore that|revert|undo)\s*[!.]?\s*$/.test(lower);
+
+    if (IS_CONFIRM) intent = 'confirm';
+    if (IS_REJECT)  intent = 'reject';
+
+    // Schedule modification: "make it weekly", "run daily", "change to hourly"
+    if (/\b(make|set|change|switch|update|run|schedule)\b.*(it|this|the trigger|the workflow|the schedule)?.*(weekly|daily|hourly|monthly|every (day|week|hour|morning|night|minute|5 min|15 min))/.test(lower)) intent = 'modify_schedule';
+    if (/\b(every|each|run at|run on|schedule for) (day|week|month|hour|morning|night|minute|monday|tuesday|wednesday|thursday|friday|noon|midnight)\b/.test(lower)) intent = 'modify_schedule';
+
+    // Conditional logic: "only if", "when amount > 100", "if it fails"
+    if (/^only if\b/.test(lower) || /\badd (a )?(condition|conditional|if node|logic|filter|gate|check)\b/.test(lower)) intent = 'add_condition';
+    if (/\bif (it )?fails?\b/.test(lower) || /\bwhen (it )?fails?\b/.test(lower)) intent = 'add_error_handler';
+    if (/\bretry (if|on|when) (fail|error|failed)\b/.test(lower)) intent = 'add_error_handler';
+
+    // Delay / wait
+    if (/\badd (a )?(delay|pause|wait|sleep)\b/.test(lower) || /\bwait (for |a )?(few )?(second|minute|hour)\b/.test(lower)) intent = 'add_delay';
+
+    // Add after: "add X after this/that/the Y node"
+    if (/\badd\b.+\b(after|before|between|following)\b/.test(lower)) intent = 'add_after';
+
+    // Replace / swap: "replace X with Y", "use Y instead"
+    if (/\b(replace|swap|switch|change)\b.+(with|for|to)\b/.test(lower) || /\buse\b.+\binstead( of)?\b/.test(lower)) intent = 'replace_node';
 
     // Explain / describe
-    if (/what does (this|it|the workflow|this workflow) (do|mean|actually do)/.test(lower))                                 intent = 'explain';
-    if (/what is (this|the workflow|it)\b/.test(lower))                                                                      intent = 'explain';
-    if (/^(explain|describe|tell me (about|what)|walk me through|summari[sz]e)\b/.test(lower))                              intent = 'explain';
-    if (/(summarize|summarise) (this|the|my)? ?(workflow|automation|it)/.test(lower))                                       intent = 'explain';
+    if (/what does (this|it|the workflow|this workflow) (do|mean|actually do)/.test(lower)) intent = 'explain';
+    if (/what is (this|the workflow|it)\b/.test(lower))                                      intent = 'explain';
+    if (/^(explain|describe|tell me (about|what)|walk me through|summari[sz]e)\b/.test(lower)) intent = 'explain';
+    if (/(summarize|summarise) (this|the|my)? ?(workflow|automation|it)/.test(lower))        intent = 'explain';
+    if (/\bwhat('?s| is) (happening|going on|the flow|the purpose)\b/.test(lower))          intent = 'explain';
 
     // Suggestions / improvements
     if (/\b(any|give( me)?|show( me)?|share|got) (any )?(suggestions?|ideas?|recommendations?|tips?|advice)\b/.test(lower)) intent = 'suggest';
-    if (/^(suggestions?|ideas?|tips?|advice|recommendations?)\??\s*$/.test(lower.trim()))                                   intent = 'suggest';
-    if (/what (should i|can i|could i) (add|improve|do next|change|fix)/.test(lower))                                      intent = 'suggest';
-    if (/what('s| is) (missing|next|wrong|broken|needed|lacking)/.test(lower))                                              intent = 'suggest';
-    if (/how (can i|do i|should i) (improve|optimise|optimize|fix|enhance|better)/.test(lower))                             intent = 'suggest';
-    if (/\b(improve|optimise|optimize|enhance) (this |the |my )?(workflow|automation|it|this)?\b/.test(lower))              intent = 'suggest';
-    if (/\bwhat (to|should) (add|change|do|fix|improve)\b/.test(lower))                                                     intent = 'suggest';
+    if (/^(suggestions?|ideas?|tips?|advice|recommendations?)\??\s*$/.test(lower.trim()))    intent = 'suggest';
+    if (/what (should i|can i|could i) (add|improve|do next|change|fix)/.test(lower))       intent = 'suggest';
+    if (/what('s| is) (missing|next|wrong|broken|needed|lacking)/.test(lower))               intent = 'suggest';
+    if (/how (can i|do i|should i) (improve|optimise|optimize|fix|enhance|better)/.test(lower)) intent = 'suggest';
+    if (/\b(improve|optimise|optimize|enhance) (this |the |my )?(workflow|automation|it|this)?\b/.test(lower)) intent = 'suggest';
 
     // Health / quality check
-    if (/\b(check|analyse|analyze|review|audit|assess|inspect|validate|score)\b.*(workflow|health|quality|status|it|this)/.test(lower)) intent = 'health';
-    if (/\b(workflow|health|quality|status) (score|grade|check|analysis|review)\b/.test(lower))                             intent = 'health';
-    if (/\bhow (good|healthy|ready|solid|valid) is (this|it|the workflow)\b/.test(lower))                                   intent = 'health';
-    if (/\b(is this|is it|is my workflow) (ready|valid|good|correct|complete)\b/.test(lower))                               intent = 'health';
+    if (/\b(check|analyse|analyze|review|audit|assess|validate|score)\b.*(workflow|health|quality|status|it|this)/.test(lower)) intent = 'health';
+    if (/\bhow (good|healthy|ready|solid|valid) is (this|it|the workflow)\b/.test(lower))   intent = 'health';
+    if (/\b(is this|is it|is my workflow) (ready|valid|good|correct|complete)\b/.test(lower)) intent = 'health';
 
     // Simulate / test
-    if (/\b(simulate|test|preview|dry.?run|trace|run through|walk through|trial)\b.*(workflow|this|it|execution)?/.test(lower)) intent = 'simulate';
-    if (/\bwhat (would|will) happen (if|when|after)\b/.test(lower))                                                         intent = 'simulate';
-    if (/\bhow (would|will) (this|it) (run|execute|work)\b/.test(lower))                                                    intent = 'simulate';
+    if (/\b(simulate|test|preview|dry.?run|trace|run through|walk through)\b/.test(lower))  intent = 'simulate';
+    if (/\bwhat (would|will) happen\b/.test(lower))                                          intent = 'simulate';
+    if (/\bhow (would|will) (this|it) (run|execute|work)\b/.test(lower))                    intent = 'simulate';
 
     // Debug / fix
-    if (/\b(debug|troubleshoot|diagnose|investigate|find (the )?issue|why (is it|isn't it|doesn't it|won't it))\b/.test(lower)) intent = 'debug';
-    if (/\b(fix|repair|resolve) (the |this |my )?(error|issue|problem|bug|failure)\b/.test(lower))                          intent = 'debug';
-    if (/\bwhy (isn'?t|doesn'?t|won'?t) (this|it) (work|run|fire|connect|execute)\b/.test(lower))                          intent = 'debug';
+    if (/\b(debug|troubleshoot|diagnose|find (the )?issue)\b/.test(lower))                  intent = 'debug';
+    if (/\b(fix|repair|resolve) (the |this |my )?(error|issue|problem|bug|failure)\b/.test(lower)) intent = 'debug';
+    if (/\bwhy (isn'?t|doesn'?t|won'?t) (this|it) (work|run|fire|connect|execute)\b/.test(lower)) intent = 'debug';
 
     // Clear / reset
-    if (/^(clear|reset|wipe|start (over|fresh|again)|start from scratch|empty (the )?canvas)\b/.test(lower))                intent = 'clear';
-    if (/\b(clear|wipe|reset|delete all|remove all) (the |all )?(nodes?|everything|canvas|workflow|steps?)\b/.test(lower))  intent = 'clear';
+    if (/^(clear|reset|wipe|start (over|fresh|again)|start from scratch)\b/.test(lower))   intent = 'clear';
+    if (/\b(clear|wipe|reset|delete all|remove all) (the |all )?(nodes?|everything|canvas|workflow|steps?)\b/.test(lower)) intent = 'clear';
 
     // Help
-    if (/^(help|commands?)\b/.test(lower))                                                                                   intent = 'help';
-    if (/\bwhat (can|do) you (do|help (with|me))\b/.test(lower))                                                            intent = 'help';
-    if (/\bshow (me )?(help|commands?|what you can|what you do)\b/.test(lower))                                              intent = 'help';
+    if (/^(help|commands?)\b/.test(lower))                                                   intent = 'help';
+    if (/\bwhat (can|do) you (do|help (with|me))\b/.test(lower))                            intent = 'help';
+    if (/\bshow (me )?(help|commands?|what you can)\b/.test(lower))                         intent = 'help';
     const entities = extractEntities(msg);
     const nodes = workflow.nodes || [];
     const edges = workflow.edges || [];
@@ -1445,11 +1566,205 @@ async function workflowChat({ message, history = [], workflow = {} }) {
       };
     }
 
+    /* ── CONFIRM ──────────────────────────────────────────────── */
+    if (intent === 'confirm') {
+      // Execute a pending action if one was passed from the frontend
+      if (pendingAction) {
+        const result = executePendingAction(pendingAction, nodes, edges);
+        if (result) {
+          return {
+            reply: `Done! I've added **${result.label}** to the canvas.`,
+            toolCalls: [{ name: 'add_node' }], updatedWorkflow: result.wf, messageType: 'workflow_edited',
+            suggestions: ['Check workflow health', 'Any more improvements?', 'Simulate the workflow'],
+            metadata: { changes: [`+ ${result.label}`] },
+          };
+        }
+      }
+      // No pending action — respond gracefully
+      return {
+        reply: ctx.lastAction
+          ? `Sure! What would you like me to do?`
+          : `Got it! What would you like me to build or change?`,
+        toolCalls: [], updatedWorkflow: null, messageType: 'message',
+        suggestions: ['Add a node', 'Check workflow health', 'Any suggestions?'],
+        metadata: {},
+      };
+    }
+
+    /* ── REJECT ───────────────────────────────────────────────── */
+    if (intent === 'reject') {
+      return {
+        reply: `No problem, I'll leave it as is. Let me know if you'd like to change anything else.`,
+        toolCalls: [], updatedWorkflow: null, messageType: 'message',
+        suggestions: ['Any suggestions?', 'Check workflow health', 'Explain this workflow'],
+        metadata: {},
+      };
+    }
+
+    /* ── MODIFY SCHEDULE ──────────────────────────────────────── */
+    if (intent === 'modify_schedule') {
+      const schedule = resolveSchedule(msg);
+      const triggerNode = nodes.find(n => (n.data?.type || '').includes('trigger_cron') || (n.data?.type || '').includes('trigger_manual'));
+      if (!schedule) {
+        return {
+          reply: "What schedule would you like? For example: daily, weekly, every hour, every morning, or every Monday.",
+          toolCalls: [], updatedWorkflow: null, messageType: 'clarification',
+          suggestions: ['Daily at 9am', 'Every hour', 'Every Monday', 'Every 15 minutes'],
+          metadata: {},
+        };
+      }
+      if (!nodes.length) {
+        return {
+          reply: `There's no workflow on the canvas yet. Want me to build a scheduled workflow that runs ${schedule.label}?`,
+          toolCalls: [], updatedWorkflow: null, messageType: 'message',
+          suggestions: [`Build a workflow that runs ${schedule.label}`, 'What can you build?'],
+          metadata: {},
+        };
+      }
+      // Update or replace the trigger node
+      const updatedNodes = nodes.map(n => {
+        if ((n.data?.type || '').includes('trigger')) {
+          return { ...n, data: { ...n.data, type: 'trigger_cron', label: `Schedule (${schedule.label})`, config: { expression: schedule.cron } } };
+        }
+        return n;
+      });
+      // If no trigger existed, add one at the front
+      let finalNodes = updatedNodes;
+      if (!nodes.some(n => (n.data?.type || '').includes('trigger'))) {
+        const id = `trigger_cron-${Date.now()}`;
+        finalNodes = [makeNode(id, 100, 220, `Schedule (${schedule.label})`, 'trigger_cron', { expression: schedule.cron }), ...nodes];
+      }
+      return {
+        reply: `Updated! The workflow is now scheduled to run **${schedule.label}** (cron: \`${schedule.cron}\`).`,
+        toolCalls: [{ name: 'set_workflow' }],
+        updatedWorkflow: { nodes: finalNodes, edges },
+        messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Simulate the workflow', 'Any other changes?'],
+        metadata: { changes: [`Schedule → ${schedule.label}`] },
+      };
+    }
+
+    /* ── ADD CONDITION ────────────────────────────────────────── */
+    if (intent === 'add_condition') {
+      const conditionText = msg.replace(/^only if\s*/i, '').replace(/^add (a )?(condition|conditional|if node|logic|filter)\s*/i, '').trim() || '{{data.value}} > 0';
+      const id = `logic_if-${Date.now()}`;
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      let wf = applyWorkflowTool({ nodes, edges }, 'add_node', {
+        id, nodeType: 'logic_if', label: 'Condition', position: { x: lastX + 280, y: 220 },
+        config: { condition: conditionText },
+      });
+      if (nodes.length > 0) wf = applyWorkflowTool(wf, 'add_edge', { source: nodes[nodes.length - 1].id, target: id });
+      return {
+        reply: `Added a **Condition** node. Open it to set your exact condition — for example: \`${conditionText}\`. The workflow will only continue if the condition is true.`,
+        toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Add error handling', 'Simulate the workflow'],
+        metadata: { changes: ['+ Condition (If)'] },
+      };
+    }
+
+    /* ── ADD ERROR HANDLER / RETRY ────────────────────────────── */
+    if (intent === 'add_error_handler') {
+      const id = `error_handler-${Date.now()}`;
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      let wf = applyWorkflowTool({ nodes, edges }, 'add_node', {
+        id, nodeType: 'error_handler', label: 'Error Handler', position: { x: lastX + 280, y: 380 }, config: {},
+      });
+      if (nodes.length > 0) wf = applyWorkflowTool(wf, 'add_edge', { source: nodes[nodes.length - 1].id, target: id });
+      return {
+        reply: `Added an **Error Handler** node. If anything upstream fails, execution will branch here so your workflow can recover gracefully instead of crashing silently.`,
+        toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Simulate the workflow', 'Any other improvements?'],
+        metadata: { changes: ['+ Error Handler'] },
+      };
+    }
+
+    /* ── ADD DELAY ────────────────────────────────────────────── */
+    if (intent === 'add_delay') {
+      const id = `delay-${Date.now()}`;
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      let wf = applyWorkflowTool({ nodes, edges }, 'add_node', {
+        id, nodeType: 'delay', label: 'Delay', position: { x: lastX + 280, y: 220 }, config: { duration: 5, unit: 'seconds' },
+      });
+      if (nodes.length > 0) wf = applyWorkflowTool(wf, 'add_edge', { source: nodes[nodes.length - 1].id, target: id });
+      return {
+        reply: `Added a **Delay** node. Open it to set how long to wait — useful for rate limiting, back-off strategies, or giving upstream systems time to process.`,
+        toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+        suggestions: ['Add error handling', 'Check workflow health', 'Simulate the workflow'],
+        metadata: { changes: ['+ Delay'] },
+      };
+    }
+
+    /* ── REPLACE NODE ─────────────────────────────────────────── */
+    if (intent === 'replace_node') {
+      const top = retrieveNodes(msg, 3);
+      const targetNode = findNodeByText(nodes, msg);
+      if (!targetNode || !top.length) {
+        return {
+          reply: `I'm not sure which node to replace or what to replace it with. Could you be more specific? For example: "replace the email node with Slack" or "use Discord instead of Telegram".`,
+          toolCalls: [], updatedWorkflow: null, messageType: 'message',
+          suggestions: nodes.slice(0, 3).map(n => `Replace ${n.data?.label} with...`),
+          metadata: {},
+        };
+      }
+      const newType = top.find(t => t.type !== (targetNode.data?.type || '')) || top[0];
+      const updatedNodes = nodes.map(n =>
+        n.id === targetNode.id
+          ? { ...n, data: { ...n.data, type: newType.type, label: newType.desc, config: {} } }
+          : n
+      );
+      return {
+        reply: `Swapped **${targetNode.data?.label}** for **${newType.desc}**. Open the node to configure the new connection details.`,
+        toolCalls: [{ name: 'set_workflow' }], updatedWorkflow: { nodes: updatedNodes, edges }, messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Simulate the workflow'],
+        metadata: { changes: [`${targetNode.data?.label} → ${newType.desc}`] },
+      };
+    }
+
+    /* ── ADD AFTER SPECIFIC NODE ──────────────────────────────── */
+    if (intent === 'add_after') {
+      const top = retrieveNodes(msg, 1);
+      const def = top[0];
+      const afterNode = findNodeByText(nodes, msg) || (nodes.length ? nodes[nodes.length - 1] : null);
+      if (!def) {
+        return {
+          reply: "What type of node would you like to add? For example: Slack, email, database, transform, delay, condition.",
+          toolCalls: [], updatedWorkflow: null, messageType: 'clarification',
+          suggestions: ['Add a Slack node', 'Add an email node', 'Add a delay', 'Add a condition'],
+          metadata: {},
+        };
+      }
+      const id = `${def.type}-${Date.now()}`;
+      const posX = afterNode ? (afterNode.position?.x || 100) + 280 : 380;
+      let wf = applyWorkflowTool({ nodes, edges }, 'add_node', {
+        id, nodeType: def.type, label: def.desc, position: { x: posX, y: 220 }, config: {},
+      });
+      if (afterNode) wf = applyWorkflowTool(wf, 'add_edge', { source: afterNode.id, target: id });
+      return {
+        reply: `Added **${def.desc}**${afterNode ? ` after **${afterNode.data?.label}**` : ''}. Open it to configure the details.`,
+        toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Add another node', 'Simulate the workflow'],
+        metadata: { changes: [`+ ${def.desc}${afterNode ? ` (after ${afterNode.data?.label})` : ''}`] },
+      };
+    }
+
     // If entities are strong, treat as generate even when intent score is weak
     const isStrongGenerate = entities.confidence >= 5 || entities.destinations.length >= 1;
 
     /* ── GENERATE ─────────────────────────────────────────────── */
     if (intent === 'generate' || isStrongGenerate) {
+      // If the request is meaningful but incomplete, ask a smart follow-up
+      if (entities.confidence > 0 && entities.confidence < 3 && !entities.destinations.length && !entities.sources.length) {
+        const topic = entities.actions.length ? entities.actions[0] : null;
+        const question = topic
+          ? `I can build that! What should trigger the ${topic} workflow — a webhook, a schedule, or something else?`
+          : `Interesting idea! Could you tell me more? For example, what should trigger it, and where should the result go?`;
+        return {
+          reply: question,
+          toolCalls: [], updatedWorkflow: null, messageType: 'clarification',
+          suggestions: ['Trigger by webhook', 'Run on a schedule', 'Trigger manually'],
+          metadata: {},
+        };
+      }
       const chatValidation = validatePrompt(msg);
       if (!chatValidation.valid) {
         return {
@@ -1654,22 +1969,37 @@ async function workflowChat({ message, history = [], workflow = {} }) {
       const health = analyzeWorkflowHealth({ nodes, edges });
       const parts = [];
       if (nodeSuggestions.length > 0) {
-        parts.push('Here are some improvements I\'d suggest:\n');
+        parts.push("Here's what I'd suggest improving:\n");
         nodeSuggestions.forEach((s, i) => {
           const label = NODE_INDEX.find(n => n.type === s.type)?.desc || s.type;
           parts.push(`${i + 1}. **${label}** — ${s.reason}`);
         });
+        if (nodeSuggestions.length === 1) {
+          parts.push(`\nWant me to add it? Just say **yes**.`);
+        } else {
+          parts.push(`\nSay **"add all"**, **"add the first one"**, or just **yes** to apply.`);
+        }
       }
       if (health.tips.length > 0) {
         parts.push('\nBest practices:');
         health.tips.slice(0, 2).forEach(t => parts.push(`  • ${t}`));
       }
-      if (!parts.length) parts.push("The workflow looks solid — no obvious improvements needed right now. 👍");
+      if (!parts.length) parts.push("The workflow looks solid — no obvious improvements needed. 👍");
+
+      // Build pending action so user can confirm
+      const pa = nodeSuggestions.length === 1
+        ? { type: 'add_node', nodeType: nodeSuggestions[0].type }
+        : nodeSuggestions.length > 1
+          ? { type: 'add_nodes', nodeTypes: nodeSuggestions.map(s => s.type) }
+          : null;
+
       return {
         reply: parts.join('\n').trim(),
-        toolCalls: [], updatedWorkflow: null, messageType: 'message',
-        suggestions: nodeSuggestions.map(s => `Add ${NODE_INDEX.find(n => n.type === s.type)?.desc || s.type}`).slice(0, 3),
-        metadata: {},
+        toolCalls: [], updatedWorkflow: null, messageType: 'suggest',
+        suggestions: nodeSuggestions.length > 0
+          ? ['Yes, add them', 'Add the first one', 'Skip for now']
+          : ['Check workflow health', 'Simulate the workflow'],
+        metadata: { pendingAction: pa },
       };
     }
 

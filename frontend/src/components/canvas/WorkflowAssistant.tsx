@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Bot, Workflow, X, Trash2, Activity, Play, CheckCircle2 } from 'lucide-react';
+import { Send, Bot, Workflow, X, Trash2, Activity, Play, CheckCircle2, Sparkles } from 'lucide-react';
 import { aiApi } from '../../utils/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -20,6 +20,12 @@ interface CompileData {
   releaseChecklist: string[];
 }
 
+interface PendingAction {
+  type: 'add_node' | 'add_nodes';
+  nodeType?: string;
+  nodeTypes?: string[];
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -35,6 +41,7 @@ interface ChatMessage {
     compile?: CompileData;
     simulation?: string[];
     issues?: { type: string; msg: string }[];
+    pendingAction?: PendingAction;
   };
 }
 
@@ -51,30 +58,64 @@ interface WorkflowAssistantProps {
 
 const GREETING: ChatMessage = {
   role: 'assistant',
-  content: "Hi, I'm Freckles. Tell me what you want to automate and I'll build it for you.",
+  content: "Hi! I'm Freckles, your AI workflow copilot. Describe what you want to automate and I'll build it — or ask me anything about your workflow.",
   messageType: 'message',
   suggestions: [
-    'When email arrives, send a Slack notification',
-    'Daily sales report emailed at 9 AM',
+    'Fetch gold prices daily and send a WhatsApp alert',
+    'Send Slack notification when GitHub PR is opened',
+    'What can you do?',
     'Any suggestions?',
-    'What does this workflow do?',
   ],
 };
 
-// ── Typing indicator (3 bouncing dots) ────────────────────────────────────
+// ── Typing indicator ───────────────────────────────────────────────────────
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-3 py-2.5">
+    <div className="flex items-center gap-1.5 px-3.5 py-3">
       {[0, 1, 2].map(i => (
         <span
           key={i}
-          className="h-1.5 w-1.5 rounded-full bg-foreground-muted/40 animate-bounce"
-          style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.9s' }}
+          className="h-1.5 w-1.5 rounded-full bg-brand-400/60 animate-bounce"
+          style={{ animationDelay: `${i * 0.18}s`, animationDuration: '0.85s' }}
         />
       ))}
     </div>
   );
+}
+
+// ── Markdown renderer — supports **bold**, • bullets, _italic_, `code` ────
+
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1 leading-relaxed">
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-1" />;
+        // Render inline formatting
+        const rendered = renderInline(line);
+        return <p key={i} className="text-sm">{rendered}</p>;
+      })}
+    </div>
+  );
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  // Split on **bold**, _italic_, `code`
+  const re = /(\*\*[^*]+\*\*|_[^_]+_|`[^`]+`)/g;
+  let last = 0, m;
+  let idx = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(<span key={idx++}>{text.slice(last, m.index)}</span>);
+    const raw = m[0];
+    if (raw.startsWith('**'))      parts.push(<strong key={idx++} className="font-semibold text-foreground">{raw.slice(2, -2)}</strong>);
+    else if (raw.startsWith('_')) parts.push(<em key={idx++} className="italic text-foreground-muted">{raw.slice(1, -1)}</em>);
+    else                           parts.push(<code key={idx++} className="rounded bg-surface-border px-1 py-0.5 text-[11px] font-mono text-brand-400">{raw.slice(1, -1)}</code>);
+    last = m.index + raw.length;
+  }
+  if (last < text.length) parts.push(<span key={idx++}>{text.slice(last)}</span>);
+  return parts;
 }
 
 // ── Health bar ────────────────────────────────────────────────────────────
@@ -84,12 +125,10 @@ function HealthBar({ health }: { health: HealthData }) {
     health.score >= 80 ? 'bg-emerald-500' :
     health.score >= 60 ? 'bg-yellow-500' :
     health.score >= 40 ? 'bg-orange-500' : 'bg-red-500';
-
   const scoreColor =
     health.score >= 80 ? 'text-emerald-400' :
     health.score >= 60 ? 'text-yellow-400' :
     health.score >= 40 ? 'text-orange-400' : 'text-red-400';
-
   return (
     <div className="mt-2 rounded-xl border border-surface-border bg-surface-base p-3 space-y-2">
       <div className="flex items-center justify-between">
@@ -149,6 +188,51 @@ function ChangesList({ changes }: { changes: string[] }) {
   );
 }
 
+// ── Clarification card ────────────────────────────────────────────────────
+
+function ClarificationCard({ options, onSelect }: { options: string[]; onSelect: (s: string) => void }) {
+  return (
+    <div className="mt-2 rounded-xl border border-brand-500/20 bg-brand-500/5 p-3">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <Sparkles size={11} className="text-brand-400" />
+        <span className="text-[11px] font-semibold text-brand-400 uppercase tracking-wider">Choose an option</span>
+      </div>
+      <div className="space-y-1.5">
+        {options.map((opt, i) => (
+          <button
+            key={i}
+            onClick={() => onSelect(opt)}
+            className="w-full text-left rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-foreground-secondary hover:border-brand-500/50 hover:text-brand-400 hover:bg-brand-500/5 transition"
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Confirmation prompt ───────────────────────────────────────────────────
+
+function ConfirmationPrompt({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <button
+        onClick={onYes}
+        className="flex-1 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 transition"
+      >
+        Yes, do it
+      </button>
+      <button
+        onClick={onNo}
+        className="flex-1 rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground hover:border-foreground-muted transition"
+      >
+        Skip
+      </button>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────
 
 export default function WorkflowAssistant({
@@ -169,10 +253,11 @@ export default function WorkflowAssistant({
     return [GREETING];
   });
 
-  const [input, setInput]     = useState('');
-  const [loading, setLoading] = useState(false);
-  const bottomRef             = useRef<HTMLDivElement>(null);
-  const textareaRef           = useRef<HTMLTextAreaElement>(null);
+  const [input, setInput]             = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const bottomRef                     = useRef<HTMLDivElement>(null);
+  const textareaRef                   = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify(messages)); } catch {}
@@ -184,23 +269,34 @@ export default function WorkflowAssistant({
 
   const clearHistory = () => {
     setMessages([GREETING]);
+    setPendingAction(null);
     try { localStorage.removeItem(storageKey); } catch {}
   };
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, overridePendingAction?: PendingAction | null) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: trimmed }]);
     setLoading(true);
+
+    // Determine which pending action to send
+    const actionToSend = overridePendingAction !== undefined ? overridePendingAction : pendingAction;
+
     try {
       const history = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
       const res = await aiApi.workflowChat(workspaceId, {
         message: trimmed,
         history,
         workflow: { nodes: workflowNodes, edges: workflowEdges },
+        pendingAction: actionToSend,
       });
       const { reply, updatedWorkflow, messageType, suggestions, metadata } = res.data;
+
+      // Update pending action from response
+      const newPending = metadata?.pendingAction ?? null;
+      setPendingAction(newPending);
+
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: reply || 'Done.',
@@ -216,13 +312,12 @@ export default function WorkflowAssistant({
       setLoading(false);
       textareaRef.current?.focus();
     }
-  }, [messages, loading, workspaceId, workflowNodes, workflowEdges, onWorkflowUpdate]);
+  }, [messages, loading, workspaceId, workflowNodes, workflowEdges, onWorkflowUpdate, pendingAction]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   };
 
-  // Auto-resize textarea
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     e.target.style.height = 'auto';
@@ -235,7 +330,6 @@ export default function WorkflowAssistant({
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border shrink-0">
         <div className="flex items-center gap-2.5">
-          {/* Avatar */}
           <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 shadow-sm">
             <Bot size={15} className="text-white" />
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-surface-card" />
@@ -246,17 +340,12 @@ export default function WorkflowAssistant({
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            onClick={clearHistory}
-            title="Clear chat"
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
-          >
+          <button onClick={clearHistory} title="Clear chat"
+            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition">
             <Trash2 size={13} />
           </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition"
-          >
+          <button onClick={onClose}
+            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition">
             <X size={14} />
           </button>
         </div>
@@ -264,64 +353,91 @@ export default function WorkflowAssistant({
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start gap-2.5'}`}>
+        {messages.map((msg, i) => {
+          const isUser = msg.role === 'user';
+          const isClarification = msg.messageType === 'clarification';
+          const hasPending = msg.metadata?.pendingAction && !isUser;
+          // Only show confirm prompt on the LAST assistant suggest message
+          const isLastSuggest = hasPending && i === messages.length - 1;
 
-            {/* Bot avatar */}
-            {msg.role === 'assistant' && (
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 mt-1">
-                <Bot size={11} className="text-white" />
-              </div>
-            )}
+          return (
+            <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start gap-2.5'}`}>
 
-            <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : 'max-w-[88%]'}`}>
+              {/* Bot avatar */}
+              {!isUser && (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 mt-1">
+                  <Bot size={11} className="text-white" />
+                </div>
+              )}
 
-              {/* Bubble */}
-              <div className={
-                msg.role === 'user'
-                  ? 'bg-brand-500 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm leading-relaxed'
-                  : 'bg-surface-hover rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-foreground'
-              }>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+              <div className={`space-y-2 ${isUser ? 'max-w-[80%]' : 'max-w-[90%]'}`}>
 
-                {/* Canvas updated pill */}
-                {msg.workflowUpdated && (
-                  <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[11px] font-medium text-emerald-300">
-                    <Workflow size={10} />
-                    Canvas updated
+                {/* Bubble */}
+                <div className={
+                  isUser
+                    ? 'bg-brand-500 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5'
+                    : 'bg-surface-hover rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-foreground'
+                }>
+                  {isUser
+                    ? <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    : <MarkdownText text={msg.content} />
+                  }
+
+                  {/* Canvas updated pill */}
+                  {msg.workflowUpdated && (
+                    <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[11px] font-medium text-emerald-300">
+                      <Workflow size={10} />
+                      Canvas updated
+                    </div>
+                  )}
+                </div>
+
+                {/* Metadata cards */}
+                {msg.metadata?.health && <HealthBar health={msg.metadata.health} />}
+                {msg.metadata?.simulation && msg.metadata.simulation.length > 0 && (
+                  <SimulationSteps steps={msg.metadata.simulation} />
+                )}
+                {msg.metadata?.changes && msg.metadata.changes.length > 0 && (
+                  <ChangesList changes={msg.metadata.changes} />
+                )}
+
+                {/* Clarification card — option buttons */}
+                {isClarification && msg.suggestions && msg.suggestions.length > 0 && i === messages.length - 1 && (
+                  <ClarificationCard
+                    options={msg.suggestions}
+                    onSelect={s => sendMessage(s)}
+                  />
+                )}
+
+                {/* Confirmation prompt for pending actions (only on last suggest msg) */}
+                {isLastSuggest && !loading && (
+                  <ConfirmationPrompt
+                    onYes={() => sendMessage('yes', pendingAction)}
+                    onNo={() => sendMessage('no', null)}
+                  />
+                )}
+
+                {/* Regular suggestion chips (not shown for clarification — those use ClarificationCard) */}
+                {!isUser && msg.suggestions && msg.suggestions.length > 0 && !isClarification && !isLastSuggest && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {msg.suggestions.map((s, si) => (
+                      <button
+                        key={si}
+                        onClick={() => sendMessage(s)}
+                        disabled={loading}
+                        className="rounded-full border border-surface-border bg-surface-card px-2.5 py-1 text-[11px] text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 hover:bg-brand-500/5 transition disabled:opacity-40"
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {/* Metadata cards */}
-              {msg.metadata?.health && <HealthBar health={msg.metadata.health} />}
-              {msg.metadata?.simulation && msg.metadata.simulation.length > 0 && (
-                <SimulationSteps steps={msg.metadata.simulation} />
-              )}
-              {msg.metadata?.changes && msg.metadata.changes.length > 0 && (
-                <ChangesList changes={msg.metadata.changes} />
-              )}
-
-              {/* Suggestion chips */}
-              {msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {msg.suggestions.map((s, si) => (
-                    <button
-                      key={si}
-                      onClick={() => sendMessage(s)}
-                      disabled={loading}
-                      className="rounded-full border border-surface-border bg-surface-card px-2.5 py-1 text-[11px] text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 hover:bg-brand-500/5 transition disabled:opacity-40"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
-        {/* Typing indicator */}
+        {/* Thinking indicator */}
         {loading && (
           <div className="flex justify-start gap-2.5">
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shrink-0 mt-1">
