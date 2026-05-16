@@ -959,7 +959,12 @@ const TOPIC_VOCAB = tfidfVector(
   'price rate stock gold silver crypto bitcoin currency forex exchange ' +
   'whatsapp sms message notification report data request call endpoint ' +
   'stripe payment hubspot salesforce airtable google sheets drive calendar ' +
-  'webhook receive post get put delete rest json parse extract'
+  'webhook receive post get put delete rest json parse extract ' +
+  'add remove improve enhance optimize suggestions improvements additions ' +
+  'better upgrade update modify change replace swap condition retry delay ' +
+  'build create make automate connect log output input result output ' +
+  'what how when where which can could should would will may might ' +
+  'missing next wrong needed lacking broken issue problem fix resolve'
 );
 
 // Explicit blacklist — terms that are clearly outside the workflow domain.
@@ -993,9 +998,12 @@ function isExplicitlyOffTopic(message) {
 
 function isOnTopic(message, intent) {
   if (isExplicitlyOffTopic(message)) return false;
-  if (['generate','add_node','remove_node','connect','clear','explain','health','simulate','debug','suggest','greeting','help'].includes(intent)) return true;
-  // Unknown intent — allow only if some workflow vocabulary present
-  return cosineSim(tfidfVector(message), TOPIC_VOCAB) >= 0.10;
+  // Any classified intent is on-topic by definition
+  if (['generate','add_node','remove_node','connect','clear','explain','health','simulate','debug',
+       'suggest','greeting','help','confirm','reject','modify_schedule','add_condition',
+       'add_error_handler','add_delay','add_after','replace_node'].includes(intent)) return true;
+  // Unknown intent — allow if there's any workflow vocabulary overlap
+  return cosineSim(tfidfVector(message), TOPIC_VOCAB) >= 0.04;
 }
 
 
@@ -1482,6 +1490,10 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
 
     let { intent, confidence } = classifyIntent(msg);
 
+    // ── Resolve workflow state FIRST so ctx and all handlers can use it ───
+    const nodes = workflow.nodes || [];
+    const edges = workflow.edges || [];
+
     // ── Pattern overrides: comprehensive natural language recognition ────────
     const lower = msg.toLowerCase();
     const ctx   = buildConversationContext(history, nodes);
@@ -1521,13 +1533,19 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
     if (/(summarize|summarise) (this|the|my)? ?(workflow|automation|it)/.test(lower))        intent = 'explain';
     if (/\bwhat('?s| is) (happening|going on|the flow|the purpose)\b/.test(lower))          intent = 'explain';
 
-    // Suggestions / improvements
+    // Suggestions / improvements — broad coverage for natural phrasings
     if (/\b(any|give( me)?|show( me)?|share|got) (any )?(suggestions?|ideas?|recommendations?|tips?|advice)\b/.test(lower)) intent = 'suggest';
     if (/^(suggestions?|ideas?|tips?|advice|recommendations?)\??\s*$/.test(lower.trim()))    intent = 'suggest';
-    if (/what (should i|can i|could i) (add|improve|do next|change|fix)/.test(lower))       intent = 'suggest';
-    if (/what('s| is) (missing|next|wrong|broken|needed|lacking)/.test(lower))               intent = 'suggest';
-    if (/how (can i|do i|should i) (improve|optimise|optimize|fix|enhance|better)/.test(lower)) intent = 'suggest';
+    if (/what (should i|can i|could i) (add|improve|do next|change|fix|include|build)/.test(lower)) intent = 'suggest';
+    if (/what('s| is) (missing|next|wrong|broken|needed|lacking|left)/.test(lower))          intent = 'suggest';
+    if (/how (can i|do i|should i) (improve|optimise|optimize|fix|enhance|make (it|this) better)/.test(lower)) intent = 'suggest';
     if (/\b(improve|optimise|optimize|enhance) (this |the |my )?(workflow|automation|it|this)?\b/.test(lower)) intent = 'suggest';
+    if (/\bwhat (additions?|improvements?|changes?|modifications?|enhancements?|nodes?|steps?)\b.*(can|could|should)/.test(lower)) intent = 'suggest';
+    if (/\bwhat (can|could|should) (be|i) (add|do|improve|change|include|build|make)\b/.test(lower)) intent = 'suggest';
+    if (/\b(how|what).*(make (this|it|the workflow) better|improve (this|it|the workflow))\b/.test(lower)) intent = 'suggest';
+    if (/\bwhat (else|more) (can|could|should) (be|i|we) (add|do|improve|change)\b/.test(lower)) intent = 'suggest';
+    if (/\b(make (it|this|the workflow) better|better(ify)?|level up)\b/.test(lower))        intent = 'suggest';
+    if (/\bwhat (features?|capabilities|options|things?) (can|could|should) (be )?(add|include|build)\b/.test(lower)) intent = 'suggest';
 
     // Health / quality check
     if (/\b(check|analyse|analyze|review|audit|assess|validate|score)\b.*(workflow|health|quality|status|it|this)/.test(lower)) intent = 'health';
@@ -1553,8 +1571,6 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
     if (/\bwhat (can|do) you (do|help (with|me))\b/.test(lower))                            intent = 'help';
     if (/\bshow (me )?(help|commands?|what you can)\b/.test(lower))                         intent = 'help';
     const entities = extractEntities(msg);
-    const nodes = workflow.nodes || [];
-    const edges = workflow.edges || [];
 
     // Hard scope guard
     if (!isOnTopic(msg, intent)) {
