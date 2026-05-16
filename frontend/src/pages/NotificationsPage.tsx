@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Bell, CheckCheck, CheckCircle2, Clock3, Inbox, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
+import { useStore } from '../store';
 
 interface NotificationItem {
   id: string;
@@ -25,6 +26,8 @@ interface InvitationItem {
 }
 
 export default function NotificationsPage() {
+  const setUser = useStore((s) => s.setUser);
+  const setWorkspaces = useStore((s) => s.setWorkspaces);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [invitations, setInvitations] = useState<InvitationItem[]>([]);
@@ -64,6 +67,10 @@ export default function NotificationsPage() {
     try {
       setRespondingId(id);
       await authApi.respondInvitation(id, action);
+      const meRes = await authApi.me();
+      const targetInvite = invitations.find((item) => item.id === id);
+      setUser(meRes.data.user);
+      setWorkspaces(meRes.data.workspaces || [], action === 'accept' ? targetInvite?.workspaceId : undefined);
       toast.success(action === 'accept' ? 'Invitation accepted' : 'Invitation rejected');
       await loadData();
     } catch (err: any) {

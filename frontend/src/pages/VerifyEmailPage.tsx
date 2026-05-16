@@ -29,10 +29,11 @@ export default function VerifyEmailPage() {
         setStatus('success');
         // Auto-login: set auth state
         if (data.token && data.user) {
+          const workspaces = data.workspaces || (data.workspace ? [data.workspace] : []);
           setAuth(
             data.token,
             data.user,
-            data.workspace ?? { id: '', name: '', slug: '', role: '' }
+            workspaces
           );
           toast.success('Email verified! Redirecting…');
           setTimeout(() => navigate('/dashboard'), 2000);

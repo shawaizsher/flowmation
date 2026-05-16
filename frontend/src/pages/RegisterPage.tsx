@@ -28,7 +28,7 @@ export default function RegisterPage() {
   const inputRefs                 = useRef<(HTMLInputElement | null)[]>([]);
 
   // Pending auth data — held until experience is selected
-  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any; workspace: any } | null>(null);
+  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any; workspaces: any[] } | null>(null);
 
   /* ── Submit registration form ── */
   const handleSubmit = async (e: FormEvent) => {
@@ -43,7 +43,7 @@ export default function RegisterPage() {
         setStep('otp');
         toast.success('A 6-digit code was sent to your email!');
       } else {
-        setAuth(data.token, data.user, data.workspace ?? { id: '', name: '', slug: '', role: '' });
+        setAuth(data.token, data.user, data.workspaces || (data.workspace ? [data.workspace] : []));
         toast.success('Account created!');
         navigate('/dashboard');
       }
@@ -98,7 +98,7 @@ export default function RegisterPage() {
       setPendingAuth({
         token: data.token,
         user: data.user,
-        workspace: data.workspace ?? { id: '', name: '', slug: '', role: '' },
+        workspaces: data.workspaces || (data.workspace ? [data.workspace] : []),
       });
       toast.success('Email verified! One more thing…');
       setStep('experience');
@@ -130,7 +130,7 @@ export default function RegisterPage() {
   /* ── Experience selection ── */
   const handleExperienceSelect = (isNew: boolean) => {
     if (!pendingAuth) return;
-    setAuth(pendingAuth.token, pendingAuth.user, pendingAuth.workspace);
+    setAuth(pendingAuth.token, pendingAuth.user, pendingAuth.workspaces || []);
     if (isNew) {
       setShowTutorial(true);
       toast.success('Welcome! We\'ll show you around.');
