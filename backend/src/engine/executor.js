@@ -277,8 +277,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         // Create node log record
         const logResult = await query(
           `INSERT INTO node_logs (execution_id, node_id, node_type, node_label, status, started_at)
-           RETURNING id
-           VALUES ($1, $2, $3, $4, 'running', NOW())`,
+           VALUES ($1, $2, $3, $4, 'running', NOW())
+           RETURNING id`,
           [executionId, node.id, nodeType, nodeLabel]
         );
         const logId = logResult.rows[0].id;
