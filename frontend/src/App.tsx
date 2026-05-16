@@ -6,9 +6,13 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
+<<<<<<< HEAD
 import NotificationsPage from './pages/NotificationsPage';
 import InboxPage from './pages/InboxPage';
 import TeamPage from './pages/TeamPage';
+=======
+import MarketplacePage from './pages/MarketplacePage';
+>>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -44,6 +48,7 @@ export default function App() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
       </Route>
 
       <Route path="/workflows/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />

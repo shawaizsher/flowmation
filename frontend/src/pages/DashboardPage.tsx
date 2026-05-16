@@ -20,6 +20,10 @@ import {
   TrendingUp,
   Activity,
   Users,
+  Store,
+  Download,
+  Upload,
+  ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, aiApi } from '../utils/api';
@@ -72,6 +76,45 @@ export default function DashboardPage() {
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [selectedCollaboratorIds, setSelectedCollaboratorIds] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Publish to Marketplace modal
+  const [showPublishModal, setShowPublishModal]     = useState(false);
+  const [publishingWfId, setPublishingWfId]         = useState<string | null>(null);
+  const [publishCategory, setPublishCategory]       = useState('General');
+  const [publishSetupGuide, setPublishSetupGuide]   = useState('');
+  const [publishing, setPublishing]                 = useState(false);
+
+  const PUBLISH_CATEGORIES = ['General','Sales','Marketing','Data','Finance','Productivity','AI','DevOps','Operations','Governance','Social'];
+
+  const openPublishModal = (wfId: string) => {
+    setPublishingWfId(wfId);
+    setPublishCategory('General');
+    setPublishSetupGuide('');
+    setShowPublishModal(true);
+  };
+
+  const handlePublish = async () => {
+    if (!workspaceId || !publishingWfId) return;
+    try {
+      setPublishing(true);
+      const setupGuide = publishSetupGuide
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await workflowApi.publishTemplate(workspaceId, {
+        workflowId: publishingWfId,
+        category: publishCategory,
+        setupGuide,
+        requiredCredentials: [],
+      });
+      toast.success('Workflow published to Marketplace!');
+      setShowPublishModal(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to publish');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   // AI Generate modal
   const [showAiModal, setShowAiModal] = useState(false);
@@ -216,9 +259,54 @@ export default function DashboardPage() {
     setAiConfidence(null);
   };
 
+  // Automation-related vocabulary — any prompt containing at least one of these
+  // words is allowed through; short prompts with zero matches are rejected immediately.
+  const AUTOMATION_WORDS = new Set([
+    'fetch','send','get','post','webhook','trigger','schedule','cron',
+    'email','slack','discord','telegram','whatsapp','sms','database','db',
+    'api','http','https','notify','alert','store','save','insert','filter',
+    'transform','parse','classify','summarize','github','twilio','stripe',
+    'daily','weekly','hourly','every','when','report','data','workflow',
+    'automate','automation','request','response','message','notification',
+    'event','run','execute','query','read','write','create','update','delete',
+    'upload','download','push','pull','connect','monitor','check','watch',
+    'receive','process','make','build','integrate','log','google','postgres',
+    'mysql','mongodb','redis','aws','s3','jira','notion','airtable','hubspot',
+    'salesforce','openai','anthropic','price','stock','payment','invoice',
+    'form','file','csv','pdf','add','import','export','new','if','action',
+    'source','destination','pipeline','node','step','flow','send',
+  ]);
+
+  const clientValidatePrompt = (text: string): string | null => {
+    if (text.length < 5) return 'Please describe a workflow to generate.';
+    const tokens = text.toLowerCase().split(/\W+/).filter(t => t.length > 1);
+    if (tokens.length === 0) return 'Please describe a workflow to generate.';
+    // If the prompt is short AND contains zero known automation words → gibberish
+    const hasKnownWord = tokens.some(t => AUTOMATION_WORDS.has(t));
+    if (!hasKnownWord && text.length < 30) {
+      return "That doesn't look like a workflow description. Try: \"Send a Slack alert when a new GitHub PR is opened.\"";
+    }
+    return null;
+  };
+
   const handleAiGenerate = async (promptOverride?: string) => {
     const prompt = (promptOverride ?? aiPrompt).trim();
     if (!workspaceId || !prompt) return;
+
+    // Client-side gate — catches obvious gibberish without a round-trip to the server
+    const clientError = clientValidatePrompt(prompt);
+    if (clientError) {
+      setAiError({
+        message: clientError,
+        suggestions: [
+          'Fetch gold prices via HTTP and send a WhatsApp message via Twilio',
+          'Send a Slack alert when a new GitHub PR is opened',
+          'Daily report from Postgres emailed at 9am',
+          'When a webhook fires, transform the data and insert it into a database',
+        ],
+      });
+      return;
+    }
 
     resetAiModal();
 
@@ -254,8 +342,8 @@ export default function DashboardPage() {
     } catch (err: any) {
       const errorData = err.response?.data;
 
-      if (errorData?.type === 'invalid_input') {
-        setAiError({ message: errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
+      if (errorData?.type === 'invalid_input' || errorData?.type === 'invalid_prompt') {
+        setAiError({ message: errorData.message || errorData.error || 'Invalid input.', suggestions: errorData.suggestions || [] });
         return;
       }
       if (errorData?.type === 'unsafe_request') {
@@ -540,6 +628,44 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* ── Marketplace banner ── */}
+          <div
+            className="relative overflow-hidden rounded-2xl border border-brand-500/20 bg-gradient-to-br from-brand-500/10 via-surface-card to-accent-500/10 p-6 cursor-pointer group hover:border-brand-500/40 transition-all duration-300"
+            onClick={() => navigate('/marketplace')}
+          >
+            {/* Background glow blobs */}
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-8 right-32 h-32 w-32 rounded-full bg-accent-500/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/30 to-accent-500/30 group-hover:from-brand-500/40 group-hover:to-accent-500/40 transition-all duration-300">
+                  <Store size={22} className="text-brand-400" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                    Workflow Marketplace
+                    <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-[11px] font-bold text-brand-400">New</span>
+                  </h2>
+                  <p className="text-sm text-foreground-muted mt-0.5">
+                    Browse pre-built workflow templates and install them in one click.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-foreground-muted">
+                  <Download size={12} className="text-brand-400" />
+                  <span>One-click install</span>
+                </div>
+                <button className="flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 text-sm font-bold text-white transition-all duration-200 group-hover:shadow-lg group-hover:shadow-brand-500/25">
+                  Browse Templates
+                  <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* ── Selected workflow detail / Quick actions ── */}
           {selectedWorkflow ? (
             <div className="card p-6 animate-fade-in">
@@ -600,6 +726,12 @@ export default function DashboardPage() {
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 text-sm font-medium hover:bg-red-500/20 transition"
                 >
                   <Trash2 size={14} /> Delete
+                </button>
+                <button
+                  onClick={() => openPublishModal(selectedWorkflow.id)}
+                  className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-sm font-medium hover:bg-brand-500/20 border border-brand-500/20 transition"
+                >
+                  <Upload size={14} /> Publish to Marketplace
                 </button>
               </div>
             </div>
@@ -992,6 +1124,90 @@ export default function DashboardPage() {
                 </>
               )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════ Publish to Marketplace Modal ═══════════ */}
+      {showPublishModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card mx-4 w-full max-w-lg p-6 animate-scale-in">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                <Upload size={18} className="text-brand-400" />
+                Publish to Marketplace
+              </h2>
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="text-foreground-muted hover:text-foreground transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-foreground-muted mb-5">
+              Publishing makes this workflow available as a template in the Marketplace so anyone in your workspace can install it.
+            </p>
+
+            <div className="space-y-4">
+              {/* Category */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Category
+                </label>
+                <div className="relative">
+                  <select
+                    value={publishCategory}
+                    onChange={(e) => setPublishCategory(e.target.value)}
+                    className="input-field w-full appearance-none pr-8"
+                  >
+                    {PUBLISH_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+                </div>
+              </div>
+
+              {/* Setup guide */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Setup Guide <span className="text-foreground-muted font-normal">(one step per line, optional)</span>
+                </label>
+                <textarea
+                  value={publishSetupGuide}
+                  onChange={(e) => setPublishSetupGuide(e.target.value)}
+                  placeholder={"Configure your webhook URL in the trigger node.\nAdd your API credentials in Settings.\nTest with a sample payload."}
+                  className="input-field min-h-28 resize-none w-full"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishing}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50"
+              >
+                {publishing ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Publishing…
+                  </>
+                ) : (
+                  <>
+                    <Store size={15} />
+                    Publish Template
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

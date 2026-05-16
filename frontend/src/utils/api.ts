@@ -91,6 +91,22 @@ export const workflowApi = {
   installTemplate: (workspaceId: string, templateId: string, data?: { name?: string }) =>
     api.post(`/workspaces/${workspaceId}/workflows/templates/${templateId}/install`, data),
 
+  rateTemplate: (workspaceId: string, templateId: string, rating: number) =>
+    api.post(`/workspaces/${workspaceId}/workflows/templates/${templateId}/rate`, { rating }),
+
+  publishTemplate: (
+    workspaceId: string,
+    data: {
+      workflowId: string;
+      category: string;
+      setupGuide: string[];
+      requiredCredentials: { label: string; required: boolean; reason: string; serviceId: string }[];
+    }
+  ) => api.post(`/workspaces/${workspaceId}/workflows/templates/publish`, data),
+
+  suggestNodes: (workspaceId: string, currentNodeTypes: string[]) =>
+    api.post(`/workspaces/${workspaceId}/workflows/suggest-nodes`, { currentNodeTypes }),
+
   list: (workspaceId: string, params?: Record<string, string>) =>
     api.get(`/workspaces/${workspaceId}/workflows`, { params }),
 
@@ -277,6 +293,7 @@ export const aiApi = {
       message: string;
       history: { role: 'user' | 'assistant'; content: string }[];
       workflow: { nodes: unknown[]; edges: unknown[] };
+      pendingAction?: { type: string; nodeType?: string; nodeTypes?: string[] } | null;
     }
   ) => api.post(`/workspaces/${workspaceId}/ai/chat`, data),
 };
