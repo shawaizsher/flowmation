@@ -8,6 +8,12 @@ import {
 import toast from 'react-hot-toast';
 import { useStore } from '../store';
 import { useTheme, useAccentTheme, type Theme } from '../hooks/useTheme';
+import { authApi } from '../utils/api';
+import {
+  AVATAR_EMOJIS as PROFILE_AVATAR_EMOJIS,
+  AVATAR_GRADIENTS as PROFILE_AVATAR_GRADIENTS,
+  UserAvatar,
+} from '../components/UserAvatar';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -235,8 +241,25 @@ function AvatarPickerModal({
     if (!file.type.startsWith('image/')) { setImgError('Please select an image file'); return; }
     setImgError('');
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setDraft({ type: 'image', imageUrl: ev.target?.result as string });
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSize = 320;
+        const scale = Math.min(maxSize / image.width, maxSize / image.height, 1);
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setImgError('Could not process image');
+          return;
+        }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const optimized = canvas.toDataURL('image/jpeg', 0.82);
+        setDraft({ type: 'image', imageUrl: optimized });
+      };
+      image.onerror = () => setImgError('Could not read image');
+      image.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -255,7 +278,7 @@ function AvatarPickerModal({
 
         {/* Preview */}
         <div className="flex items-center gap-4 px-5 py-4 border-b border-surface-border bg-surface-input/40">
-          <AvatarDisplay avatar={draft} name={name} size={56} />
+          <UserAvatar avatar={draft} name={name} size={56} showRing />
           <div>
             <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
             <p className="text-xs text-foreground-muted mt-0.5">Preview</p>
@@ -289,7 +312,7 @@ function AvatarPickerModal({
           {/* ── Colors ── */}
           {tab === 'gradient' && (
             <div className="grid grid-cols-6 gap-3">
-              {AVATAR_GRADIENTS.map(g => {
+              {PROFILE_AVATAR_GRADIENTS.map(g => {
                 const active = draft.type === 'gradient' && draft.gradient?.from === g.from;
                 return (
                   <button
@@ -313,7 +336,7 @@ function AvatarPickerModal({
           {/* ── Emoji ── */}
           {tab === 'emoji' && (
             <div className="grid grid-cols-9 gap-2">
-              {AVATAR_EMOJIS.map(em => (
+              {PROFILE_AVATAR_EMOJIS.map(em => (
                 <button
                   key={em}
                   onClick={() => setDraft({ type: 'emoji', emoji: em })}
@@ -401,31 +424,42 @@ function AvatarPickerModal({
 // ══════════════════════════════════════════════════════════════════════════
 
 export default function SettingsPage() {
-  const { user } = useStore();
+  const { user, setUser } = useStore();
   const [activeTab, setActiveTab]   = useState<Tab>('profile');
 
   // ── Avatar ──────────────────────────────────────────────────────────────
-  const [avatar, setAvatar]               = useState<AvatarData | null>(loadAvatar);
+  const [avatar, setAvatar]               = useState<AvatarData | null>(user?.avatar || loadAvatar());
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   const handleAvatarSave = (data: AvatarData) => {
     saveAvatar(data);
     setAvatar(data);
-    toast.success('Avatar updated');
+    setProfileSaved(false);
   };
 
   // ── Profile ─────────────────────────────────────────────────────────────
   const [name, setName]             = useState(user?.name || '');
   const [email]                     = useState(user?.email || '');
+  const [headline, setHeadline]     = useState(user?.headline || '');
   const [nameError, setNameError]   = useState('');
   const [profileDirty, setProfileDirty] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved]   = useState(false);
 
   useEffect(() => {
-    setProfileDirty(name !== (user?.name || ''));
+    setName(user?.name || '');
+    setHeadline(user?.headline || '');
+    setAvatar(user?.avatar || loadAvatar());
+  }, [user?.name, user?.headline, user?.avatar]);
+
+  useEffect(() => {
+    setProfileDirty(
+      name !== (user?.name || '') ||
+      headline !== (user?.headline || '') ||
+      JSON.stringify(avatar || null) !== JSON.stringify(user?.avatar || null)
+    );
     setProfileSaved(false);
-  }, [name, user?.name]);
+  }, [name, headline, avatar, user?.name, user?.headline, user?.avatar]);
 
   const handleProfileSave = async (e: FormEvent) => {
     e.preventDefault();
@@ -433,11 +467,24 @@ export default function SettingsPage() {
     if (name.trim().length < 2) { setNameError('Name must be at least 2 characters'); return; }
     setNameError('');
     setProfileSaving(true);
-    await new Promise(r => setTimeout(r, 600)); // Simulate API
-    setProfileSaving(false);
-    setProfileSaved(true);
-    setProfileDirty(false);
-    toast.success('Profile updated');
+    try {
+      const { data } = await authApi.updateProfile({
+        name: name.trim(),
+        headline: headline.trim(),
+        avatar,
+      });
+      if (data?.user && user) {
+        setUser({ ...user, ...data.user });
+      }
+      if (avatar) saveAvatar(avatar);
+      setProfileSaved(true);
+      setProfileDirty(false);
+      toast.success('Profile updated across your workspace');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   // ── Security ─────────────────────────────────────────────────────────────
@@ -558,7 +605,7 @@ export default function SettingsPage() {
             <p className="text-xs font-bold text-foreground-muted uppercase tracking-wider mb-2">Tip</p>
             <p className="text-xs text-foreground-muted leading-relaxed">
               {activeTab === 'security' && 'Use 12+ characters with a mix of letters, numbers and symbols for a strong password.'}
-              {activeTab === 'profile' && "Your display name is shown to collaborators in real-time sessions."}
+              {activeTab === 'profile' && 'Your avatar, name, and headline update across settings, sidebar, dashboard, and collaboration surfaces.'}
               {activeTab === 'notifications' && 'Failure alerts are recommended — they notify you when a workflow stops working.'}
               {activeTab === 'appearance' && 'Theme and accent color are saved automatically as you select them.'}
             </p>
@@ -579,7 +626,7 @@ export default function SettingsPage() {
                 <SavedBadge show={profileSaved} />
               </div>
 
-              <form onSubmit={handleProfileSave} className="space-y-6 max-w-md">
+              <form onSubmit={handleProfileSave} className="space-y-6 max-w-xl">
                 {/* Avatar */}
                 <div className="flex items-center gap-4">
                   {/* Clickable avatar with camera overlay */}
@@ -589,7 +636,7 @@ export default function SettingsPage() {
                     className="relative group shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                     aria-label="Change avatar"
                   >
-                    <AvatarDisplay avatar={avatar} name={name || 'U'} size={64} />
+                    <UserAvatar avatar={avatar} name={name || 'U'} size={64} showRing />
                     {/* Hover overlay */}
                     <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <Camera size={18} className="text-white" />
@@ -599,6 +646,7 @@ export default function SettingsPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
                     <p className="text-xs text-foreground-muted mt-0.5">{user?.role || 'Member'}</p>
+                    {headline && <p className="mt-1 text-xs text-brand-300">{headline}</p>}
                     <button
                       type="button"
                       onClick={() => setShowAvatarPicker(true)}
@@ -646,6 +694,22 @@ export default function SettingsPage() {
                   <InfoBox>Email address is tied to your account and cannot be changed.</InfoBox>
                 </div>
 
+                <div>
+                  <label htmlFor="profile-headline" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                    Headline
+                  </label>
+                  <input
+                    id="profile-headline"
+                    type="text"
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value.slice(0, 120))}
+                    className="input-field"
+                    placeholder="Automation architect · Team lead · Building smooth workflows"
+                    maxLength={120}
+                  />
+                  <p className="text-xs text-foreground-muted/60 mt-1">{headline.length}/120 characters</p>
+                </div>
+
                 <div className="flex items-center gap-3 pt-1">
                   <button
                     type="submit"
@@ -660,7 +724,12 @@ export default function SettingsPage() {
                   {profileDirty && !profileSaving && (
                     <button
                       type="button"
-                      onClick={() => { setName(user?.name || ''); setNameError(''); }}
+                      onClick={() => {
+                        setName(user?.name || '');
+                        setHeadline(user?.headline || '');
+                        setAvatar(user?.avatar || loadAvatar());
+                        setNameError('');
+                      }}
                       className="text-sm text-foreground-muted hover:text-foreground transition"
                     >
                       Discard

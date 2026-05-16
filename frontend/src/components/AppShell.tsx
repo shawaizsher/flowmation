@@ -10,6 +10,7 @@ import FlowaLogo from './FlowaLogo';
 import { useState } from 'react';
 import { useStore } from '../store';
 import toast from 'react-hot-toast';
+import { UserAvatar } from './UserAvatar';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -70,13 +71,11 @@ export default function AppShell() {
           {/* User info */}
           {user && (
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 min-w-[32px] rounded-full bg-gradient-to-br from-brand-500 to-accent-500 flex items-center justify-center text-white text-xs font-bold uppercase">
-                {user.name?.charAt(0) || 'U'}
-              </div>
+              <UserAvatar avatar={user.avatar} name={user.name || 'User'} size={32} />
               {!collapsed && (
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                  <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+                  <p className="text-xs text-foreground-muted truncate">{user.headline || user.email}</p>
                 </div>
               )}
             </div>

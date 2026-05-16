@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import { workflowApi, aiApi } from '../utils/api';
 import { useStore } from '../store';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface WorkflowItem {
   id: string;
@@ -484,12 +485,17 @@ export default function DashboardPage() {
         <header className="border-b border-surface-border px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold text-foreground">
-                Welcome back{user?.name ? `, ${user.name}` : ''}
-              </h1>
-              <p className="text-sm text-foreground-muted mt-1">
-                Here's what's happening in your workspace
-              </p>
+              <div className="flex items-center gap-4">
+                <UserAvatar avatar={user?.avatar} name={user?.name || 'User'} size={52} showRing />
+                <div>
+                  <h1 className="font-display text-2xl font-bold text-foreground">
+                    Welcome back{user?.name ? `, ${user.name}` : ''}
+                  </h1>
+                  <p className="text-sm text-foreground-muted mt-1">
+                    {user?.headline || "Here's what's happening in your workspace"}
+                  </p>
+                </div>
+              </div>
             </div>
             <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
               <Plus size={16} />

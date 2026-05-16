@@ -69,6 +69,7 @@ async function transaction(callback) {
 async function initDb() {
   try {
     const result = await pool.query('SELECT NOW() as now');
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'");
     logger.info(`PostgreSQL connected at ${result.rows[0].now}`);
   } catch (err) {
     logger.error('Failed to connect to PostgreSQL:', err);
