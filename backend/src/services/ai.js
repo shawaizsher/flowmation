@@ -1069,43 +1069,40 @@ const EXAMPLE_PROMPTS = [
 function validatePrompt(prompt) {
   const trimmed = (prompt || '').trim();
 
+  // 1. Too short to be a workflow description
   if (trimmed.length < 5) {
     return { valid: false, message: 'Please describe a workflow to generate. Example: "' + EXAMPLE_PROMPTS[0] + '"' };
   }
 
   const meaningful = removeStopWords(tokenize(trimmed));
 
+  // 2. Nothing left after removing stop words
   if (meaningful.length === 0) {
     return { valid: false, message: 'Please describe a workflow to generate.' };
   }
 
-  // All tokens are purely numeric (e.g. "123214") or single-char noise
-  if (meaningful.every(t => /^\d+$/.test(t) || t.length < 2)) {
+  // 3. All tokens are purely numeric  (e.g. "123214", "999 000")
+  if (meaningful.every(t => /^\d+$/.test(t))) {
     return {
       valid: false,
       message: "That doesn't look like a workflow description. Try: \"" + EXAMPLE_PROMPTS[1] + '"',
     };
   }
 
-  // High-entropy garbage detection: token has no vowels and length > 5
-  // (e.g. "sajdkhasjkd", "xkzqwrtpl") — real words always have vowels
-  const hasVowel = /[aeiou]/i;
-  const longTokens = meaningful.filter(t => t.length > 5);
-  if (longTokens.length > 0 && longTokens.every(t => !hasVowel.test(t))) {
-    return {
-      valid: false,
-      message: "That doesn't look like a workflow description. Try: \"" + EXAMPLE_PROMPTS[2] + '"',
-    };
-  }
-
-  // Topic-relevance gate: cosine similarity against workflow vocabulary
+  // 4. Topic-relevance gate: cosine similarity with the workflow vocabulary.
+  //    Gibberish like "sajdkhasjkd" or "asdfghjkl" scores exactly 0 because
+  //    none of their characters form tokens present in TOPIC_VOCAB.
   const topicScore = cosineSim(tfidfVector(trimmed), TOPIC_VOCAB);
-  const entities   = extractEntities(trimmed);
 
-  if (topicScore < 0.05 && entities.confidence < 2) {
+  // 5. Entity confidence: how many triggers / sources / actions / destinations matched.
+  const entities = extractEntities(trimmed);
+
+  // Reject when BOTH scores are near-zero — this catches random strings,
+  // keyboard mashing, single real words that have no automation meaning, etc.
+  if (topicScore < 0.06 && entities.confidence < 2) {
     return {
       valid: false,
-      message: "I couldn't find any automation intent in that. Try describing a trigger, an action, and a destination — for example: \"" + EXAMPLE_PROMPTS[3] + '"',
+      message: "I couldn't find any automation intent in that. Describe a trigger, an action, and a destination — for example: \"" + EXAMPLE_PROMPTS[3] + '"',
       suggestions: EXAMPLE_PROMPTS,
     };
   }
@@ -1119,18 +1116,20 @@ function validatePrompt(prompt) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 async function generateWorkflow(prompt) {
-  try {
-    // Validate before doing any work
-    const validation = validatePrompt(prompt);
-    if (!validation.valid) {
-      return {
-        success: false,
-        type: 'invalid_prompt',
-        message: validation.message,
-        suggestions: validation.suggestions || EXAMPLE_PROMPTS,
-      };
-    }
+  // ── Validation runs OUTSIDE try/catch ──────────────────────────────────
+  // If validation is inside the catch it gets silently swallowed and the
+  // fallback generates a workflow anyway — defeating the whole point.
+  const validation = validatePrompt(prompt);
+  if (!validation.valid) {
+    return {
+      success: false,
+      type: 'invalid_prompt',
+      message: validation.message,
+      suggestions: validation.suggestions || EXAMPLE_PROMPTS,
+    };
+  }
 
+  try {
     // Re-use entities already extracted during validation
     const entities = validation.entities || extractEntities(prompt);
     logger.info(`[intelligence] generateWorkflow: ${JSON.stringify({
@@ -1412,6 +1411,17 @@ async function workflowChat({ message, history = [], workflow = {} }) {
 
     /* ── GENERATE ─────────────────────────────────────────────── */
     if (intent === 'generate' || isStrongGenerate) {
+      // Validate before building — prevents gibberish from slipping through
+      // via a high entity-confidence false-positive
+      const chatValidation = validatePrompt(msg);
+      if (!chatValidation.valid) {
+        return {
+          reply: chatValidation.message,
+          toolCalls: [], updatedWorkflow: null, messageType: 'error',
+          suggestions: chatValidation.suggestions || EXAMPLE_PROMPTS,
+          metadata: {},
+        };
+      }
       const built = buildWorkflowFromEntities(entities);
       const updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'set_workflow', built);
       const compile = compileWorkflow(updatedWorkflow);
