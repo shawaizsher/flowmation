@@ -22,8 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await authApi.login(email, password);
-      const ws = data.workspaces?.[0];
-      setAuth(data.token, data.user, ws ?? { id: '', name: '', slug: '', role: '' });
+      setAuth(data.token, data.user, data.workspaces || []);
       toast.success(`Welcome back, ${data.user.name}!`);
       navigate('/dashboard');
     } catch (err: unknown) {

@@ -49,11 +49,13 @@ interface AppState {
   token: string | null;
   user: User | null;
   workspace: Workspace | null;
+  workspaces: Workspace[];
 
-  setAuth: (token: string, user: User, workspace: Workspace) => void;
+  setAuth: (token: string, user: User, workspaces: Workspace[], preferredWorkspaceId?: string) => void;
   setUser: (user: User) => void;
   logout: () => void;
   setWorkspace: (ws: Workspace) => void;
+  setWorkspaces: (workspaces: Workspace[], preferredWorkspaceId?: string) => void;
 
   /* execution */
   nodeStatuses: Record<string, string>;
@@ -94,20 +96,41 @@ export const useStore = create<AppState>()(
       token: null,
       user: null,
       workspace: null,
+      workspaces: [],
 
-      setAuth: (token, user, workspace) => set({ token, user, workspace }),
+      setAuth: (token, user, workspaces, preferredWorkspaceId) =>
+        set((state) => {
+          const nextWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+          const nextWorkspace =
+            nextWorkspaces.find((ws) => ws.id === preferredWorkspaceId) ||
+            nextWorkspaces.find((ws) => ws.id === state.workspace?.id) ||
+            nextWorkspaces[0] ||
+            null;
+          return { token, user, workspace: nextWorkspace, workspaces: nextWorkspaces };
+        }),
       setUser: (user) => set({ user }),
       logout: () =>
         set({
           token: null,
           user: null,
           workspace: null,
+          workspaces: [],
           nodeStatuses: {},
           executionId: null,
           executionStatus: null,
           collaborators: {},
         }),
       setWorkspace: (ws) => set({ workspace: ws }),
+      setWorkspaces: (workspaces, preferredWorkspaceId) =>
+        set((state) => {
+          const nextWorkspaces = Array.isArray(workspaces) ? workspaces : [];
+          const nextWorkspace =
+            nextWorkspaces.find((ws) => ws.id === preferredWorkspaceId) ||
+            nextWorkspaces.find((ws) => ws.id === state.workspace?.id) ||
+            nextWorkspaces[0] ||
+            null;
+          return { workspaces: nextWorkspaces, workspace: nextWorkspace };
+        }),
 
       /* ---- execution ---- */
       nodeStatuses: {},
@@ -160,6 +183,7 @@ export const useStore = create<AppState>()(
         token: state.token,
         user: state.user,
         workspace: state.workspace,
+        workspaces: state.workspaces,
         showTutorial: state.showTutorial,
       }),
     },

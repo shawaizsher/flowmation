@@ -4,6 +4,7 @@ import {
   Bell,
   MessagesSquare,
   UserPlus,
+  ChevronDown,
   Settings,
   LogOut,
   ChevronLeft,
@@ -18,17 +19,12 @@ import { UserAvatar } from './UserAvatar';
 import { authApi } from '../utils/api';
 
 const navItems = [
-<<<<<<< HEAD
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/team', icon: UserPlus, label: 'Team' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/inbox', icon: MessagesSquare, label: 'Inbox' },
+  { to: '/marketplace', icon: Store, label: 'Marketplace' },
   { to: '/settings', icon: Settings, label: 'Settings' },
-=======
-  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/marketplace', icon: Store,           label: 'Marketplace' },
-  { to: '/settings',    icon: Settings,        label: 'Settings' },
->>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 ];
 
 export default function AppShell() {
@@ -36,7 +32,7 @@ export default function AppShell() {
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const navigate = useNavigate();
-  const { user, token, logout } = useStore();
+  const { user, token, workspace, workspaces, logout, setUser, setWorkspaces, setWorkspace } = useStore();
 
   useEffect(() => {
     if (!token) return;
@@ -54,6 +50,21 @@ export default function AppShell() {
       active = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    authApi.me()
+      .then((res) => {
+        if (!active) return;
+        setUser(res.data.user);
+        setWorkspaces(res.data.workspaces || []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [token, setUser, setWorkspaces]);
 
   const handleLogout = () => {
     logout();
@@ -73,9 +84,30 @@ export default function AppShell() {
         <div className="flex items-center gap-2.5 px-4 py-5 border-b border-surface-border">
           <FlowaLogo size={32} className="min-w-[32px]" />
           {!collapsed && (
-            <span className="font-body text-lg font-bold tracking-tight text-foreground truncate">
-              Flowa
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="font-body text-lg font-bold tracking-tight text-foreground truncate block">
+                Flowa
+              </span>
+              {workspaces.length > 0 && (
+                <div className="relative mt-2">
+                  <select
+                    value={workspace?.id || ''}
+                    onChange={(e) => {
+                      const next = workspaces.find((ws) => ws.id === e.target.value);
+                      if (next) setWorkspace(next);
+                    }}
+                    className="w-full appearance-none rounded-xl border border-surface-border bg-surface-input px-3 py-2 pr-8 text-xs font-medium text-foreground outline-none transition focus:border-brand-500/40"
+                  >
+                    {workspaces.map((ws) => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+                </div>
+              )}
+            </div>
           )}
         </div>
 
