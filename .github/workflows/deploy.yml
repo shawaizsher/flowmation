@@ -13,8 +13,8 @@ jobs:
     steps:
       - name: Trigger Render backend deploy
         run: |
-          curl -s -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}" | \
-            python3 -c "import sys,json; d=json.load(sys.stdin); print('Deploy triggered:', d.get('deploy',{}).get('id','ok'))"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}")
+          echo "Render backend deploy status: $STATUS"
 
   deploy-worker:
     name: Deploy Worker (Render)
@@ -22,8 +22,8 @@ jobs:
     steps:
       - name: Trigger Render worker deploy
         run: |
-          curl -s -X POST "${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}" | \
-            python3 -c "import sys,json; d=json.load(sys.stdin); print('Deploy triggered:', d.get('deploy',{}).get('id','ok'))"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}")
+          echo "Render worker deploy status: $STATUS"
 
   # ── Deploy frontend to Vercel ─────────────────────────────────────────────
   deploy-frontend:
