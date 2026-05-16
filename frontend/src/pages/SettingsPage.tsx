@@ -278,7 +278,7 @@ function AvatarPickerModal({
 
         {/* Preview */}
         <div className="flex items-center gap-4 px-5 py-4 border-b border-surface-border bg-surface-input/40">
-          <UserAvatar avatar={draft} name={name} size={56} showRing />
+          <UserAvatar avatar={draft} name={name} size={56} showRing glow animatedBorder presence="online" />
           <div>
             <p className="text-sm font-semibold text-foreground">{name || 'Your name'}</p>
             <p className="text-xs text-foreground-muted mt-0.5">Preview</p>
@@ -636,7 +636,7 @@ export default function SettingsPage() {
                     className="relative group shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                     aria-label="Change avatar"
                   >
-                    <UserAvatar avatar={avatar} name={name || 'U'} size={64} showRing />
+                    <UserAvatar avatar={avatar} name={name || 'U'} size={64} showRing glow animatedBorder presence="online" />
                     {/* Hover overlay */}
                     <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <Camera size={18} className="text-white" />

@@ -19,6 +19,7 @@ const navItems = [
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const [showProfileCard, setShowProfileCard] = useState(false);
   const navigate = useNavigate();
   const { user, logout } = useStore();
 
@@ -70,12 +71,55 @@ export default function AppShell() {
         <div className="border-t border-surface-border px-2 py-3 space-y-1">
           {/* User info */}
           {user && (
-            <div className="flex items-center gap-3 px-3 py-2">
-              <UserAvatar avatar={user.avatar} name={user.name || 'User'} size={32} />
-              {!collapsed && (
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
-                  <p className="text-xs text-foreground-muted truncate">{user.headline || user.email}</p>
+            <div
+              className="relative"
+              onMouseEnter={() => setShowProfileCard(true)}
+              onMouseLeave={() => setShowProfileCard(false)}
+            >
+              <div className="flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200 hover:bg-surface-hover/80">
+                <UserAvatar
+                  avatar={user.avatar}
+                  name={user.name || 'User'}
+                  size={collapsed ? 36 : 38}
+                  glow
+                  animatedBorder
+                  presence="online"
+                />
+                {!collapsed && (
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                    <p className="text-xs text-foreground-muted truncate">{user.headline || user.email}</p>
+                  </div>
+                )}
+              </div>
+
+              {showProfileCard && (
+                <div className={`absolute bottom-full mb-3 z-30 w-64 rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.98),rgba(15,23,42,0.95))] p-4 shadow-2xl backdrop-blur-xl ${collapsed ? 'left-0' : 'left-2'}`}>
+                  <div className="flex items-start gap-3">
+                    <UserAvatar
+                      avatar={user.avatar}
+                      name={user.name || 'User'}
+                      size={52}
+                      glow
+                      animatedBorder
+                      presence="online"
+                      showRing
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
+                        <span className="rounded-full bg-emerald-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                          Online
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-foreground-muted">{user.headline || 'Building workflows and collaborating live.'}</p>
+                      <p className="mt-2 truncate text-xs text-foreground-secondary">{user.email}</p>
+                      <div className="mt-3 flex items-center gap-2 text-[11px] text-foreground-muted">
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">{user.role || 'Member'}</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">Presence active</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -48,55 +48,130 @@ export function getAvatarBackground(avatar: AvatarData | null | undefined, name:
   return `linear-gradient(135deg, ${fallback.from}, ${fallback.to})`;
 }
 
+function getAvatarColors(avatar: AvatarData | null | undefined, name: string) {
+  if (avatar?.type === 'gradient' && avatar.gradient) {
+    return avatar.gradient;
+  }
+  return getDefaultGradient(name);
+}
+
 export function UserAvatar({
   avatar,
   name,
   size = 40,
   className = '',
   showRing = false,
+  presence = 'online',
+  glow = false,
+  animatedBorder = true,
 }: {
   avatar?: AvatarData | null;
   name: string;
   size?: number;
   className?: string;
   showRing?: boolean;
+  presence?: 'online' | 'away' | 'busy' | 'offline';
+  glow?: boolean;
+  animatedBorder?: boolean;
 }) {
   const fontSize = Math.max(14, Math.round(size * 0.38));
   const ringClass = showRing ? 'ring-1 ring-white/10 ring-offset-2 ring-offset-surface-card' : '';
+  const statusColor =
+    presence === 'busy'
+      ? '#ef4444'
+      : presence === 'away'
+        ? '#f59e0b'
+        : presence === 'offline'
+          ? '#6b7280'
+          : '#22c55e';
+  const glowShadow = glow
+    ? presence === 'busy'
+      ? '0 0 0 1px rgba(239,68,68,0.2), 0 0 22px rgba(239,68,68,0.25)'
+      : presence === 'away'
+        ? '0 0 0 1px rgba(245,158,11,0.2), 0 0 22px rgba(245,158,11,0.22)'
+        : presence === 'offline'
+          ? '0 0 0 1px rgba(107,114,128,0.18), 0 0 12px rgba(107,114,128,0.18)'
+          : '0 0 0 1px rgba(34,197,94,0.2), 0 0 22px rgba(34,197,94,0.24)'
+    : undefined;
+  const hasAnimatedBorder = animatedBorder && avatar?.type !== 'image';
+  const avatarBg = getAvatarBackground(avatar, name);
+  const avatarColors = getAvatarColors(avatar, name);
+  const wrapperSize = size;
+  const innerSize = Math.max(0, size - (hasAnimatedBorder ? 4 : 0));
+  const baseWrapperClass = `relative inline-flex items-center justify-center shrink-0 ${className}`.trim();
+
+  const withPresence = (child: React.ReactNode) => (
+    <div
+      className={baseWrapperClass}
+      style={{ width: wrapperSize, height: wrapperSize, filter: glowShadow ? 'drop-shadow(0 0 0 transparent)' : undefined }}
+      title={name}
+    >
+      <div style={{ boxShadow: glowShadow }} className="rounded-full">
+        {child}
+      </div>
+      <span
+        className="absolute bottom-[1px] right-[1px] rounded-full border-2 border-surface-card"
+        style={{ width: Math.max(9, size * 0.24), height: Math.max(9, size * 0.24), backgroundColor: statusColor }}
+      />
+    </div>
+  );
 
   if (avatar?.type === 'image' && avatar.imageUrl) {
-    return (
-      <img
-        src={avatar.imageUrl}
-        alt={name}
-        className={`rounded-full object-cover shadow-lg shrink-0 ${ringClass} ${className}`.trim()}
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  if (avatar?.type === 'emoji' && avatar.emoji) {
-    return (
+    return withPresence(
       <div
-        className={`rounded-full flex items-center justify-center shadow-lg shrink-0 bg-surface-border ${ringClass} ${className}`.trim()}
-        style={{ width: size, height: size, fontSize: fontSize * 1.2 }}
-        title={name}
+        className={`relative overflow-hidden rounded-full shadow-lg bg-surface-border ${ringClass}`.trim()}
+        style={{ width: size, height: size }}
       >
-        {avatar.emoji}
+        <img
+          src={avatar.imageUrl}
+          alt={name}
+          className="block h-full w-full object-cover object-center"
+          draggable={false}
+        />
       </div>
     );
   }
 
-  const bg = getAvatarBackground(avatar, name);
-  const initial = name.trim().charAt(0).toUpperCase();
+  if (avatar?.type === 'emoji' && avatar.emoji) {
+    const emojiCore = (
+      <div
+        className={`rounded-full flex items-center justify-center shadow-lg bg-surface-border ${ringClass}`.trim()}
+        style={{ width: innerSize, height: innerSize, fontSize: fontSize * 1.2 }}
+      >
+        {avatar.emoji}
+      </div>
+    );
 
-  return (
+    return withPresence(
+      hasAnimatedBorder ? (
+        <div
+          className="flowa-avatar-animated-ring rounded-full p-[2px]"
+          style={{ width: size, height: size, backgroundImage: `conic-gradient(from 0deg, ${avatarColors.from}, ${avatarColors.to}, rgba(255,255,255,0.2), ${avatarColors.from})` }}
+        >
+          {emojiCore}
+        </div>
+      ) : emojiCore
+    );
+  }
+
+  const initial = name.trim().charAt(0).toUpperCase();
+  const gradientCore = (
     <div
-      className={`rounded-full flex items-center justify-center text-white font-bold uppercase select-none shadow-lg shrink-0 ${ringClass} ${className}`.trim()}
-      style={{ width: size, height: size, fontSize, background: bg }}
-      title={name}
+      className={`rounded-full flex items-center justify-center text-white font-bold uppercase select-none shadow-lg ${ringClass}`.trim()}
+      style={{ width: innerSize, height: innerSize, fontSize, background: avatarBg }}
     >
       {initial || <User size={Math.max(14, size * 0.35)} />}
     </div>
+  );
+
+  return withPresence(
+    hasAnimatedBorder ? (
+      <div
+        className="flowa-avatar-animated-ring rounded-full p-[2px]"
+        style={{ width: size, height: size, backgroundImage: `conic-gradient(from 0deg, rgba(255,255,255,0.10), ${avatarColors.from}, ${avatarColors.to}, rgba(255,255,255,0.18), ${avatarColors.from})` }}
+      >
+        {gradientCore}
+      </div>
+    ) : gradientCore
   );
 }

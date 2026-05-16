@@ -18,8 +18,22 @@ html {
     transform: translateY(0);
   }
 }
+
+@keyframes avatarOrbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
 #root {
   animation: pageEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.flowa-avatar-animated-ring {
+  animation: avatarOrbit 6s linear infinite;
+  will-change: transform;
 }
 
 /* ── Theme CSS Variables ── */

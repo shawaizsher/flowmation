@@ -486,7 +486,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-4">
-                <UserAvatar avatar={user?.avatar} name={user?.name || 'User'} size={52} showRing />
+                <UserAvatar avatar={user?.avatar} name={user?.name || 'User'} size={52} showRing glow animatedBorder presence="online" />
                 <div>
                   <h1 className="font-display text-2xl font-bold text-foreground">
                     Welcome back{user?.name ? `, ${user.name}` : ''}
