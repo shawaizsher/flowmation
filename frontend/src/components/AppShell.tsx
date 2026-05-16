@@ -1,27 +1,52 @@
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Bell,
+  MessagesSquare,
+  UserPlus,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import FlowaLogo from './FlowaLogo';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import toast from 'react-hot-toast';
 import { UserAvatar } from './UserAvatar';
+import { authApi } from '../utils/api';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/team', icon: UserPlus, label: 'Team' },
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
+  { to: '/inbox', icon: MessagesSquare, label: 'Inbox' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const navigate = useNavigate();
-  const { user, logout } = useStore();
+  const { user, token, logout } = useStore();
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    authApi.notifications()
+      .then((res) => {
+        if (!active) return;
+        setUnreadNotifications(Number(res.data.unreadCount || 0));
+      })
+      .catch(() => {
+        if (!active) return;
+        setUnreadNotifications(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const handleLogout = () => {
     logout();
@@ -61,7 +86,14 @@ export default function AppShell() {
                 }`
               }
             >
-              <item.icon size={18} className="min-w-[18px]" />
+              <div className="relative min-w-[18px]">
+                <item.icon size={18} className="min-w-[18px]" />
+                {item.to === '/notifications' && unreadNotifications > 0 && (
+                  <span className="absolute -right-2 -top-2 rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </div>
               {!collapsed && <span className="truncate">{item.label}</span>}
             </NavLink>
           ))}

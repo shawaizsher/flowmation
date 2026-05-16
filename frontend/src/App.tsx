@@ -6,6 +6,9 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
+import NotificationsPage from './pages/NotificationsPage';
+import InboxPage from './pages/InboxPage';
+import TeamPage from './pages/TeamPage';
 import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -37,6 +40,9 @@ export default function App() {
 
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/team" element={<TeamPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/inbox" element={<InboxPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

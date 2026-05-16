@@ -46,7 +46,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { workflowApi, executionApi, nodeApi, aiApi, versionApi } from '../utils/api';
+import { workflowApi, executionApi, nodeApi, aiApi, versionApi, collaborationApi } from '../utils/api';
 import { useStore } from '../store';
 import FlowNode from '../components/canvas/FlowNode';
 import BanterLoader from '../components/BanterLoader';
@@ -141,6 +141,9 @@ function EditorCanvas() {
   const [nodeComments, setNodeComments] = useState<any[]>([]);
   const [activityFeed, setActivityFeed] = useState<any[]>([]);
   const [sharedDebugFeed, setSharedDebugFeed] = useState<any[]>([]);
+  const [workflowCollaborators, setWorkflowCollaborators] = useState<any[]>([]);
+  const [workflowProgressFeed, setWorkflowProgressFeed] = useState<any[]>([]);
+  const [collaborationLoading, setCollaborationLoading] = useState(false);
   const [promptSandboxNodeId, setPromptSandboxNodeId] = useState('');
   const [promptSandboxInput, setPromptSandboxInput] = useState('{\n  "body": {\n    "email": "lead@example.com",\n    "message": "Customer wants a product demo",\n    "priority": "high"\n  }\n}');
   const [promptSandboxResult, setPromptSandboxResult] = useState<any>(null);
@@ -169,6 +172,23 @@ function EditorCanvas() {
   const executionPollInFlightRef = useRef(false);
 
   const workspaceId = workspace?.id;
+
+  const loadCollaborationPanel = useCallback(async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setCollaborationLoading(true);
+      const [membersRes, activityRes] = await Promise.all([
+        collaborationApi.workflowMembers(workspaceId, id),
+        collaborationApi.workflowActivity(workspaceId, id),
+      ]);
+      setWorkflowCollaborators(membersRes.data.members || []);
+      setWorkflowProgressFeed(activityRes.data.activity || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to load collaboration data');
+    } finally {
+      setCollaborationLoading(false);
+    }
+  }, [workspaceId, id]);
 
   const normalizeGraph = useCallback((rawGraph: any) => {
     if (!rawGraph) return { nodes: [], edges: [], comments: [] };
@@ -1395,7 +1415,14 @@ function EditorCanvas() {
             <Store size={16} />
           </button>
           <button
-            onClick={() => setRightPanel(rightPanel === 'collaboration' ? 'none' : 'collaboration')}
+            onClick={() => {
+              if (rightPanel === 'collaboration') {
+                setRightPanel('none');
+                return;
+              }
+              setRightPanel('collaboration');
+              loadCollaborationPanel();
+            }}
             className={`rounded p-1.5 ${rightPanel === 'collaboration' ? 'bg-brand-500/20 text-brand-400' : 'text-foreground-muted hover:text-foreground'}`}
             title="Live collaboration"
           >
@@ -2113,6 +2140,38 @@ function EditorCanvas() {
 
                 <div className="space-y-3">
                   <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-foreground">Workflow Access</h4>
+                      <button
+                        onClick={loadCollaborationPanel}
+                        className="text-[11px] font-semibold text-brand-300 hover:text-brand-200"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                    {collaborationLoading ? (
+                      <p className="text-xs text-foreground-muted">Loading collaborators...</p>
+                    ) : workflowCollaborators.length === 0 ? (
+                      <p className="text-xs text-foreground-muted">No explicit workflow members yet. Workspace access still applies.</p>
+                    ) : (
+                      workflowCollaborators.map((member) => (
+                        <div key={member.userId} className="mb-2 flex items-center justify-between rounded-md border border-surface-border bg-surface-card p-2">
+                          <div className="flex items-center gap-2">
+                            <UserAvatar avatar={member.avatar} name={member.name || 'User'} size={28} />
+                            <div>
+                              <p className="text-xs font-semibold text-foreground">{member.name}</p>
+                              <p className="text-[11px] text-foreground-muted">{member.workspaceRole} • {member.accessRole}</p>
+                            </div>
+                          </div>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground-secondary">
+                            {member.accessRole}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
                     <h4 className="mb-2 text-sm font-semibold text-foreground">Presence</h4>
                     {collaborators.length === 0 ? (
                       <p className="text-xs text-foreground-muted">No other collaborators are currently in this workflow.</p>
@@ -2194,6 +2253,25 @@ function EditorCanvas() {
                         <div key={item.id} className="mb-2 rounded-md border border-surface-border bg-surface-card p-2">
                           <p className="text-xs font-semibold text-foreground">{item.actorName}</p>
                           <p className="mt-1 text-xs text-foreground-muted">{item.summary}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">Progress Timeline</h4>
+                    {workflowProgressFeed.length === 0 ? (
+                      <p className="text-xs text-foreground-muted">No tracked workflow progress yet.</p>
+                    ) : (
+                      workflowProgressFeed.slice(0, 8).map((item) => (
+                        <div key={item.id} className="mb-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-foreground">{item.title}</p>
+                            <span className="text-[10px] text-foreground-muted">
+                              {new Date(item.createdAt).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          {item.body && <p className="mt-1 text-xs text-foreground-muted">{item.body}</p>}
                         </div>
                       ))
                     )}

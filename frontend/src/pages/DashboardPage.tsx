@@ -154,17 +154,16 @@ export default function DashboardPage() {
       return;
     }
 
-    const tags = [
-      `visibility:${collaborationMode}`,
-      ...selectedCollaboratorIds.map((uid) => `collab-user:${uid}`),
-    ];
-
     try {
       setCreatingWorkflow(true);
       const res = await workflowApi.create(workspaceId, {
         name,
         description,
-        tags,
+        tags: [`visibility:${collaborationMode}`],
+        collaborators: selectedCollaboratorIds.map((userId) => ({
+          userId,
+          accessRole: 'edit',
+        })),
       });
       toast.success('Workflow created');
       setShowCreateModal(false);
