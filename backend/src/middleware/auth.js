@@ -2,6 +2,16 @@ const jwt = require('jsonwebtoken');
 const { query } = require('../db');
 const logger = require('../utils/logger');
 
+function parseUserSettings(rawSettings) {
+  if (!rawSettings) return {};
+  if (typeof rawSettings === 'object') return rawSettings;
+  try {
+    return JSON.parse(rawSettings);
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Authenticate JWT token from Authorization header
  */
@@ -16,7 +26,7 @@ async function authenticate(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     const result = await query(
-      'SELECT id, email, name, role, is_active FROM users WHERE id = $1',
+      'SELECT id, email, name, role, settings, is_active FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -29,7 +39,17 @@ async function authenticate(req, res, next) {
       return res.status(403).json({ error: 'Account is deactivated' });
     }
 
-    req.user = user;
+    const settings = parseUserSettings(user.settings);
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      settings,
+      avatar: settings.avatar || null,
+      headline: typeof settings.headline === 'string' ? settings.headline : '',
+      is_active: user.is_active,
+    };
     next();
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {

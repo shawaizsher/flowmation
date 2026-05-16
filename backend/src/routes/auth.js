@@ -9,6 +9,62 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 
+function parseUserSettings(rawSettings) {
+  if (!rawSettings) return {};
+  if (typeof rawSettings === 'object') return rawSettings;
+  try {
+    return JSON.parse(rawSettings);
+  } catch {
+    return {};
+  }
+}
+
+function formatUser(row) {
+  if (!row) return null;
+  const settings = parseUserSettings(row.settings);
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+    avatar: settings.avatar || null,
+    headline: typeof settings.headline === 'string' ? settings.headline : '',
+  };
+}
+
+function sanitizeAvatar(avatar) {
+  if (!avatar || typeof avatar !== 'object') return null;
+
+  if (avatar.type === 'emoji' && typeof avatar.emoji === 'string' && avatar.emoji.trim()) {
+    return { type: 'emoji', emoji: avatar.emoji.trim().slice(0, 16) };
+  }
+
+  if (
+    avatar.type === 'image' &&
+    typeof avatar.imageUrl === 'string' &&
+    avatar.imageUrl.startsWith('data:image/')
+  ) {
+    return { type: 'image', imageUrl: avatar.imageUrl.slice(0, 1024 * 1024) };
+  }
+
+  if (
+    avatar.type === 'gradient' &&
+    avatar.gradient &&
+    typeof avatar.gradient.from === 'string' &&
+    typeof avatar.gradient.to === 'string'
+  ) {
+    return {
+      type: 'gradient',
+      gradient: {
+        from: avatar.gradient.from.slice(0, 32),
+        to: avatar.gradient.to.slice(0, 32),
+      },
+    };
+  }
+
+  return null;
+}
+
 // ── POST /api/auth/register ──
 router.post('/register', async (req, res) => {
   try {
@@ -33,8 +89,8 @@ router.post('/register', async (req, res) => {
 
     const result = await transaction(async (client) => {
       const userResult = await client.query(
-        'INSERT INTO users (email, password_hash, name, email_verified) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-        [email.toLowerCase(), passwordHash, name, false]
+        "INSERT INTO users (email, password_hash, name, email_verified, settings) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, settings",
+        [email.toLowerCase(), passwordHash, name, false, JSON.stringify({})]
       );
       const user = userResult.rows[0];
 
@@ -75,7 +131,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       message: 'Account created! Enter the 6-digit code we sent to your email.',
-      user: { id: result.user.id, email: result.user.email, name: result.user.name },
+      user: formatUser(result.user),
       emailVerificationRequired: true,
     });
   } catch (err) {
@@ -120,10 +176,10 @@ router.get('/verify-email', async (req, res) => {
 
     // Fetch user + workspace for auto-login
     const userResult = await query(
-      'SELECT id, email, name, role FROM users WHERE id = $1',
+      'SELECT id, email, name, role, settings FROM users WHERE id = $1',
       [record.user_id]
     );
-    const user = userResult.rows[0];
+    const user = formatUser(userResult.rows[0]);
 
     const workspaces = await query(
       `SELECT w.id, w.name, w.slug, wm.role
@@ -171,15 +227,16 @@ router.post('/verify-otp', async (req, res) => {
 
     // Look up user
     const userResult = await query(
-      'SELECT id, name, email, email_verified, role FROM users WHERE email = $1',
+      'SELECT id, name, email, email_verified, role, settings FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
     if (userResult.rows.length === 0) {
       return res.status(400).json({ error: 'No account found for this email' });
     }
-    const user = userResult.rows[0];
+    const rawUser = userResult.rows[0];
+    const user = formatUser(rawUser);
 
-    if (user.email_verified) {
+    if (rawUser.email_verified) {
       // Already verified — just return a JWT so the frontend can log in
       const workspaces = await query(
         `SELECT w.id, w.name, w.slug, wm.role FROM workspaces w
@@ -296,7 +353,7 @@ router.post('/login', async (req, res) => {
     }
 
     const result = await query(
-      'SELECT id, email, password_hash, name, role, is_active, email_verified FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, name, role, settings, is_active, email_verified FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
@@ -344,12 +401,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      },
+      user: formatUser(user),
       workspaces: workspaces.rows
     });
   } catch (err) {
@@ -377,6 +429,48 @@ router.get('/me', authenticate, async (req, res) => {
   } catch (err) {
     logger.error('Get me error:', err);
     res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+// ── PUT /api/auth/profile ──
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const nextName = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const nextHeadline = typeof req.body.headline === 'string' ? req.body.headline.trim() : '';
+    const nextAvatar = sanitizeAvatar(req.body.avatar);
+
+    if (!nextName || nextName.length < 2) {
+      return res.status(400).json({ error: 'Name must be at least 2 characters' });
+    }
+
+    if (nextName.length > 80) {
+      return res.status(400).json({ error: 'Name must be 80 characters or fewer' });
+    }
+
+    if (nextHeadline.length > 120) {
+      return res.status(400).json({ error: 'Headline must be 120 characters or fewer' });
+    }
+
+    const mergedSettings = {
+      ...(req.user.settings || {}),
+      avatar: nextAvatar,
+      headline: nextHeadline,
+    };
+
+    const result = await query(
+      `UPDATE users
+       SET name = $1,
+           settings = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, email, name, role, settings`,
+      [nextName, JSON.stringify(mergedSettings), req.user.id]
+    );
+
+    res.json({ user: formatUser(result.rows[0]) });
+  } catch (err) {
+    logger.error('Update profile error:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

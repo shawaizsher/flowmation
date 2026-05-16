@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useStore } from '../store';
+import type { AvatarData } from '../components/UserAvatar';
 
 /* ------------------------------------------------------------------ */
 /*  Base Axios instance                                                */
@@ -59,6 +60,9 @@ export const authApi = {
     api.post('/auth/verify-otp', { email, code }),
 
   me: () => api.get('/auth/me'),
+
+  updateProfile: (data: { name: string; avatar?: AvatarData | null; headline?: string }) =>
+    api.put('/auth/profile', data),
 };
 
 /* ------------------------------------------------------------------ */

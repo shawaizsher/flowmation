@@ -9,6 +9,16 @@ const WS_EVENTS_CHANNEL = 'ws:execution-events';
 // Color palette for collaborators
 const COLORS = ['#F63049', '#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
+function parseUserSettings(rawSettings) {
+  if (!rawSettings) return {};
+  if (typeof rawSettings === 'object') return rawSettings;
+  try {
+    return JSON.parse(rawSettings);
+  } catch {
+    return {};
+  }
+}
+
 class WebSocketManager {
   constructor() {
     this.wss = null;
@@ -50,18 +60,25 @@ class WebSocketManager {
 
       // Fetch user info
       let userName = 'Unknown';
+      let avatar = null;
+      let headline = '';
       try {
-        const result = await query('SELECT name FROM users WHERE id = $1', [userId]);
-        if (result.rows.length > 0) userName = result.rows[0].name;
+        const result = await query('SELECT name, settings FROM users WHERE id = $1', [userId]);
+        if (result.rows.length > 0) {
+          userName = result.rows[0].name;
+          const settings = parseUserSettings(result.rows[0].settings);
+          avatar = settings.avatar || null;
+          headline = typeof settings.headline === 'string' ? settings.headline : '';
+        }
       } catch (e) { /* fallback to Unknown */ }
 
       const color = COLORS[this.colorIndex % COLORS.length];
       this.colorIndex++;
 
-      this.clients.set(socketId, { ws, userId, userName, workspaceId: null, color });
+      this.clients.set(socketId, { ws, userId, userName, workspaceId: null, color, avatar, headline });
 
       // Send connected message
-      this.send(ws, { type: 'connected', userId, color });
+      this.send(ws, { type: 'connected', userId, color, avatar, headline });
 
       ws.on('message', (data) => {
         try {
@@ -233,13 +250,15 @@ class WebSocketManager {
     const presence = this.workflowPresence.get(workflowId);
 
     // Add to presence
-    presence.set(client.userId, {
-      socketId,
-      userName: client.userName,
-      color: client.color,
-      cursor: null,
-      selectedNode: null
-    });
+      presence.set(client.userId, {
+        socketId,
+        userName: client.userName,
+        color: client.color,
+        avatar: client.avatar || null,
+        headline: client.headline || '',
+        cursor: null,
+        selectedNode: null
+      });
 
     // Update DB
     try {
@@ -260,6 +279,8 @@ class WebSocketManager {
           userId: uid,
           userName: info.userName,
           color: info.color,
+          avatar: info.avatar || null,
+          headline: info.headline || '',
           cursor: info.cursor,
           selectedNode: info.selectedNode
         });
@@ -278,7 +299,9 @@ class WebSocketManager {
       workflowId,
       userId: client.userId,
       userName: client.userName,
-      color: client.color
+      color: client.color,
+      avatar: client.avatar || null,
+      headline: client.headline || ''
     }, client.userId);
   }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { AvatarData } from '../components/UserAvatar';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -10,6 +11,8 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  avatar?: AvatarData | null;
+  headline?: string;
 }
 
 export interface Workspace {
@@ -48,6 +51,7 @@ interface AppState {
   workspace: Workspace | null;
 
   setAuth: (token: string, user: User, workspace: Workspace) => void;
+  setUser: (user: User) => void;
   logout: () => void;
   setWorkspace: (ws: Workspace) => void;
 
@@ -92,6 +96,7 @@ export const useStore = create<AppState>()(
       workspace: null,
 
       setAuth: (token, user, workspace) => set({ token, user, workspace }),
+      setUser: (user) => set({ user }),
       logout: () =>
         set({
           token: null,

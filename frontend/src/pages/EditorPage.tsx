@@ -54,6 +54,7 @@ import NodeIcon from '../components/canvas/NodeIcon';
 import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
 import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
+import { UserAvatar } from '../components/UserAvatar';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
 
@@ -502,7 +503,7 @@ function EditorCanvas() {
         break;
       case 'user_joined':
         setCollaborators((prev) => [...prev.filter((c) => c.userId !== msg.userId), {
-          userId: msg.userId, userName: msg.userName, color: msg.color
+          userId: msg.userId, userName: msg.userName, color: msg.color, avatar: msg.avatar, headline: msg.headline
         }]);
         toast(`${msg.userName} joined`, { icon: '👋', duration: 2000 });
         break;
@@ -1342,11 +1343,10 @@ function EditorCanvas() {
               {collaborators.map((c) => (
                 <div
                   key={c.userId}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-surface text-xs font-bold text-white"
-                  style={{ backgroundColor: c.color }}
+                  className="rounded-full border-2 border-surface"
                   title={c.userName}
                 >
-                  {c.userName?.[0]?.toUpperCase() || '?'}
+                  <UserAvatar avatar={c.avatar} name={c.userName || '?'} size={28} />
                 </div>
               ))}
             </div>
@@ -2119,11 +2119,11 @@ function EditorCanvas() {
                     ) : (
                       collaborators.map((person) => (
                         <div key={person.userId} className="mb-2 flex items-center gap-2 rounded-md border border-surface-border bg-surface-card p-2">
-                          <div className="h-7 w-7 rounded-full" style={{ backgroundColor: person.color }} />
+                          <UserAvatar avatar={person.avatar} name={person.userName || 'User'} size={28} />
                           <div>
                             <p className="text-xs font-semibold text-foreground">{person.userName}</p>
                             <p className="text-[11px] text-foreground-muted">
-                              {person.selectedNode ? `Focused on ${person.selectedNode}` : 'Browsing the canvas'}
+                              {person.headline || (person.selectedNode ? `Focused on ${person.selectedNode}` : 'Browsing the canvas')}
                             </p>
                           </div>
                         </div>
