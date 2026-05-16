@@ -76,7 +76,7 @@ function cosineSim(a, b) {
 const SYNONYMS = {
   send: ['post','submit','deliver','push','dispatch','fire','transmit'],
   receive: ['get','fetch','pull','retrieve','read','load'],
-  notify: ['alert','message','inform','ping','tell','remind'],
+  notify: ['alert','message','inform','ping','tell','remind','notify'],
   schedule: ['cron','recurring','periodic','timer','interval'],
   webhook: ['http','endpoint','callback','incoming'],
   transform: ['convert','map','parse','modify','format','shape'],
@@ -87,8 +87,12 @@ const SYNONYMS = {
   email: ['mail','smtp','gmail'],
   database: ['db','sql','table'],
   spreadsheet: ['sheet','sheets','excel','csv'],
-  daily: ['everyday'],
+  daily: ['everyday','each day','every day'],
   hourly: ['per hour'],
+  fetch: ['retrieve','pull','download','get','check','lookup','look up','request','call','hit'],
+  whatsapp: ['wa','whats app'],
+  sms: ['text message','text msg'],
+  price: ['rate','cost','value','quote','exchange rate'],
 };
 
 function expandSynonyms(tokens) {
@@ -240,22 +244,22 @@ const ENTITY_PATTERNS = {
     postgres:      ['postgres', 'postgresql', 'sql database', 'database', 'pg', 'db'],
     mysql:         ['mysql'],
     mongodb:       ['mongo', 'mongodb', 'nosql'],
-    api:           ['api', 'rest api', 'http api', 'endpoint', 'web service'],
+    api:           ['api', 'rest api', 'http api', 'endpoint', 'web service', 'http request', 'http get', 'rest call', 'rest endpoint', 'price api', 'gold api', 'stock api', 'weather api', 'external api', 'third party'],
     s3:            ['s3', 'aws s3', 'amazon s3', 'bucket'],
     github:        ['github', 'pull request', 'commit', 'pr'],
     csv:           ['csv', 'csv file'],
     pdf:           ['pdf', 'pdf file'],
   },
   actions: {
-    fetch:    ['fetch', 'get data', 'retrieve', 'read from', 'pull', 'download', 'load', 'query'],
-    send:     ['send', 'post', 'submit', 'deliver', 'dispatch', 'push'],
-    transform:['transform', 'convert', 'map', 'format', 'modify', 'shape'],
-    parse:    ['parse', 'extract'],
-    filter:   ['filter', 'where', 'only', 'exclude', 'narrow'],
-    store:    ['store', 'save', 'insert', 'write', 'persist', 'add to', 'log to', 'append'],
-    notify:   ['notify', 'alert', 'inform', 'tell', 'ping', 'message'],
-    classify: ['classify', 'categorize', 'label', 'tag', 'sort by'],
-    summarize:['summarize', 'summary', 'shorten', 'abstract'],
+    fetch:    ['fetch', 'get data', 'retrieve', 'read from', 'pull', 'download', 'load', 'query', 'check', 'look up', 'lookup', 'get price', 'get rate', 'get stock', 'request data', 'call api', 'http request', 'get request'],
+    send:     ['send', 'post', 'submit', 'deliver', 'dispatch', 'push', 'forward', 'relay'],
+    transform:['transform', 'convert', 'map', 'format', 'modify', 'shape', 'reshape', 'reformat'],
+    parse:    ['parse', 'extract', 'decode', 'deserialize'],
+    filter:   ['filter', 'where', 'only', 'exclude', 'narrow', 'remove', 'drop', 'skip'],
+    store:    ['store', 'save', 'insert', 'write', 'persist', 'add to', 'log to', 'append', 'record', 'archive'],
+    notify:   ['notify', 'alert', 'inform', 'tell', 'ping', 'message', 'warn', 'remind'],
+    classify: ['classify', 'categorize', 'label', 'tag', 'sort by', 'bucket', 'group'],
+    summarize:['summarize', 'summary', 'shorten', 'abstract', 'condense', 'digest'],
   },
   destinations: {
     slack:         ['slack'],
@@ -274,13 +278,16 @@ const ENTITY_PATTERNS = {
     airtable:      ['airtable'],
   },
   schedules: {
-    every_minute: { kw: ['every minute', 'each minute', 'per minute'],     cron: '* * * * *',    label: 'every minute' },
-    hourly:       { kw: ['hourly', 'every hour', 'each hour'],             cron: '0 * * * *',    label: 'every hour' },
-    daily_9:      { kw: ['daily', 'every day', 'each morning', 'at 9'],     cron: '0 9 * * *',    label: 'daily at 9am' },
-    daily_noon:   { kw: ['at noon', 'midday'],                              cron: '0 12 * * *',   label: 'daily at noon' },
-    midnight:     { kw: ['midnight', 'at 12am'],                            cron: '0 0 * * *',    label: 'every midnight' },
-    weekly:       { kw: ['weekly', 'every monday', 'every week'],           cron: '0 9 * * 1',    label: 'every Monday 9am' },
-    monthly:      { kw: ['monthly', 'every month'],                         cron: '0 9 1 * *',    label: 'first of the month' },
+    every_minute: { kw: ['every minute', 'each minute', 'per minute', 'every 1 minute'],                                                           cron: '* * * * *',    label: 'every minute' },
+    every_5min:   { kw: ['every 5 minutes', 'every five minutes', 'each 5 minutes'],                                                               cron: '*/5 * * * *',  label: 'every 5 minutes' },
+    every_15min:  { kw: ['every 15 minutes', 'every fifteen minutes', 'each 15 minutes', 'every quarter hour'],                                    cron: '*/15 * * * *', label: 'every 15 minutes' },
+    hourly:       { kw: ['hourly', 'every hour', 'each hour', 'once an hour', 'per hour'],                                                         cron: '0 * * * *',    label: 'every hour' },
+    daily_9:      { kw: ['daily', 'every day', 'each morning', 'at 9', 'each day', 'every morning', 'once a day', 'once daily', 'day'],            cron: '0 9 * * *',    label: 'daily at 9am' },
+    daily_noon:   { kw: ['at noon', 'midday', 'lunch time', 'at 12pm', '12 pm'],                                                                   cron: '0 12 * * *',   label: 'daily at noon' },
+    daily_6pm:    { kw: ['at 6pm', 'evening', 'every evening', 'end of day', 'eod', '6 pm'],                                                       cron: '0 18 * * *',   label: 'daily at 6pm' },
+    midnight:     { kw: ['midnight', 'at 12am', 'nightly', 'every night', 'each night', 'at night', 'overnight'],                                  cron: '0 0 * * *',    label: 'every midnight' },
+    weekly:       { kw: ['weekly', 'every monday', 'every week', 'once a week', 'each week', 'on monday'],                                         cron: '0 9 * * 1',    label: 'every Monday 9am' },
+    monthly:      { kw: ['monthly', 'every month', 'once a month', 'first of the month', 'each month'],                                            cron: '0 9 1 * *',    label: 'first of the month' },
   },
   conditions: ['if', 'when', 'only if', 'unless', 'whenever', 'in case'],
 };
@@ -421,13 +428,21 @@ function buildWorkflowFromEntities(entities) {
   x += SPACING;
 
   // 2) Source
+  const HTTP_SOURCES = new Set(['api', 'github']);
   if (entities.sources.length && NODE_SPECS.source[entities.sources[0]]) {
-    const id = addNode(NODE_SPECS.source[entities.sources[0]], x, Y);
+    const srcKey = entities.sources[0];
+    const id = addNode(NODE_SPECS.source[srcKey], x, Y);
     link(lastId, id); lastId = id; x += SPACING;
+
+    // HTTP sources almost always return JSON — auto-insert a parse step
+    if (HTTP_SOURCES.has(srcKey) && !entities.actions.includes('parse')) {
+      const parseId = addNode(NODE_SPECS.transform.parse, x, Y);
+      link(lastId, parseId); lastId = parseId; x += SPACING;
+    }
   }
 
-  // 3) Parse / JSON if requested
-  if (entities.actions.includes('parse')) {
+  // 3) Parse / JSON if explicitly requested (and not already added above)
+  if (entities.actions.includes('parse') && !HTTP_SOURCES.has(entities.sources[0])) {
     const id = addNode(NODE_SPECS.transform.parse, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   }
@@ -438,14 +453,14 @@ function buildWorkflowFromEntities(entities) {
     link(lastId, id); lastId = id; x += SPACING;
   }
 
-  // 5) AI processing
+  // 5) AI / transform processing — only when explicitly asked
   if (entities.actions.includes('classify')) {
     const id = addNode(NODE_SPECS.transform.classify, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   } else if (entities.actions.includes('summarize')) {
     const id = addNode(NODE_SPECS.transform.summarize, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
-  } else if (entities.actions.includes('transform') || entities.sources.length > 0) {
+  } else if (entities.actions.includes('transform')) {
     const id = addNode(NODE_SPECS.transform.transform, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   }
@@ -940,7 +955,11 @@ const TOPIC_VOCAB = tfidfVector(
   'integration data flow process steps action source destination chain edit ' +
   'config setup channel notify alert send fetch query store debug error fix ' +
   'gmail discord telegram twilio postgres mysql mongodb s3 github jira notion ' +
-  'classify summarize health simulate cron daily weekly hourly monthly'
+  'classify summarize health simulate cron daily weekly hourly monthly ' +
+  'price rate stock gold silver crypto bitcoin currency forex exchange ' +
+  'whatsapp sms message notification report data request call endpoint ' +
+  'stripe payment hubspot salesforce airtable google sheets drive calendar ' +
+  'webhook receive post get put delete rest json parse extract'
 );
 
 // Explicit blacklist — terms that are clearly outside the workflow domain.
@@ -1036,13 +1055,84 @@ function findNodeByText(nodes, query) {
 }
 
 
+/* ┌──────────────────────────────────────────────────────────────────────┐
+ * │ 10. INPUT VALIDATION                                                  │
+ * └──────────────────────────────────────────────────────────────────────┘ */
+
+const EXAMPLE_PROMPTS = [
+  'Fetch gold prices via HTTP and send a WhatsApp message via Twilio',
+  'Send a Slack alert when a new GitHub PR is opened',
+  'Daily report from Postgres emailed at 9am',
+  'When a webhook fires, transform the data and insert it into a database',
+];
+
+function validatePrompt(prompt) {
+  const trimmed = (prompt || '').trim();
+
+  if (trimmed.length < 5) {
+    return { valid: false, message: 'Please describe a workflow to generate. Example: "' + EXAMPLE_PROMPTS[0] + '"' };
+  }
+
+  const meaningful = removeStopWords(tokenize(trimmed));
+
+  if (meaningful.length === 0) {
+    return { valid: false, message: 'Please describe a workflow to generate.' };
+  }
+
+  // All tokens are purely numeric (e.g. "123214") or single-char noise
+  if (meaningful.every(t => /^\d+$/.test(t) || t.length < 2)) {
+    return {
+      valid: false,
+      message: "That doesn't look like a workflow description. Try: \"" + EXAMPLE_PROMPTS[1] + '"',
+    };
+  }
+
+  // High-entropy garbage detection: token has no vowels and length > 5
+  // (e.g. "sajdkhasjkd", "xkzqwrtpl") — real words always have vowels
+  const hasVowel = /[aeiou]/i;
+  const longTokens = meaningful.filter(t => t.length > 5);
+  if (longTokens.length > 0 && longTokens.every(t => !hasVowel.test(t))) {
+    return {
+      valid: false,
+      message: "That doesn't look like a workflow description. Try: \"" + EXAMPLE_PROMPTS[2] + '"',
+    };
+  }
+
+  // Topic-relevance gate: cosine similarity against workflow vocabulary
+  const topicScore = cosineSim(tfidfVector(trimmed), TOPIC_VOCAB);
+  const entities   = extractEntities(trimmed);
+
+  if (topicScore < 0.05 && entities.confidence < 2) {
+    return {
+      valid: false,
+      message: "I couldn't find any automation intent in that. Try describing a trigger, an action, and a destination — for example: \"" + EXAMPLE_PROMPTS[3] + '"',
+      suggestions: EXAMPLE_PROMPTS,
+    };
+  }
+
+  return { valid: true, entities, topicScore };
+}
+
+
 /* ════════════════════════════════════════════════════════════════════════
  *  PUBLIC API
  * ════════════════════════════════════════════════════════════════════════ */
 
 async function generateWorkflow(prompt) {
   try {
-    const entities = extractEntities(prompt);
+    // Validate before doing any work
+    const validation = validatePrompt(prompt);
+    if (!validation.valid) {
+      return {
+        success: false,
+        type: 'invalid_prompt',
+        message: validation.message,
+        suggestions: validation.suggestions || EXAMPLE_PROMPTS,
+      };
+    }
+
+    // Re-use entities already extracted during validation
+    const entities = validation.entities || extractEntities(prompt);
     logger.info(`[intelligence] generateWorkflow: ${JSON.stringify({
       triggers: entities.triggers.map(t => t.type),
       sources: entities.sources, actions: entities.actions,
