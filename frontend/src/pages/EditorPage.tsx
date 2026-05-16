@@ -90,6 +90,10 @@ function EditorCanvas() {
   const [nodeSearch, setNodeSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
+  // ML node suggestions
+  const [nodeSuggestions, setNodeSuggestions] = useState<{ type: string; score: number; reason: string }[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
   // Quick-add popover
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
@@ -1111,6 +1115,29 @@ function EditorCanvas() {
     }
   };
 
+  // ── ML node suggestions: re-fetch (debounced) whenever canvas nodes change ──
+  useEffect(() => {
+    if (!workspaceId || nodes.length === 0) {
+      setNodeSuggestions([]);
+      return;
+    }
+    const currentTypes = [...new Set(
+      nodes.map((n) => (n.data?.type || n.type || '') as string).filter(Boolean)
+    )];
+    const timer = setTimeout(async () => {
+      try {
+        setSuggestionsLoading(true);
+        const res = await workflowApi.suggestNodes(workspaceId, currentTypes);
+        setNodeSuggestions(res.data.suggestions || []);
+      } catch {
+        // silently ignore — suggestions are non-critical
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 800); // 800 ms debounce
+    return () => clearTimeout(timer);
+  }, [nodes, workspaceId]);
+
   const loadTemplatesMarketplace = async () => {
     if (!workspaceId) return;
     try {
@@ -1508,6 +1535,39 @@ function EditorCanvas() {
                 )}
               </div>
             </div>
+
+            {/* ── ML Suggested nodes panel ── */}
+            {!nodeSearch && (nodeSuggestions.length > 0 || suggestionsLoading) && (
+              <div className="border-b border-surface-border px-2 py-2">
+                <div className="flex items-center gap-1.5 px-1 mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">✦ Suggested for you</span>
+                  {suggestionsLoading && (
+                    <div className="h-2.5 w-2.5 animate-spin rounded-full border border-brand-400/40 border-t-brand-400" />
+                  )}
+                </div>
+                <div className="space-y-0.5">
+                  {nodeSuggestions.map((s) => {
+                    const def = allNodes.find((n) => n.type === s.type);
+                    if (!def) return null;
+                    return (
+                      <button
+                        key={s.type}
+                        onClick={() => handleAddNode(def)}
+                        title={s.reason}
+                        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-brand-500/10 group/sug border border-transparent hover:border-brand-500/20"
+                      >
+                        <NodeIcon nodeType={def.type} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-foreground truncate">{def.label}</div>
+                          <div className="text-[10px] text-foreground-muted truncate">{s.reason}</div>
+                        </div>
+                        <Plus size={14} className="shrink-0 text-brand-400 opacity-0 group-hover/sug:opacity-100 transition-opacity" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Scrollable category list */}
             <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
