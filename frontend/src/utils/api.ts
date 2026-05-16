@@ -226,6 +226,7 @@ export const aiApi = {
       message: string;
       history: { role: 'user' | 'assistant'; content: string }[];
       workflow: { nodes: unknown[]; edges: unknown[] };
+      pendingAction?: { type: string; nodeType?: string; nodeTypes?: string[] } | null;
     }
   ) => api.post(`/workspaces/${workspaceId}/ai/chat`, data),
 };
