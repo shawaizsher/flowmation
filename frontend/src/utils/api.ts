@@ -101,6 +101,15 @@ export const workflowApi = {
   advancedReport: (workspaceId: string, id: string) =>
     api.get(`/workspaces/${workspaceId}/workflows/${id}/advanced-report`),
 
+  credentialHealth: (workspaceId: string, id: string, credentials?: Record<string, unknown>) =>
+    api.post(`/workspaces/${workspaceId}/workflows/${id}/credential-health`, { credentials }),
+
+  promptSandbox: (
+    workspaceId: string,
+    id: string,
+    data: { nodeId: string; sampleInput?: Record<string, unknown>; credentials?: Record<string, unknown> }
+  ) => api.post(`/workspaces/${workspaceId}/workflows/${id}/prompt-sandbox`, data),
+
   generateTests: (workspaceId: string, id: string) =>
     api.post(`/workspaces/${workspaceId}/workflows/${id}/tests/generate`),
 

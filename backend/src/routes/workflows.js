@@ -2,6 +2,8 @@ const express = require('express');
 const { query, transaction } = require('../db');
 const { authenticate, requireWorkspace } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const registry = require('../nodes/registry');
+const { Client } = require('pg');
 
 const router = express.Router({ mergeParams: true });
 
@@ -34,6 +36,495 @@ function getNodeType(node) {
 
 function getNodeLabel(node) {
   return node?.data?.label || node?.id || 'Unnamed node';
+}
+
+function getNodeConfig(node) {
+  return node?.data?.config || {};
+}
+
+function getNodeCredentialId(node) {
+  return node?.data?.credentialId || node?.data?.config?.credentialId || null;
+}
+
+function getCredentialRequirementForType(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('hubspot')) {
+    return { serviceId: 'hubspot', label: 'HubSpot', scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write'] };
+  }
+  if (t.includes('slack')) {
+    return { serviceId: 'slack', label: 'Slack', scopes: ['incoming-webhook'] };
+  }
+  if (t.includes('anthropic') || t.includes('ai_classify') || t.includes('ai_summar')) {
+    return { serviceId: 'anthropic', label: 'Anthropic', scopes: ['messages:create'] };
+  }
+  if (t.includes('openai')) {
+    return { serviceId: 'openai', label: 'OpenAI', scopes: ['responses.create'] };
+  }
+  if (t.includes('postgres')) {
+    return { serviceId: 'postgres', label: 'PostgreSQL', scopes: ['connect', 'query'] };
+  }
+  if (t.includes('google_')) {
+    return { serviceId: 'google', label: 'Google', scopes: ['sheets', 'gmail', 'drive'] };
+  }
+  return null;
+}
+
+function inferOutputFields(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('webhook')) return ['body.email', 'body.message', 'body.priority', 'body.status', 'headers', 'query'];
+  if (t.includes('trigger') || t.includes('cron') || t.includes('schedule')) return ['payload', 'timestamp'];
+  if (t.includes('hubspot')) return ['contact.email', 'contact.firstname', 'contact.lastname', 'contact.id', 'success'];
+  if (t.includes('http') || t.includes('rest')) return ['body', 'statusCode', 'headers', 'success'];
+  if (t.includes('filter')) return ['passed', 'rejected'];
+  if (t.includes('classify')) return ['category', 'confidence', 'explanation'];
+  if (t.includes('summar')) return ['summary', 'highlights'];
+  if (t.includes('email')) return ['to', 'subject', 'sentAt', 'success'];
+  if (t.includes('slack')) return ['text', 'channel', 'sentAt', 'success'];
+  if (t.includes('postgres') || t.includes('mysql')) return ['rows', 'count', 'result'];
+  return ['data'];
+}
+
+function buildFieldAliases(field) {
+  const base = String(field || '').toLowerCase();
+  const aliases = new Set([base]);
+  if (base.includes('email')) aliases.add('recipient');
+  if (base.includes('message') || base.includes('text')) aliases.add('body');
+  if (base.includes('subject')) aliases.add('title');
+  if (base.includes('phone')) aliases.add('number');
+  if (base.includes('body')) aliases.add('message');
+  return [...aliases];
+}
+
+function scoreFieldMapping(sourceField, targetField) {
+  const source = String(sourceField || '').toLowerCase();
+  const target = String(targetField || '').toLowerCase();
+  if (!source || !target) return 0;
+  if (source === target) return 1;
+  if (source.endsWith(`.${target}`)) return 0.95;
+  if (target.includes('email') && (source.includes('email') || source.includes('recipient'))) return 0.92;
+  if ((target.includes('message') || target.includes('text') || target.includes('body')) &&
+      (source.includes('message') || source.includes('text') || source.includes('body') || source.includes('summary'))) return 0.9;
+  if (target.includes('subject') && (source.includes('title') || source.includes('subject') || source.includes('category'))) return 0.82;
+  if (target.includes('query') && source.includes('query')) return 0.88;
+  if (target.includes('payload') && source.includes('body')) return 0.78;
+  return 0;
+}
+
+function resolveTemplateValue(value, sampleInput) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, rawPath) => {
+    const parts = String(rawPath).trim().split('.');
+    let current = sampleInput;
+    for (const part of parts) {
+      if (current == null) return '';
+      current = current[part];
+    }
+    return current == null ? '' : String(current);
+  });
+}
+
+function estimateTokens(text) {
+  return Math.max(1, Math.ceil(String(text || '').length / 4));
+}
+
+function estimateNodeCost(nodeType, promptText, outputText) {
+  const totalTokens = estimateTokens(promptText) + estimateTokens(outputText);
+  const t = (nodeType || '').toLowerCase();
+  let per1k = 0;
+  if (t.includes('anthropic') || t.includes('ai_classify') || t.includes('ai_summar')) per1k = 0.008;
+  else if (t.includes('openai')) per1k = 0.005;
+  else if (t.includes('hubspot') || t.includes('slack') || t.includes('email')) per1k = 0;
+  return {
+    estimatedTokens: totalTokens,
+    estimatedUsd: Number(((totalTokens / 1000) * per1k).toFixed(4))
+  };
+}
+
+function buildCompilerRemediations(compile) {
+  const actions = [];
+  for (const item of compile.unsupportedNodes || []) {
+    actions.push({
+      priority: 'high',
+      nodeId: item.nodeId,
+      title: `Replace or implement ${item.nodeLabel}`,
+      action: `Backend runtime does not support "${item.nodeType}" yet.`,
+      owner: 'engineering'
+    });
+  }
+  for (const item of compile.missingConfig || []) {
+    actions.push({
+      priority: item.serviceId ? 'high' : 'medium',
+      nodeId: item.nodeId,
+      title: `Configure ${item.nodeLabel}`,
+      action: item.serviceId
+        ? `Link a ${item.serviceLabel} credential and fill ${item.fields.join(', ')}.`
+        : `Fill ${item.fields.join(', ')} in node config.`,
+      owner: item.serviceId ? 'ops' : 'builder'
+    });
+  }
+  for (const finding of compile.policy?.findings || []) {
+    actions.push({
+      priority: finding.severity === 'high' ? 'high' : 'medium',
+      nodeId: finding.nodeId,
+      title: `Review policy finding on ${finding.nodeLabel}`,
+      action: finding.message,
+      owner: 'security'
+    });
+  }
+  return actions.slice(0, 3);
+}
+
+function buildSmartInputMapper(graph) {
+  const nodeMap = new Map((graph.nodes || []).map((node) => [node.id, node]));
+  const suggestions = [];
+
+  for (const edge of graph.edges || []) {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    if (!source || !target) continue;
+
+    const sourceFields = inferOutputFields(getNodeType(source));
+    const targetConfig = getNodeConfig(target);
+    const definition = registry.get(getNodeType(target));
+    const targetSchema = definition?.configSchema || {};
+    const candidateFields = Object.keys(targetSchema).filter((key) => {
+      const field = targetSchema[key];
+      const value = targetConfig[key];
+      return field?.required || value === '' || value == null;
+    });
+
+    for (const targetField of candidateFields) {
+      const best = sourceFields
+        .map((sourceField) => ({
+          sourceField,
+          confidence: Math.max(
+            scoreFieldMapping(sourceField, targetField),
+            ...buildFieldAliases(targetField).map((alias) => scoreFieldMapping(sourceField, alias))
+          )
+        }))
+        .sort((a, b) => b.confidence - a.confidence)[0];
+
+      if (best && best.confidence >= 0.78) {
+        suggestions.push({
+          edgeId: edge.id,
+          sourceNodeId: source.id,
+          sourceNodeLabel: getNodeLabel(source),
+          sourceField: best.sourceField,
+          targetNodeId: target.id,
+          targetNodeLabel: getNodeLabel(target),
+          targetField,
+          confidence: Number(best.confidence.toFixed(2)),
+          applyValue: `{{${best.sourceField}}}`
+        });
+      }
+    }
+  }
+
+  return suggestions.slice(0, 12);
+}
+
+function buildSimulationPreview(graph) {
+  const nodeMap = new Map((graph.nodes || []).map((node) => [node.id, node]));
+  const outgoing = new Map();
+  for (const edge of graph.edges || []) {
+    if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
+    outgoing.get(edge.source).push(edge.target);
+  }
+
+  const branches = [];
+  for (const node of graph.nodes || []) {
+    const targets = outgoing.get(node.id) || [];
+    if (targets.length > 1) {
+      branches.push({
+        nodeId: node.id,
+        nodeLabel: getNodeLabel(node),
+        nodeType: getNodeType(node),
+        branches: targets.map((targetId) => ({
+          targetId,
+          targetLabel: getNodeLabel(nodeMap.get(targetId)),
+        }))
+      });
+    }
+  }
+
+  return {
+    path: (graph.nodes || []).map((node, index) => ({
+      step: index + 1,
+      nodeId: node.id,
+      nodeLabel: getNodeLabel(node),
+      nodeType: getNodeType(node)
+    })),
+    branches
+  };
+}
+
+function buildApprovalSystem(graph) {
+  const approvalNodes = (graph.nodes || [])
+    .filter((node) => getNodeType(node).toLowerCase().includes('approval'))
+    .map((node) => {
+      const config = getNodeConfig(node);
+      const timeout = Number(config.timeout || config.timeoutMinutes || 60);
+      return {
+        nodeId: node.id,
+        label: getNodeLabel(node),
+        message: config.message || 'Manual review required',
+        slaMinutes: timeout,
+        assignee: config.assignee || 'Workspace reviewer',
+        escalatesAfterMinutes: Math.max(timeout, 15),
+        status: 'ready'
+      };
+    });
+
+  return {
+    enabled: approvalNodes.length > 0,
+    nodes: approvalNodes,
+    inboxSummary: approvalNodes.length
+      ? `${approvalNodes.length} approval step(s) configured for manual review.`
+      : 'No approval nodes in this workflow yet.'
+  };
+}
+
+async function buildObservability(workspaceId, workflowId) {
+  const execResult = await query(
+    `SELECT status, duration_ms, created_at
+     FROM executions
+     WHERE workspace_id = $1 AND workflow_id = $2
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [workspaceId, workflowId]
+  );
+  const executions = execResult.rows;
+  const total = executions.length;
+  const failures = executions.filter((row) => row.status === 'failed').length;
+  const successes = executions.filter((row) => row.status === 'success').length;
+  const avgDurationMs = total
+    ? Math.round(executions.reduce((sum, row) => sum + Number(row.duration_ms || 0), 0) / total)
+    : 0;
+
+  const nodeResult = await query(
+    `SELECT node_id, node_label, node_type,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
+            SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_count,
+            AVG(duration_ms) AS avg_duration_ms,
+            MAX(duration_ms) AS max_duration_ms
+     FROM node_logs
+     WHERE execution_id IN (
+       SELECT id FROM executions WHERE workspace_id = $1 AND workflow_id = $2 ORDER BY created_at DESC LIMIT 50
+     )
+     GROUP BY node_id, node_label, node_type
+     ORDER BY failed_count DESC, avg_duration_ms DESC NULLS LAST`,
+    [workspaceId, workflowId]
+  );
+
+  return {
+    totals: {
+      executions: total,
+      successes,
+      failures,
+      failureRate: total ? Number(((failures / total) * 100).toFixed(1)) : 0,
+      avgDurationMs
+    },
+    trends: executions.slice(0, 10).reverse().map((row, index) => ({
+      run: index + 1,
+      status: row.status,
+      durationMs: Number(row.duration_ms || 0),
+      createdAt: row.created_at
+    })),
+    topBrokenNodes: nodeResult.rows.slice(0, 5).map((row) => ({
+      nodeId: row.node_id,
+      nodeLabel: row.node_label,
+      nodeType: row.node_type,
+      failedCount: Number(row.failed_count || 0),
+      successCount: Number(row.success_count || 0),
+      avgDurationMs: Math.round(Number(row.avg_duration_ms || 0)),
+      maxDurationMs: Number(row.max_duration_ms || 0)
+    }))
+  };
+}
+
+function buildPrivacyMode(graph, compile) {
+  const sensitiveNodeTypes = ['postgres', 'mysql', 'mongodb', 'email', 'slack', 'http', 'hubspot', 'ai_'];
+  const sensitiveNodes = (graph.nodes || []).filter((node) =>
+    sensitiveNodeTypes.some((type) => getNodeType(node).toLowerCase().includes(type))
+  );
+  return {
+    enabled: sensitiveNodes.length > 0 || (compile.policy?.findings || []).length > 0,
+    redactionEnabled: true,
+    sensitiveNodes: sensitiveNodes.map((node) => ({
+      nodeId: node.id,
+      nodeLabel: getNodeLabel(node),
+      nodeType: getNodeType(node)
+    })),
+    warning: sensitiveNodes.length
+      ? 'Sensitive connectors detected. Redact logs before sharing exports.'
+      : 'No sensitive connectors detected.'
+  };
+}
+
+async function testCredentialConnection(serviceId, values = {}) {
+  const service = String(serviceId || '').toLowerCase();
+  const result = { status: 'unknown', message: 'No validator available yet.', scopes: [], details: null };
+
+  if (service === 'slack') {
+    const url = values.webhook_url || values.webhookUrl;
+    if (!url) return { status: 'failed', message: 'Missing Slack webhook URL.', scopes: ['incoming-webhook'], details: null };
+    return {
+      status: /^https:\/\/hooks\.slack\.com\/services\//.test(url) ? 'passed' : 'warning',
+      message: /^https:\/\/hooks\.slack\.com\/services\//.test(url)
+        ? 'Webhook URL format looks valid.'
+        : 'Webhook URL format does not match Slack incoming webhooks.',
+      scopes: ['incoming-webhook'],
+      details: { hasBotToken: Boolean(values.bot_token) }
+    };
+  }
+
+  if (service === 'hubspot') {
+    const token = values.access_token || values.accessToken;
+    if (!token) return { status: 'failed', message: 'Missing HubSpot access token.', scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write'], details: null };
+    try {
+      const response = await fetch('https://api.hubapi.com/oauth/v1/access-tokens/' + token, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        return { status: 'warning', message: `HubSpot token check returned ${response.status}.`, scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write'], details: null };
+      }
+      const data = await response.json();
+      return {
+        status: 'passed',
+        message: 'HubSpot token responded successfully.',
+        scopes: Array.isArray(data.scopes) ? data.scopes : ['crm.objects.contacts.read', 'crm.objects.contacts.write'],
+        details: { hubId: data.hub_id || null }
+      };
+    } catch (err) {
+      return { status: 'warning', message: `HubSpot validation could not complete: ${err.message}`, scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write'], details: null };
+    }
+  }
+
+  if (service === 'postgres') {
+    const client = new Client({
+      host: values.host,
+      port: Number(values.port || 5432),
+      database: values.database,
+      user: values.username,
+      password: values.password,
+      ssl: String(values.ssl || '').toLowerCase() === 'require' ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: 5000,
+    });
+    try {
+      await client.connect();
+      await client.query('SELECT 1');
+      return { status: 'passed', message: 'PostgreSQL connection succeeded.', scopes: ['connect', 'query'], details: { host: values.host, database: values.database } };
+    } catch (err) {
+      return { status: 'failed', message: `PostgreSQL connection failed: ${err.message}`, scopes: ['connect', 'query'], details: null };
+    } finally {
+      try { await client.end(); } catch {}
+    }
+  }
+
+  if (service === 'anthropic') {
+    const key = values.api_key || values.apiKey;
+    return {
+      status: key && /^sk-ant-/.test(key) ? 'passed' : 'warning',
+      message: key ? 'Anthropic key format looks valid.' : 'Missing Anthropic API key.',
+      scopes: ['messages:create'],
+      details: { liveValidation: false }
+    };
+  }
+
+  if (service === 'openai') {
+    const key = values.api_key || values.apiKey;
+    return {
+      status: key && /^sk-/.test(key) ? 'passed' : 'warning',
+      message: key ? 'OpenAI key format looks valid.' : 'Missing OpenAI API key.',
+      scopes: ['responses.create'],
+      details: { liveValidation: false }
+    };
+  }
+
+  return result;
+}
+
+async function buildCredentialHealth(graph, credentialsMap = {}) {
+  const requiredByService = new Map();
+  for (const node of graph.nodes || []) {
+    const requirement = getCredentialRequirementForType(getNodeType(node));
+    if (!requirement) continue;
+    if (!requiredByService.has(requirement.serviceId)) {
+      requiredByService.set(requirement.serviceId, {
+        serviceId: requirement.serviceId,
+        serviceLabel: requirement.label,
+        requiredByNodes: [],
+        scopes: new Set()
+      });
+    }
+    const current = requiredByService.get(requirement.serviceId);
+    current.requiredByNodes.push({ nodeId: node.id, nodeLabel: getNodeLabel(node), credentialId: getNodeCredentialId(node) });
+    requirement.scopes.forEach((scope) => current.scopes.add(scope));
+  }
+
+  const statuses = [];
+  const usedCredentialIds = new Set();
+  for (const item of requiredByService.values()) {
+    const linked = item.requiredByNodes
+      .map((node) => node.credentialId)
+      .filter(Boolean)
+      .map((credentialId) => ({ credentialId, credential: credentialsMap[credentialId] }))
+      .filter((row) => row.credential);
+
+    if (linked.length === 0) {
+      statuses.push({
+        serviceId: item.serviceId,
+        serviceLabel: item.serviceLabel,
+        status: 'missing',
+        usage: 'required',
+        requiredScopes: [...item.scopes],
+        usedByNodes: item.requiredByNodes,
+        message: `No ${item.serviceLabel} credential is linked to the required node(s).`
+      });
+      continue;
+    }
+
+    for (const link of linked) {
+      usedCredentialIds.add(link.credentialId);
+      const check = await testCredentialConnection(link.credential.serviceId, link.credential.values || {});
+      statuses.push({
+        credentialId: link.credentialId,
+        serviceId: link.credential.serviceId,
+        serviceLabel: item.serviceLabel,
+        name: link.credential.name || link.credentialId,
+        status: check.status,
+        usage: 'linked',
+        requiredScopes: [...item.scopes],
+        actualScopes: check.scopes || [],
+        usedByNodes: item.requiredByNodes.filter((node) => node.credentialId === link.credentialId),
+        message: check.message,
+        details: check.details
+      });
+    }
+  }
+
+  for (const [credentialId, credential] of Object.entries(credentialsMap || {})) {
+    if (!usedCredentialIds.has(credentialId)) {
+      statuses.push({
+        credentialId,
+        serviceId: credential.serviceId,
+        serviceLabel: credential.serviceId,
+        name: credential.name || credentialId,
+        status: 'unused',
+        usage: 'unused',
+        requiredScopes: [],
+        actualScopes: [],
+        usedByNodes: [],
+        message: 'Saved credential is not linked to any node in this workflow.'
+      });
+    }
+  }
+
+  return {
+    status: statuses.some((item) => item.status === 'failed' || item.status === 'missing') ? 'attention' : 'healthy',
+    summary: `${statuses.filter((item) => item.status === 'passed').length} healthy · ${statuses.filter((item) => item.status === 'missing' || item.status === 'failed').length} need attention`,
+    statuses
+  };
 }
 
 function generateTestFixtures(graph) {
@@ -143,11 +634,18 @@ async function buildAdvancedReport(workflow) {
   const aiService = require('../services/ai');
   const graph = parseGraphValue(workflow.graph);
   const compile = aiService.compileWorkflow(graph);
+  const observability = await buildObservability(workflow.workspace_id, workflow.id);
   return {
     compiler: compile,
+    autoRemediation: {
+      fixes: buildCompilerRemediations(compile)
+    },
     schemaAwareCanvas: {
       contracts: compile.dataContracts,
       warningCount: compile.dataContracts.filter(c => c.availableFields.length === 1 && c.availableFields[0] === 'data').length
+    },
+    smartInputMapper: {
+      suggestions: buildSmartInputMapper(graph)
     },
     selfHealing: {
       available: true,
@@ -165,9 +663,13 @@ async function buildAdvancedReport(workflow) {
     workflowUnitTests: {
       fixtures: generateTestFixtures(graph)
     },
+    simulationMode: buildSimulationPreview(graph),
+    humanApproval: buildApprovalSystem(graph),
+    observability,
     releaseSystem: makeReleasePlan(workflow, compile),
     edgeRunner: makeEdgeRunnerPlan(graph, compile),
-    policyGuardrails: compile.policy
+    policyGuardrails: compile.policy,
+    dataPrivacyMode: buildPrivacyMode(graph, compile)
   };
 }
 
@@ -242,8 +744,8 @@ router.post('/', async (req, res) => {
 
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       RETURNING *
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
       [
         req.workspaceId,
         name,
@@ -294,6 +796,95 @@ router.get('/:id/advanced-report', async (req, res) => {
   } catch (err) {
     logger.error('Advanced report error:', err);
     res.status(500).json({ error: 'Failed to build advanced workflow report' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/:id/credential-health
+router.post('/:id/credential-health', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+    const graph = parseGraphValue(workflow.graph);
+    const credentials = req.body.credentials || {};
+    res.json(await buildCredentialHealth(graph, credentials));
+  } catch (err) {
+    logger.error('Credential health error:', err);
+    res.status(500).json({ error: 'Failed to inspect credential health' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/:id/prompt-sandbox
+router.post('/:id/prompt-sandbox', async (req, res) => {
+  try {
+    const workflow = await loadWorkflowOr404(req, res);
+    if (!workflow) return;
+
+    const graph = parseGraphValue(workflow.graph);
+    const nodeId = req.body.nodeId;
+    const sampleInput = req.body.sampleInput || {};
+    const credentials = req.body.credentials || {};
+    const node = (graph.nodes || []).find((item) => item.id === nodeId);
+
+    if (!node) {
+      return res.status(404).json({ error: 'Node not found in workflow graph' });
+    }
+
+    const nodeType = getNodeType(node);
+    const definition = registry.get(nodeType);
+    if (!definition) {
+      return res.status(400).json({ error: `Unsupported node type "${nodeType}" for sandbox execution` });
+    }
+
+    const rawConfig = { ...getNodeConfig(node) };
+    const resolvedConfig = Object.fromEntries(
+      Object.entries(rawConfig).map(([key, value]) => [key, resolveTemplateValue(value, sampleInput)])
+    );
+
+    const credentialId = getNodeCredentialId(node);
+    if (credentialId && credentials[credentialId]) {
+      resolvedConfig._credentials = credentials[credentialId].values || {};
+      resolvedConfig._credentialServiceId = credentials[credentialId].serviceId || null;
+    }
+
+    const promptFields = ['prompt', 'message', 'userMessage', 'systemPrompt', 'text', 'content', 'instructions'];
+    const resolvedPrompt = promptFields
+      .map((field) => resolvedConfig[field])
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+
+    const started = Date.now();
+    let output = null;
+    let error = null;
+    try {
+      output = await definition.execute({
+        config: resolvedConfig,
+        input: { sample: sampleInput },
+        context: { triggerPayload: sampleInput, sandbox: true }
+      });
+    } catch (err) {
+      error = err.message;
+    }
+    const durationMs = Date.now() - started;
+    const outputPreview = output ? JSON.stringify(output, null, 2) : error || '';
+    const cost = estimateNodeCost(nodeType, resolvedPrompt, outputPreview);
+
+    res.json({
+      nodeId,
+      nodeType,
+      nodeLabel: getNodeLabel(node),
+      resolvedPrompt,
+      resolvedConfig,
+      sampleInput,
+      output,
+      error,
+      durationMs,
+      sandboxStatus: error ? 'failed' : 'passed',
+      cost
+    });
+  } catch (err) {
+    logger.error('Prompt sandbox error:', err);
+    res.status(500).json({ error: 'Failed to run prompt sandbox' });
   }
 });
 

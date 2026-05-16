@@ -132,6 +132,11 @@ function EditorCanvas() {
   const [debugging, setDebugging] = useState(false);
   const [advancedReport, setAdvancedReport] = useState<any>(null);
   const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [promptSandboxNodeId, setPromptSandboxNodeId] = useState('');
+  const [promptSandboxInput, setPromptSandboxInput] = useState('{\n  "body": {\n    "email": "lead@example.com",\n    "message": "Customer wants a product demo",\n    "priority": "high"\n  }\n}');
+  const [promptSandboxResult, setPromptSandboxResult] = useState<any>(null);
+  const [promptSandboxHistory, setPromptSandboxHistory] = useState<any[]>([]);
+  const [promptSandboxLoading, setPromptSandboxLoading] = useState(false);
 
   // I/O Panel
   const [ioVisible, setIoVisible] = useState(false);
@@ -236,15 +241,19 @@ function EditorCanvas() {
     const wsUrl = (import.meta.env.VITE_WS_URL || 'ws://localhost:4000/ws') + `?token=${token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    let joinedWorkflow = false;
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'subscribe', workspaceId }));
-      ws.send(JSON.stringify({ type: 'join_workflow', workflowId: id }));
     };
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        if (msg?.type === 'subscribed' && msg?.workspaceId === workspaceId && !joinedWorkflow) {
+          ws.send(JSON.stringify({ type: 'join_workflow', workflowId: id }));
+          joinedWorkflow = true;
+        }
         handleWsMessage(msg);
       } catch {}
     };
@@ -330,6 +339,20 @@ function EditorCanvas() {
     if (status === 'skipped') return 'success';
     return 'pending';
   }, []);
+
+  const buildCredentialsMap = useCallback(() => {
+    const credentialsMap: Record<string, { serviceId: string; name?: string; values: Record<string, string> }> = {};
+    for (const n of nodes) {
+      const credId = n.data.credentialId as string | undefined;
+      if (credId && !credentialsMap[credId]) {
+        const cred = credentialStore.getCredentialById(credId);
+        if (cred) {
+          credentialsMap[credId] = { serviceId: cred.serviceId, name: cred.name, values: cred.values };
+        }
+      }
+    }
+    return credentialsMap;
+  }, [credentialStore, nodes]);
 
   const syncExecutionFromApi = useCallback(async (execId: string, notifyOnTerminal = true) => {
     if (!workspaceId || executionPollInFlightRef.current) return false;
@@ -686,18 +709,7 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
-      // ── Collect per-user credentials for all nodes that have a credentialId ──
-      const credentialsMap: Record<string, { serviceId: string; values: Record<string, string> }> = {};
-      for (const n of nodes) {
-        const credId = n.data.credentialId as string | undefined;
-        if (credId && !credentialsMap[credId]) {
-          const cred = credentialStore.getCredentialById(credId);
-          if (cred) {
-            credentialsMap[credId] = { serviceId: cred.serviceId, values: cred.values };
-          }
-        }
-      }
-
+      const credentialsMap = buildCredentialsMap();
       const res = await workflowApi.execute(workspaceId, id, undefined, credentialsMap);
       setExecutionId(res.data.executionId);
       startExecutionMonitoring(res.data.executionId);
@@ -911,8 +923,15 @@ function EditorCanvas() {
     try {
       setAdvancedLoading(true);
       setRightPanel('advanced');
-      const res = await workflowApi.advancedReport(workspaceId, id);
-      setAdvancedReport(res.data);
+      const credentialsMap = buildCredentialsMap();
+      const [reportRes, healthRes] = await Promise.all([
+        workflowApi.advancedReport(workspaceId, id),
+        workflowApi.credentialHealth(workspaceId, id, credentialsMap),
+      ]);
+      setAdvancedReport({
+        ...reportRes.data,
+        credentialHealth: healthRes.data,
+      });
     } catch {
       toast.error('Failed to load advanced report');
     } finally {
@@ -984,7 +1003,132 @@ function EditorCanvas() {
     }
   };
 
+  const applySuggestedMapping = useCallback((suggestion: any) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === suggestion.targetNodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config: {
+                  ...node.data.config,
+                  [suggestion.targetField]: suggestion.applyValue,
+                },
+              },
+            }
+          : node
+      )
+    );
+
+    setSelectedNode((prev) =>
+      prev && prev.id === suggestion.targetNodeId
+        ? {
+            ...prev,
+            data: {
+              ...prev.data,
+              config: {
+                ...prev.data.config,
+                [suggestion.targetField]: suggestion.applyValue,
+              },
+            },
+          }
+        : prev
+    );
+
+    setAdvancedReport((prev: any) => ({
+      ...(prev || {}),
+      smartInputMapper: {
+        ...(prev?.smartInputMapper || {}),
+        suggestions: (prev?.smartInputMapper?.suggestions || []).filter((item: any) => !(item.edgeId === suggestion.edgeId && item.targetField === suggestion.targetField)),
+      },
+    }));
+    toast.success(`Mapped ${suggestion.sourceField} -> ${suggestion.targetField}`);
+  }, [setNodes]);
+
+  const runPromptSandbox = async () => {
+    if (!workspaceId || !id) return;
+    const sandboxNodeId = promptSandboxNodeId || (selectedNode && /ai_|anthropic|openai/i.test(selectedNode.data.type || '') ? selectedNode.id : '');
+    if (!sandboxNodeId) {
+      toast.error('Select an AI node first');
+      return;
+    }
+
+    let sampleInput: Record<string, unknown> = {};
+    try {
+      sampleInput = promptSandboxInput.trim() ? JSON.parse(promptSandboxInput) : {};
+    } catch {
+      toast.error('Sample payload must be valid JSON');
+      return;
+    }
+
+    try {
+      setPromptSandboxLoading(true);
+      const res = await workflowApi.promptSandbox(workspaceId, id, {
+        nodeId: sandboxNodeId,
+        sampleInput,
+        credentials: buildCredentialsMap(),
+      });
+      setPromptSandboxResult(res.data);
+      setPromptSandboxHistory((prev) => [res.data, ...prev].slice(0, 4));
+      toast.success(res.data.sandboxStatus === 'passed' ? 'Prompt sandbox passed' : 'Prompt sandbox needs attention');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Prompt sandbox failed');
+    } finally {
+      setPromptSandboxLoading(false);
+    }
+  };
+
+  const savePromptVersion = () => {
+    if (!promptSandboxResult?.nodeId || !promptSandboxResult?.resolvedPrompt) {
+      toast.error('Run the sandbox first');
+      return;
+    }
+
+    const versionEntry = {
+      savedAt: new Date().toISOString(),
+      prompt: promptSandboxResult.resolvedPrompt,
+      sampleInput: promptSandboxResult.sampleInput,
+      outputPreview: promptSandboxResult.output || promptSandboxResult.error,
+      cost: promptSandboxResult.cost,
+    };
+
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === promptSandboxResult.nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config: {
+                  ...node.data.config,
+                  promptVersions: [...((node.data.config?.promptVersions as any[]) || []), versionEntry].slice(-5),
+                },
+              },
+            }
+          : node
+      )
+    );
+
+    setSelectedNode((prev) =>
+      prev && prev.id === promptSandboxResult.nodeId
+        ? {
+            ...prev,
+            data: {
+              ...prev.data,
+              config: {
+                ...prev.data.config,
+                promptVersions: [...((prev.data.config?.promptVersions as any[]) || []), versionEntry].slice(-5),
+              },
+            },
+          }
+        : prev
+    );
+    toast.success('Prompt version saved on the node');
+  };
+
   // ── Filtered nodes for palette (local catalog) ──
+  const aiSandboxNodes = nodes.filter((node) => /ai_|anthropic|openai/i.test(String(node.data?.type || '')));
   const filteredCatalog = searchNodes(nodeSearch);
   const totalNodeCount = allNodes.length;
 
@@ -1809,6 +1953,25 @@ function EditorCanvas() {
                       </p>
                     </div>
 
+                    {(advancedReport.autoRemediation?.fixes || []).length > 0 && (
+                      <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">Compiler Auto-Remediation</h4>
+                        <div className="space-y-2">
+                          {(advancedReport.autoRemediation.fixes || []).map((fix: any, index: number) => (
+                            <div key={`${fix.nodeId || index}-${index}`} className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-bold text-foreground">{fix.title}</p>
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${fix.priority === 'high' ? 'bg-red-500/15 text-red-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                                  {fix.priority}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-foreground-muted">{fix.action}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {((advancedReport.compiler?.missingConfig || []).length > 0 || (advancedReport.compiler?.unsupportedNodes || []).length > 0) && (
                       <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
                         <h4 className="mb-2 text-sm font-semibold text-foreground">Fix Missing Config</h4>
@@ -1852,6 +2015,68 @@ function EditorCanvas() {
                     )}
 
                     <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-foreground">Credential Health Center</h4>
+                        <button
+                          onClick={loadAdvancedReport}
+                          disabled={advancedLoading}
+                          className="rounded border border-surface-border px-2 py-1 text-[11px] font-bold text-foreground-muted hover:border-brand-500/40 hover:text-brand-400 disabled:opacity-50"
+                        >
+                          Test All
+                        </button>
+                      </div>
+                      <p className="mb-2 text-xs text-foreground-muted">{advancedReport.credentialHealth?.summary || 'No credential health data yet.'}</p>
+                      <div className="space-y-2">
+                        {(advancedReport.credentialHealth?.statuses || []).slice(0, 6).map((item: any, index: number) => (
+                          <div key={`${item.credentialId || item.serviceId}-${index}`} className="rounded-md border border-surface-border bg-surface-card p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-bold text-foreground">{item.name || item.serviceLabel}</p>
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                                item.status === 'passed' ? 'bg-green-500/15 text-green-300' :
+                                item.status === 'missing' || item.status === 'failed' ? 'bg-red-500/15 text-red-300' :
+                                'bg-amber-500/15 text-amber-300'
+                              }`}>
+                                {item.status}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-foreground-muted">{item.message}</p>
+                            {(item.usedByNodes || []).length > 0 && (
+                              <p className="mt-1 text-[11px] text-foreground-muted">
+                                Used by: {(item.usedByNodes || []).map((node: any) => node.nodeLabel).join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-2 text-sm font-semibold text-foreground">Smart Input Mapper</h4>
+                      {(advancedReport.smartInputMapper?.suggestions || []).length === 0 ? (
+                        <p className="text-xs text-foreground-muted">No obvious field mappings detected right now.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(advancedReport.smartInputMapper?.suggestions || []).slice(0, 6).map((suggestion: any) => (
+                            <div key={`${suggestion.edgeId}-${suggestion.targetField}`} className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <p className="text-xs font-bold text-foreground">
+                                {suggestion.sourceNodeLabel} → {suggestion.targetNodeLabel}
+                              </p>
+                              <p className="mt-1 text-xs text-foreground-muted">
+                                {suggestion.sourceField} → {suggestion.targetField} · {Math.round((suggestion.confidence || 0) * 100)}% match
+                              </p>
+                              <button
+                                onClick={() => applySuggestedMapping(suggestion)}
+                                className="mt-2 rounded border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[11px] font-bold text-brand-400 hover:bg-brand-500/20"
+                              >
+                                Apply Mapping
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
                       <h4 className="mb-2 text-sm font-semibold text-foreground">Policy Guardrails</h4>
                       {(advancedReport.policyGuardrails?.findings || []).length === 0 ? (
                         <p className="text-xs text-green-400">No policy findings.</p>
@@ -1871,6 +2096,96 @@ function EditorCanvas() {
                           {contract.from} -&gt; {contract.to}: {contract.availableFields?.join(', ')}
                         </p>
                       ))}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-2 text-sm font-semibold text-foreground">Observability Dashboard</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-foreground-muted">Failure rate</p>
+                          <p className="mt-1 text-sm font-bold text-foreground">{advancedReport.observability?.totals?.failureRate ?? 0}%</p>
+                        </div>
+                        <div className="rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-foreground-muted">Avg duration</p>
+                          <p className="mt-1 text-sm font-bold text-foreground">{advancedReport.observability?.totals?.avgDurationMs ?? 0}ms</p>
+                        </div>
+                      </div>
+                      {(advancedReport.observability?.topBrokenNodes || []).length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {(advancedReport.observability.topBrokenNodes || []).slice(0, 4).map((node: any) => (
+                            <p key={node.nodeId} className="text-xs text-foreground-muted">
+                              {node.nodeLabel}: {node.failedCount} failures · avg {node.avgDurationMs}ms
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-2 text-sm font-semibold text-foreground">Prompt Sandbox</h4>
+                      {aiSandboxNodes.length === 0 ? (
+                        <p className="text-xs text-foreground-muted">Add an AI node to use the sandbox and save prompt versions.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <select
+                            value={promptSandboxNodeId}
+                            onChange={(e) => setPromptSandboxNodeId(e.target.value)}
+                            className="w-full rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/40"
+                          >
+                            <option value="">Use selected AI node</option>
+                            {aiSandboxNodes.map((node) => (
+                              <option key={node.id} value={node.id}>{node.data.label || node.id}</option>
+                            ))}
+                          </select>
+                          <textarea
+                            value={promptSandboxInput}
+                            onChange={(e) => setPromptSandboxInput(e.target.value)}
+                            rows={6}
+                            className="w-full rounded-lg border border-surface-border bg-surface-card p-3 font-mono text-xs text-foreground outline-none focus:border-brand-500/40"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={runPromptSandbox}
+                              disabled={promptSandboxLoading}
+                              className="rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-foreground hover:border-brand-500/40 disabled:opacity-50"
+                            >
+                              {promptSandboxLoading ? 'Running…' : 'Run Node Unit Test'}
+                            </button>
+                            <button
+                              onClick={savePromptVersion}
+                              disabled={!promptSandboxResult}
+                              className="rounded-lg border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-foreground hover:border-brand-500/40 disabled:opacity-50"
+                            >
+                              Save Prompt Version
+                            </button>
+                          </div>
+                          {promptSandboxResult && (
+                            <div className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <p className="text-xs font-bold text-foreground">{promptSandboxResult.nodeLabel}</p>
+                              <p className="mt-1 text-xs text-foreground-muted">
+                                {promptSandboxResult.cost?.estimatedTokens ?? 0} tokens · ${promptSandboxResult.cost?.estimatedUsd ?? 0} · {promptSandboxResult.durationMs}ms
+                              </p>
+                              {promptSandboxResult.error ? (
+                                <p className="mt-2 text-xs text-red-300">{promptSandboxResult.error}</p>
+                              ) : (
+                                <pre className="mt-2 max-h-32 overflow-auto rounded bg-surface-border p-2 text-[11px] text-foreground-secondary">
+                                  {JSON.stringify(promptSandboxResult.output, null, 2)}
+                                </pre>
+                              )}
+                            </div>
+                          )}
+                          {promptSandboxHistory.length > 1 && (
+                            <div className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <p className="text-xs font-semibold text-foreground">Recent sandbox runs</p>
+                              {promptSandboxHistory.slice(0, 3).map((item, index) => (
+                                <p key={`${item.nodeId}-${index}`} className="mt-1 text-[11px] text-foreground-muted">
+                                  Run {index + 1}: {item.cost?.estimatedTokens ?? 0} tokens · {item.sandboxStatus}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -1914,6 +2229,24 @@ function EditorCanvas() {
                       </div>
                     )}
 
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-1 text-sm font-semibold text-foreground">Simulation Mode</h4>
+                      {(advancedReport.simulationMode?.branches || []).length === 0 ? (
+                        <p className="text-xs text-foreground-muted">Current graph is mostly linear. Add a branching node to preview alternate paths.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(advancedReport.simulationMode.branches || []).slice(0, 4).map((branch: any) => (
+                            <div key={branch.nodeId} className="rounded-md border border-surface-border bg-surface-card p-2">
+                              <p className="text-xs font-bold text-foreground">{branch.nodeLabel}</p>
+                              <p className="mt-1 text-xs text-foreground-muted">
+                                {branch.branches.map((item: any) => item.targetLabel).join(' · ')}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {advancedReport.timeTravelDebugger?.replay && (
                       <div className="rounded-lg border border-surface-border bg-surface-input p-3">
                         <h4 className="mb-2 text-sm font-semibold text-foreground">Time-Travel Replay</h4>
@@ -1932,8 +2265,31 @@ function EditorCanvas() {
                     </div>
 
                     <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-1 text-sm font-semibold text-foreground">Human-in-the-Loop</h4>
+                      <p className="text-xs text-foreground-muted">{advancedReport.humanApproval?.inboxSummary}</p>
+                      {(advancedReport.humanApproval?.nodes || []).slice(0, 3).map((item: any) => (
+                        <div key={item.nodeId} className="mt-2 rounded-md border border-surface-border bg-surface-card p-2">
+                          <p className="text-xs font-bold text-foreground">{item.label}</p>
+                          <p className="mt-1 text-xs text-foreground-muted">
+                            SLA {item.slaMinutes} min · {item.assignee}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
                       <h4 className="mb-1 text-sm font-semibold text-foreground">Local Edge Runner</h4>
                       <p className="text-xs text-foreground-muted">{advancedReport.edgeRunner?.mode}: {advancedReport.edgeRunner?.reason}</p>
+                    </div>
+
+                    <div className="rounded-lg border border-surface-border bg-surface-input p-3">
+                      <h4 className="mb-1 text-sm font-semibold text-foreground">Data Privacy Mode</h4>
+                      <p className="text-xs text-foreground-muted">{advancedReport.dataPrivacyMode?.warning}</p>
+                      {(advancedReport.dataPrivacyMode?.sensitiveNodes || []).slice(0, 3).map((item: any) => (
+                        <p key={item.nodeId} className="mt-1 text-xs text-foreground-muted">
+                          {item.nodeLabel} · {item.nodeType}
+                        </p>
+                      ))}
                     </div>
                   </div>
                 )}
