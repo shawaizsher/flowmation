@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 import SettingsPage from './pages/SettingsPage';
+import MarketplacePage from './pages/MarketplacePage';
 import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -38,6 +39,7 @@ export default function App() {
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
       </Route>
 
       <Route path="/workflows/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
