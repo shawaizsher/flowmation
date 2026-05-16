@@ -480,8 +480,8 @@ router.put('/:id', async (req, res) => {
            status = COALESCE($4, status),
            tags = COALESCE($5, tags),
            updated_at = NOW()
-       RETURNING *
-       WHERE id = $6 AND workspace_id = $7`,
+       WHERE id = $6 AND workspace_id = $7
+       RETURNING *`,
       [
         name || null,
         description !== undefined ? description : null,
@@ -586,7 +586,7 @@ router.post('/:id/publish', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await query(
-      'DELETE FROM workflows RETURNING id WHERE id = $1 AND workspace_id = $2',
+      'DELETE FROM workflows WHERE id = $1 AND workspace_id = $2 RETURNING id',
       [req.params.id, req.workspaceId]
     );
 
