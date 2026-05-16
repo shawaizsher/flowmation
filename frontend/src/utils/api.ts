@@ -89,6 +89,9 @@ export const workflowApi = {
     }
   ) => api.post(`/workspaces/${workspaceId}/workflows/templates/publish`, data),
 
+  suggestNodes: (workspaceId: string, currentNodeTypes: string[]) =>
+    api.post(`/workspaces/${workspaceId}/workflows/suggest-nodes`, { currentNodeTypes }),
+
   list: (workspaceId: string, params?: Record<string, string>) =>
     api.get(`/workspaces/${workspaceId}/workflows`, { params }),
 
