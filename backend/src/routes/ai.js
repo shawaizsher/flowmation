@@ -192,9 +192,9 @@ router.post('/apply-fix', async (req, res) => {
 
       const newVersion = workflow.version + 1;
       const updated = await client.query(
-        `UPDATE workflows SET graph = $1, version = $2, updated_at = GETDATE()
-         OUTPUT INSERTED.*
-         WHERE id = $3`,
+        `UPDATE workflows SET graph = $1, version = $2, updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
         [JSON.stringify(graph), newVersion, workflow.id]
       );
 

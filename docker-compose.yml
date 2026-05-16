@@ -1,28 +1,28 @@
 version: '3.8'
 
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+  postgres:
+    image: postgres:16-alpine
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Flowa_Secret_2026!}
-      MSSQL_PID: ${MSSQL_PID:-Developer}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-flowa}
     ports:
-      - "1433:1433"
+      - "127.0.0.1:5432:5432"
     volumes:
-      - sqldata:/var/opt/mssql
+      - pgdata:/var/lib/postgresql/data
       - ./backend/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Flowa_Secret_2026! -C -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -40,11 +40,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 4000
-      DB_SERVER: ${DB_SERVER:-sqlserver}
-      DB_PORT: ${DB_PORT:-1433}
-      DB_DATABASE: ${DB_DATABASE:-flowa}
-      DB_USER: ${DB_USER:-sa}
-      DB_PASSWORD: ${DB_PASSWORD:-Flowa_Secret_2026!}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/flowa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
@@ -53,7 +49,7 @@ services:
       HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
-      sqlserver:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -68,11 +64,7 @@ services:
     command: node src/worker.js
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DB_SERVER: ${DB_SERVER:-sqlserver}
-      DB_PORT: ${DB_PORT:-1433}
-      DB_DATABASE: ${DB_DATABASE:-flowa}
-      DB_USER: ${DB_USER:-sa}
-      DB_PASSWORD: ${DB_PASSWORD:-Flowa_Secret_2026!}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/flowa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -80,7 +72,7 @@ services:
       HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
-      sqlserver:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -106,5 +98,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  sqldata:
+  pgdata:
   redisdata:

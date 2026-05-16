@@ -114,4 +114,46 @@ async function sendVerificationEmail(toEmail, userName, token) {
   return info;
 }
 
-module.exports = { initEmail, generateToken, sendVerificationEmail };
+async function sendPasswordResetEmail(toEmail, userName, token) {
+  const digits = token.split('');
+  const digitBoxStyle =
+    'display:inline-block;width:44px;height:52px;line-height:52px;text-align:center;' +
+    'font-size:28px;font-weight:700;letter-spacing:0;color:#111;' +
+    'background:#f4f4f5;border-radius:8px;margin:0 4px;';
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
+    to: toEmail,
+    subject: `${token} is your Flowa password reset code`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#fff;">
+        <div style="text-align:center;margin-bottom:32px;">
+          <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
+        </div>
+        <h2 style="font-size:20px;color:#111;margin:0 0 8px;font-weight:700;">Reset your password</h2>
+        <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px;">
+          Hi ${userName}, enter the code below to reset your Flowa password.
+        </p>
+        <div style="text-align:center;margin:0 0 32px;">
+          ${digits.map(d => `<span style="${digitBoxStyle}">${d}</span>`).join('')}
+        </div>
+        <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 8px;">
+          This code expires in <strong>15 minutes</strong>.
+        </p>
+        <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 28px;">
+          If you didn't request a password reset, you can safely ignore this email.
+        </p>
+        <hr style="border:none;border-top:1px solid #eee;margin:0 0 20px;" />
+        <p style="color:#bbb;font-size:12px;margin:0;">Flowa — AI-Native Workflow Automation</p>
+      </div>
+    `,
+    text: `Hi ${userName},\n\nYour Flowa password reset code is: ${token}\n\nThis code expires in 15 minutes.`,
+  };
+
+  const info = await transporter.sendMail(mailOptions);
+  logger.info(`Password reset email sent to ${toEmail}`);
+  return info;
+}
+
+module.exports = { initEmail, generateToken, sendVerificationEmail, sendPasswordResetEmail };

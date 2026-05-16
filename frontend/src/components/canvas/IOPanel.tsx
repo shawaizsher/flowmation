@@ -41,7 +41,16 @@ interface IOPanelProps {
 
 /* ────────── Helpers ────────── */
 function formatJsonPretty(data: unknown): string {
-  if (data === undefined || data === null) return '-';
+  if (data === undefined || data === null) return '';
+  if (typeof data === 'string') {
+    // Try to re-pretty-print if it looks like JSON, otherwise return as-is
+    try {
+      const parsed = JSON.parse(data);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return data;
+    }
+  }
   try {
     return JSON.stringify(data, null, 2);
   } catch {
@@ -50,13 +59,22 @@ function formatJsonPretty(data: unknown): string {
 }
 
 function formatJsonRaw(data: unknown): string {
-  if (data === undefined || data === null) return '-';
+  if (data === undefined || data === null) return '';
   if (typeof data === 'string') return data;
   try {
     return JSON.stringify(data);
   } catch {
     return String(data);
   }
+}
+
+/** Returns true when a payload has no meaningful content to display. */
+function isEmptyPayload(data: unknown): boolean {
+  if (data === undefined || data === null) return true;
+  if (typeof data === 'string') return data.trim() === '';
+  if (Array.isArray(data)) return data.length === 0;
+  if (typeof data === 'object') return Object.keys(data as object).length === 0;
+  return false;
 }
 
 function stringifyCellValue(value: unknown): string {
@@ -418,22 +436,40 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
               {/* Data display */}
               <div className="flex-1 overflow-auto p-4 custom-scrollbar space-y-4">
                 {activeTab === 'error' ? (
+                  /* ── Error tab ── */
                   selectedNode.error ? (
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle size={16} className="text-red-400" />
-                      <span className="text-sm font-semibold text-red-400">Error</span>
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle size={16} className="text-red-400" />
+                        <span className="text-sm font-semibold text-red-400">Error</span>
+                      </div>
+                      <pre className="whitespace-pre-wrap text-sm text-red-400 dark:text-red-300 font-mono leading-relaxed break-words">
+                        {selectedNode.error}
+                      </pre>
                     </div>
-                    <pre className="whitespace-pre-wrap text-sm text-red-300 font-mono leading-relaxed">
-                      {selectedNode.error}
-                    </pre>
-                  </div>
                   ) : (
                     <div className="rounded-lg border border-surface-border bg-surface-hover p-4 text-sm text-foreground-muted">
                       This node completed without an error payload.
                     </div>
                   )
+
+                ) : activeTab === 'input' && isEmptyPayload(activePayload) ? (
+                  /* ── INPUT tab — no runtime data captured yet ── */
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-surface-border bg-surface-hover/50 py-14 text-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-card">
+                      <ArrowDownToLine size={18} className="text-foreground-muted" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground-muted">No input data captured</p>
+                      <p className="text-xs text-foreground-muted/60 max-w-[260px]">
+                        Runtime input will appear here once this node executes.
+                        {selectedNode.status === 'pending' && ' Node is still pending.'}
+                      </p>
+                    </div>
+                  </div>
+
                 ) : viewMode === 'table' ? (
+                  /* ── Table view ── */
                   tableData.rows.length > 0 ? (
                     <div className="overflow-auto rounded-lg border border-surface-border">
                       <table className="min-w-full text-xs">
@@ -464,14 +500,33 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                       No tabular data available for this view.
                     </div>
                   )
-                ) : viewMode === 'raw' ? (
-                  <pre className="whitespace-pre-wrap text-sm text-foreground-secondary font-mono leading-relaxed">
-                    {formatJsonRaw(activePayload)}
-                  </pre>
+
                 ) : (
-                  <pre className="whitespace-pre-wrap text-sm text-foreground-secondary font-mono leading-relaxed">
-                    {formatJsonPretty(activePayload)}
-                  </pre>
+                  /* ── Raw / JSON view (shared for input, output, meta) ── */
+                  <div className="rounded-lg border border-surface-border bg-surface-base overflow-hidden">
+                    {/* Tab label pill */}
+                    <div className="flex items-center justify-between border-b border-surface-border bg-surface-hover px-3 py-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-foreground-muted">
+                        {activeTab}
+                      </span>
+                      {!isEmptyPayload(activePayload) && (
+                        <span className="text-[10px] text-foreground-muted/60">
+                          {viewMode === 'raw' ? 'raw' : 'json'}
+                        </span>
+                      )}
+                    </div>
+                    {isEmptyPayload(activePayload) ? (
+                      <p className="px-4 py-6 text-sm text-foreground-muted text-center">
+                        No data available.
+                      </p>
+                    ) : (
+                      <pre className="overflow-auto p-4 whitespace-pre-wrap break-words text-[13px] leading-relaxed font-mono text-slate-700 dark:text-slate-200">
+                        {viewMode === 'raw'
+                          ? formatJsonRaw(activePayload)
+                          : formatJsonPretty(activePayload)}
+                      </pre>
+                    )}
+                  </div>
                 )}
 
                 {/* Previous / Next node context */}

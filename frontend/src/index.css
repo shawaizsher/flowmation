@@ -81,6 +81,44 @@ html {
   --glass-border: rgba(255, 255, 255, 0.06);
 
   --card-gradient-bg: #111113;
+
+  /* ── Node / Edge theme tokens (dark mode) ── */
+  --node-box-bg:            rgba(11, 16, 27, 0.9);
+  --node-backdrop-blur:     blur(14px);
+  --node-handle-idle-bg:    rgba(11, 16, 27, 0.95);
+  --node-handle-idle-border:rgba(255, 255, 255, 0.15);
+  --node-toolbar-bg:        rgba(10, 15, 28, 0.96);
+  --node-toolbar-border:    rgba(255, 255, 255, 0.07);
+  --node-toolbar-icon:      rgba(255, 255, 255, 0.38);
+  --node-quickadd-bg:       rgba(10, 15, 28, 0.92);
+  --node-quickadd-border:   rgba(255, 255, 255, 0.1);
+  --node-quickadd-icon:     rgba(255, 255, 255, 0.38);
+  --node-separator:         rgba(255, 255, 255, 0.07);
+  --node-running-depth:     0 4px 20px rgba(0, 0, 0, 0.4);
+  --edge-idle-stroke:       rgba(148, 163, 184, 0.22);
+  --edge-idle-glow:         rgba(148, 163, 184, 0.06);
+  --edge-selected-stroke:   rgba(129, 140, 248, 0.82);
+  --edge-selected-glow:     rgba(99,  102, 241,  0.18);
+}
+
+/* ── Light-mode overrides for node / edge tokens ── */
+.light, :root:not(.dark) {
+  --node-box-bg:            rgba(255, 255, 255, 0.97);
+  --node-backdrop-blur:     none;
+  --node-handle-idle-bg:    #ffffff;
+  --node-handle-idle-border:rgba(0, 0, 0, 0.2);
+  --node-toolbar-bg:        rgba(255, 255, 255, 0.98);
+  --node-toolbar-border:    rgba(0, 0, 0, 0.07);
+  --node-toolbar-icon:      rgba(0, 0, 0, 0.42);
+  --node-quickadd-bg:       rgba(255, 255, 255, 0.97);
+  --node-quickadd-border:   rgba(0, 0, 0, 0.1);
+  --node-quickadd-icon:     rgba(0, 0, 0, 0.35);
+  --node-separator:         rgba(0, 0, 0, 0.07);
+  --node-running-depth:     0 2px 10px rgba(0, 0, 0, 0.1);
+  --edge-idle-stroke:       rgba(100, 116, 139, 0.35);
+  --edge-idle-glow:         rgba(100, 116, 139, 0.08);
+  --edge-selected-stroke:   rgba(79,  70,  229,  0.85);
+  --edge-selected-glow:     rgba(79,  70,  229,  0.14);
 }
 
 /* ── Base styles ── */
@@ -328,6 +366,32 @@ body {
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
+@keyframes node-running-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1.5px rgba(59, 130, 246, 0.35),
+      0 0 16px rgba(59, 130, 246, 0.18),
+      var(--node-running-depth);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(59, 130, 246, 0.62),
+      0 0 34px rgba(59, 130, 246, 0.38),
+      var(--node-running-depth);
+  }
+}
+
+@keyframes node-shake {
+  0%, 100% { transform: translateX(0); }
+  12%  { transform: translateX(-5px); }
+  25%  { transform: translateX(5px); }
+  37%  { transform: translateX(-4px); }
+  50%  { transform: translateX(4px); }
+  62%  { transform: translateX(-2px); }
+  75%  { transform: translateX(2px); }
+  87%  { transform: translateX(-1px); }
+}
+
 /* ── Landing page animations ── */
 @keyframes gradientShift {
   0% { background-position: 0% 50%; }
@@ -493,6 +557,14 @@ body {
 
 .node-error-flash {
   animation: node-error-flash 1s ease-out;
+}
+
+.animate-node-running {
+  animation: node-running-pulse 1.8s ease-in-out infinite;
+}
+
+.animate-node-shake {
+  animation: node-shake 0.45s ease-in-out;
 }
 
 /* Landing-specific animation utilities */

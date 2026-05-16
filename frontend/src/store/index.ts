@@ -73,6 +73,10 @@ interface AppState {
   setSidebarTab: (tab: AppState['sidebarTab']) => void;
   selectedNodeId: string | null;
   setSelectedNodeId: (id: string | null) => void;
+
+  /* onboarding tutorial */
+  showTutorial: boolean;
+  setShowTutorial: (show: boolean) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -140,6 +144,10 @@ export const useStore = create<AppState>()(
       setSidebarTab: (tab) => set({ sidebarTab: tab }),
       selectedNodeId: null,
       setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+
+      /* ---- onboarding tutorial ---- */
+      showTutorial: false,
+      setShowTutorial: (show) => set({ showTutorial: show }),
     }),
     {
       name: 'flowa-storage',
@@ -147,6 +155,7 @@ export const useStore = create<AppState>()(
         token: state.token,
         user: state.user,
         workspace: state.workspace,
+        showTutorial: state.showTutorial,
       }),
     },
   ),

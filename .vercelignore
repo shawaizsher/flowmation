@@ -1,0 +1,5 @@
+backend
+nginx
+docker-compose.yml
+package-lock.json
+*.docx

@@ -1,0 +1,29 @@
+name: Deploy to Render & Vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ── Deploy backend to Render ───────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (Render)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render backend deploy
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}")
+          echo "Render backend deploy status: $STATUS"
+
+  # ── Deploy worker to Render ────────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy Worker (Render)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render worker deploy
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}")
+          echo "Render worker deploy status: $STATUS"
+
+  # Vercel deploys automatically via GitHub integration — no action needed here

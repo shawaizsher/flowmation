@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm --prefix ../frontend install && npm --prefix ../frontend run build && cp -r ../frontend/dist ./public",
+  "outputDirectory": "public",
+  "installCommand": "echo ok",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+const TutorialOverlay = lazy(() => import('../components/TutorialOverlay'));
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -52,7 +53,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; label
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { workspace, user } = useStore();
+  const { workspace, user, showTutorial } = useStore();
 
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,6 +325,7 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full flex">
+      {showTutorial && <Suspense fallback={null}><TutorialOverlay /></Suspense>}
       {/* ═══════════ Left sidebar — Workflow list ═══════════ */}
       <div className="w-[320px] border-r border-surface-border flex flex-col bg-surface-card/40">
         {/* Search + New */}
