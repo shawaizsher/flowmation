@@ -4,11 +4,8 @@ const { authenticate, requireWorkspace } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const registry = require('../nodes/registry');
 const { Client } = require('pg');
-<<<<<<< HEAD
 const { createNotification, logWorkflowActivity } = require('../services/collaboration');
-=======
 const { suggest: suggestNodes, invalidateCache } = require('../services/nodeSuggestions');
->>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 
 const router = express.Router({ mergeParams: true });
 
@@ -1181,7 +1178,6 @@ router.post('/templates/:templateId/install', async (req, res) => {
       ? req.body.name.trim()
       : name;
 
-<<<<<<< HEAD
     const result = await transaction(async (client) => {
       const created = await client.query(
         `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
@@ -1189,10 +1185,10 @@ router.post('/templates/:templateId/install', async (req, res) => {
          RETURNING *`,
         [
           req.workspaceId,
-          name,
-          template.description,
-          JSON.stringify(template.graph),
-          JSON.stringify(template.tags || []),
+          finalName,
+          description,
+          JSON.stringify(graph),
+          JSON.stringify(tags || []),
           req.user.id
         ]
       );
@@ -1205,6 +1201,7 @@ router.post('/templates/:templateId/install', async (req, res) => {
       return created;
     });
 
+    invalidateCache();
     await logWorkflowActivity({
       workflowId: result.rows[0].id,
       workspaceId: req.workspaceId,
@@ -1214,14 +1211,6 @@ router.post('/templates/:templateId/install', async (req, res) => {
       body: `${req.user.name} installed the ${template.name} template.`,
       metadata: { templateId: template.id, templateName: template.name },
     });
-=======
-    const result = await query(
-      `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [req.workspaceId, finalName, description, JSON.stringify(graph), JSON.stringify(tags || []), req.user.id]
-    );
->>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 
     res.status(201).json({
       workflow: result.rows[0],
@@ -1520,7 +1509,6 @@ router.put('/:id', async (req, res) => {
 
     const updatedWorkflow = result.rows[0];
 
-<<<<<<< HEAD
     await logWorkflowActivity({
       workflowId: req.params.id,
       workspaceId: req.workspaceId,
@@ -1530,10 +1518,8 @@ router.put('/:id', async (req, res) => {
       body: `${req.user.name} saved workflow changes.`,
       metadata: { version: updatedWorkflow.version },
     });
-=======
     // Invalidate ML suggestion cache so next request re-learns from updated graphs
     if (graph) invalidateCache();
->>>>>>> 9f657bef8610d1492ce935b2b1c9a049f2807d7c
 
     // Broadcast save event via WebSocket
     try {

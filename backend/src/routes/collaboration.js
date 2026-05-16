@@ -398,6 +398,20 @@ router.post('/inbox/threads', async (req, res) => {
     );
     const validIds = validParticipants.rows.map((row) => row.user_id);
 
+    const invalidParticipantIds = allParticipantIds.filter((id) => !validIds.includes(id));
+    if (invalidParticipantIds.length > 0) {
+      return res.status(400).json({
+        error: 'One or more selected teammates are not active members of this workspace yet.',
+        invalidParticipantIds,
+      });
+    }
+
+    if (validIds.length < 2) {
+      return res.status(400).json({
+        error: 'Add at least one teammate who has already joined this workspace.',
+      });
+    }
+
     const thread = await transaction(async (client) => {
       const created = await client.query(
         `INSERT INTO inbox_threads (workspace_id, workflow_id, type, title, created_by)
