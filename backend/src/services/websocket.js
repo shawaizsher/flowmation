@@ -109,6 +109,12 @@ class WebSocketManager {
       case 'graph_change':
         this.handleGraphChange(socketId, client, message);
         break;
+      case 'node_comment':
+        this.handleNodeComment(socketId, client, message);
+        break;
+      case 'shared_debug':
+        this.handleSharedDebug(socketId, client, message);
+        break;
       default:
         logger.warn(`Unknown WebSocket message type: ${message.type}`);
     }
@@ -178,10 +184,23 @@ class WebSocketManager {
       normalized.workflowName = change.workflowName.slice(0, 255);
     }
 
+    if (typeof change.summary === 'string') {
+      normalized.summary = change.summary.slice(0, 255);
+    }
+
+    if (typeof change.changedNodeId === 'string') {
+      normalized.changedNodeId = change.changedNodeId.slice(0, 255);
+    }
+
+    if (typeof change.changedField === 'string') {
+      normalized.changedField = change.changedField.slice(0, 255);
+    }
+
     if (change.graph && typeof change.graph === 'object') {
       normalized.graph = {
         nodes: Array.isArray(change.graph.nodes) ? change.graph.nodes : [],
-        edges: Array.isArray(change.graph.edges) ? change.graph.edges : []
+        edges: Array.isArray(change.graph.edges) ? change.graph.edges : [],
+        comments: Array.isArray(change.graph.comments) ? change.graph.comments : []
       };
     }
 
@@ -339,6 +358,42 @@ class WebSocketManager {
       userId: client.userId,
       userName: client.userName,
       change: normalizedChange
+    }, client.userId);
+  }
+
+  async handleNodeComment(socketId, client, message) {
+    const { workflowId, comment } = message;
+    if (!workflowId || !comment) return;
+
+    const canAccess = await this.canAccessWorkflow(client, workflowId);
+    if (!canAccess) return;
+
+    this.broadcastToWorkflow(workflowId, {
+      type: 'node_comment',
+      workflowId,
+      comment: {
+        ...comment,
+        authorId: client.userId,
+        authorName: client.userName,
+      }
+    }, client.userId);
+  }
+
+  async handleSharedDebug(socketId, client, message) {
+    const { workflowId, debug } = message;
+    if (!workflowId || !debug) return;
+
+    const canAccess = await this.canAccessWorkflow(client, workflowId);
+    if (!canAccess) return;
+
+    this.broadcastToWorkflow(workflowId, {
+      type: 'shared_debug',
+      workflowId,
+      debug: {
+        ...debug,
+        actorId: client.userId,
+        actorName: client.userName,
+      }
     }, client.userId);
   }
 
