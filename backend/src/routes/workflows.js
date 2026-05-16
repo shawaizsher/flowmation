@@ -4,6 +4,7 @@ const { authenticate, requireWorkspace } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const registry = require('../nodes/registry');
 const { Client } = require('pg');
+const { suggest: suggestNodes, invalidateCache } = require('../services/nodeSuggestions');
 
 const router = express.Router({ mergeParams: true });
 
@@ -1389,6 +1390,9 @@ router.put('/:id', async (req, res) => {
 
     const updatedWorkflow = result.rows[0];
 
+    // Invalidate ML suggestion cache so next request re-learns from updated graphs
+    if (graph) invalidateCache();
+
     // Broadcast save event via WebSocket
     try {
       const { broadcast } = require('../services/websocket');
@@ -1576,6 +1580,29 @@ router.get('/:id/presence', async (req, res) => {
   } catch (err) {
     logger.error('Get presence error:', err);
     res.status(500).json({ error: 'Failed to get presence' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/suggest-nodes
+// ML-powered node suggestion: returns top-5 recommended node types to add
+// given the types already present in the current workflow canvas.
+router.post('/suggest-nodes', async (req, res) => {
+  try {
+    const { currentNodeTypes = [] } = req.body;
+    if (!Array.isArray(currentNodeTypes)) {
+      return res.status(400).json({ error: 'currentNodeTypes must be an array of strings' });
+    }
+
+    // Collect all available node types from the registry
+    const allTypes = registry.getAll
+      ? registry.getAll().map(n => n.type || n.id).filter(Boolean)
+      : [];
+
+    const suggestions = await suggestNodes(currentNodeTypes, allTypes, 5);
+    res.json({ suggestions });
+  } catch (err) {
+    logger.error('Node suggestion error:', err);
+    res.status(500).json({ error: 'Failed to generate node suggestions' });
   }
 });
 
