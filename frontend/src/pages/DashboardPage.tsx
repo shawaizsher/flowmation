@@ -20,6 +20,8 @@ import {
   TrendingUp,
   Activity,
   Users,
+  Store,
+  Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workflowApi, aiApi } from '../utils/api';
@@ -538,6 +540,44 @@ export default function DashboardPage() {
               </div>
               <p className="font-display text-3xl font-bold text-foreground">{errorCount}</p>
               <p className="text-xs text-foreground-muted mt-1">need attention</p>
+            </div>
+          </div>
+
+          {/* ── Marketplace banner ── */}
+          <div
+            className="relative overflow-hidden rounded-2xl border border-brand-500/20 bg-gradient-to-br from-brand-500/10 via-surface-card to-accent-500/10 p-6 cursor-pointer group hover:border-brand-500/40 transition-all duration-300"
+            onClick={() => navigate('/marketplace')}
+          >
+            {/* Background glow blobs */}
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-8 right-32 h-32 w-32 rounded-full bg-accent-500/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/30 to-accent-500/30 group-hover:from-brand-500/40 group-hover:to-accent-500/40 transition-all duration-300">
+                  <Store size={22} className="text-brand-400" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                    Workflow Marketplace
+                    <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-[11px] font-bold text-brand-400">New</span>
+                  </h2>
+                  <p className="text-sm text-foreground-muted mt-0.5">
+                    Browse pre-built workflow templates and install them in one click.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-foreground-muted">
+                  <Download size={12} className="text-brand-400" />
+                  <span>One-click install</span>
+                </div>
+                <button className="flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 text-sm font-bold text-white transition-all duration-200 group-hover:shadow-lg group-hover:shadow-brand-500/25">
+                  Browse Templates
+                  <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
             </div>
           </div>
 
