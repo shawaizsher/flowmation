@@ -898,59 +898,203 @@ router.get('/:id/advanced-report', async (req, res) => {
 // GET /api/workspaces/:wid/workflows/templates/marketplace
 router.get('/templates/marketplace', async (req, res) => {
   try {
-    res.json({
-      templates: WORKFLOW_TEMPLATES.map((template) => ({
-        id: template.id,
-        name: template.name,
-        category: template.category,
-        description: template.description,
-        tags: template.tags,
-        setupGuide: template.setupGuide,
-        requiredCredentials: template.requiredCredentials,
-        nodeCount: template.graph.nodes.length,
-        edgeCount: template.graph.edges.length
-      }))
-    });
+    const userId = req.user.id;
+    const builtInIds = WORKFLOW_TEMPLATES.map((t) => t.id);
+
+    // Ratings for built-in templates
+    const builtInRatingsRes = await query(
+      `SELECT template_id,
+              ROUND(AVG(rating)::numeric, 2)  AS avg_rating,
+              COUNT(*)::int                   AS rating_count,
+              MAX(CASE WHEN user_id = $1 THEN rating END) AS user_rating
+         FROM template_ratings
+        WHERE template_id = ANY($2)
+        GROUP BY template_id`,
+      [userId, builtInIds]
+    );
+    const builtInRatings = {};
+    for (const r of builtInRatingsRes.rows) {
+      builtInRatings[r.template_id] = {
+        avgRating:   parseFloat(r.avg_rating)  || 0,
+        ratingCount: parseInt(r.rating_count)  || 0,
+        userRating:  r.user_rating ? parseInt(r.user_rating) : null,
+      };
+    }
+
+    // User-published templates + their ratings
+    const publishedRes = await query(
+      `SELECT mt.*,
+              ROUND(AVG(tr.rating)::numeric, 2) AS avg_rating,
+              COUNT(tr.id)::int                 AS rating_count,
+              MAX(CASE WHEN tr.user_id = $1 THEN tr.rating END) AS user_rating
+         FROM marketplace_templates mt
+         LEFT JOIN template_ratings tr ON tr.template_id = mt.id::text
+        WHERE mt.is_active = true
+        GROUP BY mt.id
+        ORDER BY mt.created_at DESC`,
+      [userId]
+    );
+
+    const builtIn = WORKFLOW_TEMPLATES.map((t) => ({
+      id:                  t.id,
+      name:                t.name,
+      category:            t.category,
+      description:         t.description,
+      tags:                t.tags,
+      setupGuide:          t.setupGuide,
+      requiredCredentials: t.requiredCredentials,
+      nodeCount:           t.graph.nodes.length,
+      edgeCount:           t.graph.edges.length,
+      owner:               'Flowa Team',
+      isBuiltIn:           true,
+      avgRating:           builtInRatings[t.id]?.avgRating   ?? 0,
+      ratingCount:         builtInRatings[t.id]?.ratingCount ?? 0,
+      userRating:          builtInRatings[t.id]?.userRating  ?? null,
+      installCount:        0,
+    }));
+
+    const published = publishedRes.rows.map((t) => ({
+      id:                  t.id,
+      name:                t.name,
+      category:            t.category,
+      description:         t.description,
+      tags:                t.tags,
+      setupGuide:          t.setup_guide,
+      requiredCredentials: t.required_credentials,
+      nodeCount:           t.node_count,
+      edgeCount:           t.edge_count,
+      owner:               t.published_by_name,
+      isBuiltIn:           false,
+      avgRating:           parseFloat(t.avg_rating)  || 0,
+      ratingCount:         parseInt(t.rating_count)  || 0,
+      userRating:          t.user_rating ? parseInt(t.user_rating) : null,
+      installCount:        t.install_count,
+    }));
+
+    res.json({ templates: [...builtIn, ...published] });
   } catch (err) {
     logger.error('Templates marketplace error:', err);
     res.status(500).json({ error: 'Failed to load workflow templates marketplace' });
   }
 });
 
+// POST /api/workspaces/:wid/workflows/templates/publish
+router.post('/templates/publish', async (req, res) => {
+  try {
+    const { workflowId, category, setupGuide, requiredCredentials } = req.body;
+    if (!workflowId) return res.status(400).json({ error: 'workflowId is required' });
+
+    const wfRes = await query(
+      'SELECT * FROM workflows WHERE id = $1 AND workspace_id = $2',
+      [workflowId, req.workspaceId]
+    );
+    if (!wfRes.rows.length) return res.status(404).json({ error: 'Workflow not found' });
+
+    const wf    = wfRes.rows[0];
+    const graph = parseGraphValue(wf.graph);
+
+    const result = await query(
+      `INSERT INTO marketplace_templates
+         (name, description, category, tags, graph, setup_guide, required_credentials,
+          published_by, published_by_name, node_count, edge_count)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING *`,
+      [
+        wf.name,
+        wf.description || '',
+        category || 'General',
+        wf.tags || '[]',
+        JSON.stringify(graph),
+        JSON.stringify(setupGuide          || []),
+        JSON.stringify(requiredCredentials || []),
+        req.user.id,
+        req.user.name || 'Unknown',
+        graph.nodes?.length || 0,
+        graph.edges?.length || 0,
+      ]
+    );
+
+    res.status(201).json({ template: result.rows[0] });
+  } catch (err) {
+    logger.error('Publish template error:', err);
+    res.status(500).json({ error: 'Failed to publish template' });
+  }
+});
+
+// POST /api/workspaces/:wid/workflows/templates/:templateId/rate
+router.post('/templates/:templateId/rate', async (req, res) => {
+  try {
+    const rating = parseInt(req.body.rating);
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'rating must be an integer 1–5' });
+    }
+
+    await query(
+      `INSERT INTO template_ratings (template_id, user_id, rating)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (template_id, user_id) DO UPDATE SET rating = $3`,
+      [req.params.templateId, req.user.id, rating]
+    );
+
+    const stats = await query(
+      `SELECT ROUND(AVG(rating)::numeric, 2) AS avg_rating, COUNT(*)::int AS rating_count
+         FROM template_ratings WHERE template_id = $1`,
+      [req.params.templateId]
+    );
+
+    res.json({
+      avgRating:   parseFloat(stats.rows[0].avg_rating)  || 0,
+      ratingCount: parseInt(stats.rows[0].rating_count)  || 0,
+      userRating:  rating,
+    });
+  } catch (err) {
+    logger.error('Rate template error:', err);
+    res.status(500).json({ error: 'Failed to rate template' });
+  }
+});
+
 // POST /api/workspaces/:wid/workflows/templates/:templateId/install
 router.post('/templates/:templateId/install', async (req, res) => {
   try {
-    const template = getTemplateById(req.params.templateId);
-    if (!template) {
-      return res.status(404).json({ error: 'Workflow template not found' });
+    const { templateId } = req.params;
+
+    // Try built-in first, then user-published
+    const builtIn = getTemplateById(templateId);
+    let name, description, graph, tags, setupGuide, requiredCredentials;
+
+    if (builtIn) {
+      ({ name, description, graph, tags, setupGuide, requiredCredentials } = builtIn);
+    } else {
+      const dbRes = await query(
+        'SELECT * FROM marketplace_templates WHERE id = $1 AND is_active = true',
+        [templateId]
+      );
+      if (!dbRes.rows.length) return res.status(404).json({ error: 'Workflow template not found' });
+      const t = dbRes.rows[0];
+      name                = t.name;
+      description         = t.description;
+      graph               = parseGraphValue(t.graph);
+      tags                = t.tags;
+      setupGuide          = t.setup_guide;
+      requiredCredentials = t.required_credentials;
+      // increment install counter in background
+      query('UPDATE marketplace_templates SET install_count = install_count + 1 WHERE id = $1', [templateId]).catch(() => {});
     }
 
-    const name = typeof req.body.name === 'string' && req.body.name.trim()
+    const finalName = typeof req.body.name === 'string' && req.body.name.trim()
       ? req.body.name.trim()
-      : template.name;
+      : name;
 
     const result = await query(
       `INSERT INTO workflows (workspace_id, name, description, graph, tags, created_by)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [
-        req.workspaceId,
-        name,
-        template.description,
-        JSON.stringify(template.graph),
-        JSON.stringify(template.tags || []),
-        req.user.id
-      ]
+      [req.workspaceId, finalName, description, JSON.stringify(graph), JSON.stringify(tags || []), req.user.id]
     );
 
     res.status(201).json({
       workflow: result.rows[0],
-      template: {
-        id: template.id,
-        name: template.name,
-        setupGuide: template.setupGuide,
-        requiredCredentials: template.requiredCredentials
-      }
+      template: { id: templateId, name, setupGuide, requiredCredentials },
     });
   } catch (err) {
     logger.error('Install workflow template error:', err);
