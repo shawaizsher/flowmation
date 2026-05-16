@@ -5,6 +5,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Store,
 } from 'lucide-react';
 import FlowaLogo from './FlowaLogo';
 import { useState } from 'react';
@@ -13,8 +14,9 @@ import toast from 'react-hot-toast';
 import { UserAvatar } from './UserAvatar';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/marketplace', icon: Store,           label: 'Marketplace' },
+  { to: '/settings',    icon: Settings,        label: 'Settings' },
 ];
 
 export default function AppShell() {
