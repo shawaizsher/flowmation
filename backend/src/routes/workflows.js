@@ -1074,7 +1074,7 @@ router.get('/templates/marketplace', async (req, res) => {
 // POST /api/workspaces/:wid/workflows/templates/publish
 router.post('/templates/publish', async (req, res) => {
   try {
-    const { workflowId, category, setupGuide, requiredCredentials } = req.body;
+    const { workflowId, category, setupGuide, requiredCredentials, description } = req.body;
     if (!workflowId) return res.status(400).json({ error: 'workflowId is required' });
 
     const wfRes = await query(
@@ -1094,7 +1094,7 @@ router.post('/templates/publish', async (req, res) => {
        RETURNING *`,
       [
         wf.name,
-        wf.description || '',
+        (typeof description === 'string' && description.trim()) ? description.trim() : (wf.description || ''),
         category || 'General',
         wf.tags || '[]',
         JSON.stringify(graph),
