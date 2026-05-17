@@ -48,8 +48,6 @@ export const categoryMeta: Record<string, { label: string; icon: string; color: 
   analytics:   { label: 'Analytics',           icon: '📊', color: 'text-rose-400' },
   design:      { label: 'Design',             icon: '🎨', color: 'text-fuchsia-400' },
   utilities:   { label: 'Utilities',           icon: '🛠️', color: 'text-gray-400' },
-  shapes:      { label: 'Shapes',              icon: '⬜', color: 'text-purple-400' },
-  ui:          { label: 'UI Elements',         icon: '📝', color: 'text-violet-400' },
 };
 
 // ─────────────────────────────────────────
@@ -2347,89 +2345,6 @@ export const nodeCatalog: NodeDefinition[] = [
     },
   },
 
-  // ━━━ SHAPES ━━━
-  {
-    type: 'shape_square',
-    label: 'Square',
-    description: 'Add a square shape to the canvas',
-    category: 'shapes',
-    icon: '⬜',
-    color: 'text-purple-400',
-    configSchema: {
-      backgroundColor: { type: 'string', label: 'Background Color', default: '#3B82F6', placeholder: '#3B82F6' },
-      borderColor: { type: 'string', label: 'Border Color', default: '#1F2937', placeholder: '#1F2937' },
-      borderWidth: { type: 'number', label: 'Border Width', default: 2 },
-    },
-  },
-  {
-    type: 'shape_circle',
-    label: 'Circle',
-    description: 'Add a circle shape to the canvas',
-    category: 'shapes',
-    icon: '⭕',
-    color: 'text-purple-400',
-    configSchema: {
-      backgroundColor: { type: 'string', label: 'Background Color', default: '#EF4444', placeholder: '#EF4444' },
-      borderColor: { type: 'string', label: 'Border Color', default: '#1F2937', placeholder: '#1F2937' },
-      borderWidth: { type: 'number', label: 'Border Width', default: 2 },
-    },
-  },
-  {
-    type: 'shape_rectangle',
-    label: 'Rectangle',
-    description: 'Add a rectangle shape to the canvas',
-    category: 'shapes',
-    icon: '▭',
-    color: 'text-purple-400',
-    configSchema: {
-      backgroundColor: { type: 'string', label: 'Background Color', default: '#10B981', placeholder: '#10B981' },
-      borderColor: { type: 'string', label: 'Border Color', default: '#1F2937', placeholder: '#1F2937' },
-      borderWidth: { type: 'number', label: 'Border Width', default: 2 },
-    },
-  },
-  {
-    type: 'shape_diamond',
-    label: 'Diamond',
-    description: 'Add a diamond shape to the canvas',
-    category: 'shapes',
-    icon: '◆',
-    color: 'text-purple-400',
-    configSchema: {
-      backgroundColor: { type: 'string', label: 'Background Color', default: '#F59E0B', placeholder: '#F59E0B' },
-      borderColor: { type: 'string', label: 'Border Color', default: '#1F2937', placeholder: '#1F2937' },
-      borderWidth: { type: 'number', label: 'Border Width', default: 2 },
-    },
-  },
-
-  // ━━━ UI ELEMENTS ━━━
-  {
-    type: 'ui_text',
-    label: 'Text',
-    description: 'Add a text element to the canvas',
-    category: 'ui',
-    icon: '📝',
-    color: 'text-violet-400',
-    configSchema: {
-      text: { type: 'string', label: 'Text Content', default: 'Add text here', placeholder: 'Enter text...' },
-      fontSize: { type: 'number', label: 'Font Size', default: 14 },
-      fontColor: { type: 'string', label: 'Font Color', default: '#1F2937', placeholder: '#1F2937' },
-      fontWeight: { type: 'select', label: 'Font Weight', default: 'normal', options: ['normal', 'bold', 'lighter'] },
-      textAlign: { type: 'select', label: 'Text Align', default: 'center', options: ['left', 'center', 'right'] },
-    },
-  },
-  {
-    type: 'ui_note',
-    label: 'Note/Comment',
-    description: 'Add a sticky note comment to the canvas',
-    category: 'ui',
-    icon: '📌',
-    color: 'text-violet-400',
-    configSchema: {
-      text: { type: 'string', label: 'Note Text', default: 'Add your note here', placeholder: 'Enter note...' },
-      backgroundColor: { type: 'string', label: 'Background Color', default: '#FEF08A', placeholder: '#FEF08A' },
-      textColor: { type: 'string', label: 'Text Color', default: '#1F2937', placeholder: '#1F2937' },
-    },
-  },
 ];
 
 // ── Grouped by category (for palette rendering) ──

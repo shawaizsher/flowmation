@@ -44,7 +44,7 @@ export interface Collaborator {
 /*  Store shape                                                        */
 /* ------------------------------------------------------------------ */
 
-interface AppState {
+export interface AppState {
   /* auth */
   token: string | null;
   user: User | null;
