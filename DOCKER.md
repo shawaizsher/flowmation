@@ -50,7 +50,13 @@ REDIS_PASSWORD=your_redis_password
 JWT_SECRET=your_jwt_secret_here
 DOCKER_USERNAME=your_docker_hub_username
 VERSION=1.0.0
+
+# ⚠️  IMPORTANT: Update these if not running on localhost
+API_URL=http://localhost:4000           # Change to your domain
+WS_URL=ws://localhost:4000              # Change to your domain
 ```
+
+**Note**: `API_URL` and `WS_URL` are embedded into the frontend build. If running on a different domain or server, update these BEFORE building the Docker image.
 
 ---
 

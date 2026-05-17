@@ -1,4 +1,7 @@
 # Multi-stage build for optimized production image
+ARG VITE_API_URL=http://localhost:4000
+ARG VITE_WS_URL=ws://localhost:4000
+
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -12,8 +15,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with Vite env vars
+ARG VITE_API_URL
+ARG VITE_WS_URL
+RUN VITE_API_URL=${VITE_API_URL} VITE_WS_URL=${VITE_WS_URL} npm run build
 
 # Production stage - serve with lightweight server
 FROM node:18-alpine
