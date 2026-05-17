@@ -107,8 +107,9 @@ registry.register('httpRequest', {
     // Query Parameters
     parameters: { type: 'json', label: 'Query Parameters', default: '{}', description: 'URL query string parameters' },
 
-    // Request Headers
-    headers: { type: 'json', label: 'Headers', default: '{}' },
+    // Request Headers - Support both JSON and dynamic headers
+    headers: { type: 'json', label: 'Headers (JSON)', default: '{}', description: 'Optional: JSON object of headers' },
+    dynamicHeaders: { type: 'json', label: 'Dynamic Headers', default: '[]', description: 'Array of header objects: [{"key": "header-name", "value": "header-value"}]' },
 
     // Request Body
     body: { type: 'json', label: 'Request Body' },
@@ -144,6 +145,19 @@ registry.register('httpRequest', {
       try { headers = JSON.parse(headers); } catch { headers = {}; }
     }
     headers = headers || {};
+
+    // Merge dynamic headers (array format)
+    let dynamicHeaders = config.dynamicHeaders;
+    if (typeof dynamicHeaders === 'string') {
+      try { dynamicHeaders = JSON.parse(dynamicHeaders); } catch { dynamicHeaders = []; }
+    }
+    if (Array.isArray(dynamicHeaders)) {
+      dynamicHeaders.forEach(headerObj => {
+        if (headerObj && headerObj.key && headerObj.value !== undefined) {
+          headers[headerObj.key] = headerObj.value;
+        }
+      });
+    }
 
     let params = config.parameters;
     if (typeof params === 'string') {
