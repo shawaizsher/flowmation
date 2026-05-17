@@ -72,6 +72,13 @@ async function initDb() {
     const migrations = [
       'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE',
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'",
+      `CREATE TABLE IF NOT EXISTS login_otp_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(10) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
       `CREATE TABLE IF NOT EXISTS workspace_invitations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -150,6 +157,8 @@ async function initDb() {
       'CREATE INDEX IF NOT EXISTS idx_inbox_threads_workspace ON inbox_threads(workspace_id, updated_at DESC)',
       'CREATE INDEX IF NOT EXISTS idx_inbox_messages_thread ON inbox_messages(thread_id, created_at ASC)',
       'CREATE INDEX IF NOT EXISTS idx_workflow_activity_workflow ON workflow_activity(workflow_id, created_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_login_otp_user ON login_otp_tokens(user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_login_otp_created ON login_otp_tokens(created_at)',
     ];
     for (const statement of migrations) {
       await pool.query(statement);
