@@ -102,16 +102,19 @@ export default function DashboardPage() {
     if (!wf) return;
     try {
       setGeneratingDesc(true);
+      // Fetch the full workflow graph so the generator has nodes + edges
+      const wfRes = await workflowApi.get(workspaceId, publishingWfId);
+      const graph = wfRes.data.workflow?.graph || { nodes: [], edges: [] };
       const res = await aiApi.generateDescription(workspaceId, {
         name: wf.name,
-        nodes: [],
-        edges: [],
+        nodes: graph.nodes || [],
+        edges: graph.edges || [],
       });
       if (res.data.description) setPublishDescription(res.data.description);
       if (res.data.setupGuide?.length) setPublishSetupGuide(res.data.setupGuide.join('\n'));
       toast.success('Description generated!');
     } catch {
-      toast.error('AI generation failed — check your ANTHROPIC_API_KEY');
+      toast.error('Failed to generate description');
     } finally {
       setGeneratingDesc(false);
     }
