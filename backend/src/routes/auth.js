@@ -12,8 +12,6 @@ const router = express.Router();
 
 const LOGIN_RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
 const LOGIN_RATE_LIMIT_MAX = Number.parseInt(process.env.LOGIN_RATE_LIMIT_MAX, 10) || 8;
-const LOGIN_OTP_EXPIRY_MS = Number.parseInt(process.env.LOGIN_OTP_EXPIRY_MS, 10) || 15 * 60 * 1000;
-const LOGIN_OTP_RESEND_WINDOW_MS = Number.parseInt(process.env.LOGIN_OTP_RESEND_WINDOW_MS, 10) || 60 * 1000;
 const loginAttempts = new Map();
 
 function getClientIp(req) {
@@ -147,7 +145,7 @@ router.post('/register', async (req, res) => {
     const result = await transaction(async (client) => {
       const userResult = await client.query(
         "INSERT INTO users (email, password_hash, name, email_verified, settings) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, settings",
-        [email.toLowerCase(), passwordHash, name, true, JSON.stringify({})]
+        [email.toLowerCase(), passwordHash, name, false, JSON.stringify({})]
       );
       const user = userResult.rows[0];
 
@@ -163,30 +161,26 @@ router.post('/register', async (req, res) => {
         [workspace.id, user.id, 'owner']
       );
 
-      return { user, workspace };
+      const verificationToken = generateToken();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await client.query(
+        'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, verificationToken, expiresAt]
+      );
+
+      return { user, workspace, verificationToken };
     });
 
-    const token = jwt.sign(
-      { userId: result.user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d', algorithm: 'HS256' }
-    );
+    sendVerificationEmail(email.toLowerCase(), name, result.verificationToken).catch((err) => {
+      logger.error('Failed to send OTP email:', err);
+    });
 
-    logger.info(`User registered: ${result.user.email}`);
+    logger.info(`User registered (OTP sent): ${result.user.email}`);
 
     res.status(201).json({
-      message: 'Account created successfully.',
-      token,
+      message: 'Account created! Enter the 6-digit code we sent to your email.',
       user: formatUser(result.user),
-      workspaces: [
-        {
-          id: result.workspace.id,
-          name: result.workspace.name,
-          slug: result.workspace.slug,
-          role: 'owner',
-        },
-      ],
-      emailVerificationRequired: false,
+      emailVerificationRequired: true,
     });
   } catch (err) {
     logger.error('Registration error:', err);
@@ -434,83 +428,15 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: 'Please verify your email address before signing in.',
+        emailVerificationRequired: true,
+        email: user.email,
+      });
+    }
+
     clearLoginAttempts(loginKey);
-
-    const resendCutoff = new Date(Date.now() - LOGIN_OTP_RESEND_WINDOW_MS);
-    const recentOtp = await query(
-      'SELECT id FROM login_otp_tokens WHERE user_id = $1 AND created_at > $2',
-      [user.id, resendCutoff]
-    );
-    if (recentOtp.rows.length > 0) {
-      return res.status(429).json({ error: 'Please wait before requesting another code.' });
-    }
-
-    await query('DELETE FROM login_otp_tokens WHERE user_id = $1', [user.id]);
-
-    const otpToken = generateToken();
-    const expiresAt = new Date(Date.now() + LOGIN_OTP_EXPIRY_MS);
-    await query(
-      'INSERT INTO login_otp_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, otpToken, expiresAt]
-    );
-
-    await sendVerificationEmail(user.email, user.name, otpToken);
-
-    logger.info(`Login OTP sent: ${user.email}`);
-
-    res.json({
-      loginOtpRequired: true,
-      email: user.email,
-      message: 'Enter the 6-digit code sent to your email to finish signing in.'
-    });
-  } catch (err) {
-    logger.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// ── POST /api/auth/login-otp/verify ──
-router.post('/login-otp/verify', async (req, res) => {
-  try {
-    const { email, code } = req.body;
-
-    if (!email || !code) {
-      return res.status(400).json({ error: 'Email and code are required' });
-    }
-
-    const normalizedCode = String(code).trim();
-    if (!/^\d{6}$/.test(normalizedCode)) {
-      return res.status(400).json({ error: 'Code must be 6 digits' });
-    }
-
-    const userResult = await query(
-      'SELECT id, email, name, role, settings, is_active FROM users WHERE email = $1',
-      [email.toLowerCase()]
-    );
-    if (userResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired code' });
-    }
-
-    const user = userResult.rows[0];
-    if (!user.is_active) {
-      return res.status(403).json({ error: 'Account is deactivated' });
-    }
-
-    const tokenResult = await query(
-      'SELECT id, expires_at FROM login_otp_tokens WHERE user_id = $1 AND token = $2',
-      [user.id, normalizedCode]
-    );
-    if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired code' });
-    }
-
-    const record = tokenResult.rows[0];
-    if (new Date(record.expires_at) < new Date()) {
-      await query('DELETE FROM login_otp_tokens WHERE id = $1', [record.id]);
-      return res.status(400).json({ error: 'Code has expired. Please request a new one.' });
-    }
-
-    await query('DELETE FROM login_otp_tokens WHERE user_id = $1', [user.id]);
 
     const workspaces = await query(
       `SELECT w.id, w.name, w.slug, wm.role
@@ -527,7 +453,7 @@ router.post('/login-otp/verify', async (req, res) => {
       { expiresIn: '7d', algorithm: 'HS256' }
     );
 
-    logger.info(`User logged in with OTP: ${user.email}`);
+    logger.info(`User logged in: ${user.email}`);
 
     res.json({
       token,
@@ -535,8 +461,8 @@ router.post('/login-otp/verify', async (req, res) => {
       workspaces: workspaces.rows
     });
   } catch (err) {
-    logger.error('Login OTP verify error:', err);
-    res.status(500).json({ error: 'Login verification failed' });
+    logger.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 

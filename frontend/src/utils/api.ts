@@ -41,9 +41,6 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
 
-  verifyLoginOtp: (email: string, code: string) =>
-    api.post('/auth/login-otp/verify', { email, code }),
-
   register: (data: { name: string; email: string; password: string }) =>
     api.post('/auth/register', data),
 
