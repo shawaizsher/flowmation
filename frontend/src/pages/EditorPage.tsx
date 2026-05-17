@@ -54,6 +54,7 @@ import NodeIcon from '../components/canvas/NodeIcon';
 import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
 import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
+import DynamicHeadersInput from '../components/DynamicHeadersInput';
 import { UserAvatar } from '../components/UserAvatar';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
@@ -1916,19 +1917,24 @@ function EditorCanvas() {
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
                                       className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-brand-500/50 appearance-none cursor-pointer"
                                     >
-                                      {key === 'method' && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(m => (
+                                      {key === 'method' && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT'].map(m => (
                                         <option key={m} value={m}>{m}</option>
                                       ))}
-                                      {key === 'authType' && ['none', 'basic', 'bearer', 'api_key', 'oauth2'].map(t => (
+                                      {key === 'authType' && ['none', 'basic', 'bearer', 'api_key', 'oauth2', 'custom'].map(t => (
                                         <option key={t} value={t}>{t.replace(/_/g, ' ').toUpperCase()}</option>
                                       ))}
-                                      {key === 'bodyType' && ['auto', 'json', 'form', 'raw'].map(t => (
+                                      {key === 'bodyType' && ['auto', 'json', 'form', 'raw', 'xml'].map(t => (
                                         <option key={t} value={t}>{t.toUpperCase()}</option>
                                       ))}
-                                      {key === 'responseType' && ['auto', 'json', 'text', 'arraybuffer'].map(t => (
+                                      {key === 'responseType' && ['auto', 'json', 'text', 'arraybuffer', 'blob', 'stream'].map(t => (
                                         <option key={t} value={t}>{t.toUpperCase()}</option>
                                       ))}
                                     </select>
+                                  ) : key === 'dynamicHeaders' ? (
+                                    <DynamicHeadersInput
+                                      value={Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value || '[]').catch(() => []) : []}
+                                      onChange={(headers) => handleUpdateNodeConfig(key, headers)}
+                                    />
                                   ) : (value as string)?.length > 80 || key === 'body' || key === 'headers' || key === 'parameters' ? (
                                     <textarea
                                       value={String(value ?? '')}
