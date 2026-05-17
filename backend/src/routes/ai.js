@@ -300,4 +300,18 @@ router.post('/document-workflow', async (req, res) => {
   }
 });
 
+// POST /api/workspaces/:wid/ai/generate-description
+router.post('/generate-description', async (req, res) => {
+  try {
+    const { name, nodes = [], edges = [] } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    const result = await aiService.generateDescription({ name, nodes, edges });
+    res.json(result);
+  } catch (err) {
+    logger.error('generate-description error:', err);
+    res.status(500).json({ error: 'Failed to generate description' });
+  }
+});
+
 module.exports = router;
