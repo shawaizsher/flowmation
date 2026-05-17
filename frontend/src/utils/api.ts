@@ -99,6 +99,7 @@ export const workflowApi = {
     data: {
       workflowId: string;
       category: string;
+      description?: string;
       setupGuide: string[];
       requiredCredentials: { label: string; required: boolean; reason: string; serviceId: string }[];
     }
@@ -266,6 +267,11 @@ export const versionApi = {
 /* ------------------------------------------------------------------ */
 
 export const aiApi = {
+  generateDescription: (
+    workspaceId: string,
+    data: { name: string; nodes: unknown[]; edges: unknown[] }
+  ) => api.post(`/workspaces/${workspaceId}/ai/generate-description`, data),
+
   generateWorkflow: (workspaceId: string, prompt: string) =>
     api.post(`/workspaces/${workspaceId}/ai/generate-workflow`, { prompt }),
 
