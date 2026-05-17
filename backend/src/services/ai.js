@@ -2496,51 +2496,146 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
  * @param {{ name:string, nodes:any[], edges:any[] }} workflow
  * @returns {Promise<{ description:string, setupGuide:string[] }>}
  */
-async function generateDescription({ name, nodes = [], edges = [] }) {
-  try {
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+/**
+ * generateDescription — fully algorithmic, no API key required.
+ *
+ * Analyses the workflow graph (node types, labels, edge topology) and
+ * produces a human-readable description + step-by-step setup guide.
+ *
+ * Algorithm:
+ *  1. Classify every node into semantic buckets (trigger / AI / transform /
+ *     logic / HTTP / notification / approval / storage / utility).
+ *  2. Walk the edge graph to find the execution path order.
+ *  3. Build a natural-language sentence from: trigger → actions → output.
+ *  4. Generate setup guide steps only for node types that actually need
+ *     user configuration (credentials, URLs, conditions, etc.).
+ */
+function generateDescription({ name, nodes = [], edges = [] }) {
+  // ── 1. Node classification ───────────────────────────────────────────────
+  const BUCKETS = {
+    trigger:      /^(trigger_|webhook_trigger|manual_trigger|schedule_trigger|cron)/,
+    ai:           /(ai_|anthropic|openai|gemini|gpt|claude|llm|classify|summar|sentiment)/,
+    transform:    /(transform|set_variable|json_parse|split_array|merge|code_block|javascript|python|template)/,
+    filter:       /(filter|if_condition|switch|router|condition)/,
+    http:         /http_request/,
+    email:        /(email|smtp|send_email|email_send)/,
+    slack:        /slack/,
+    approval:     /(approval|wait_approval|human_in_loop)/,
+    storage:      /(database|read_db|write_db|postgres|mysql|redis|mongo)/,
+    notification: /(notify|sms|twilio|push_notification|teams|discord)/,
+    crm:          /(hubspot|salesforce|pipedrive|crm)/,
+    log:          /console_log/,
+    delay:        /(delay|wait|sleep)/,
+    loop:         /loop/,
+  };
 
-    const nodeList = nodes
-      .map(n => `- ${n.data?.label || n.data?.type || n.type || 'node'} (${n.data?.type || n.type || '?'})`)
-      .join('\n') || '(no nodes yet)';
-
-    const edgeSummary = edges.length
-      ? `${edges.length} connection${edges.length !== 1 ? 's' : ''} between nodes`
-      : 'no connections yet';
-
-    const prompt = `You are a technical writer for a workflow automation platform.
-
-Workflow name: "${name}"
-Nodes (${nodes.length}):
-${nodeList}
-Edges: ${edgeSummary}
-
-Write a JSON object with exactly two keys:
-1. "description" — 1-2 sentences (max 180 chars) describing what this workflow does in plain English. Be specific about the trigger, main action, and output. No jargon.
-2. "setupGuide" — an array of 3-5 short imperative strings (each max 90 chars) that tell a new user how to configure and use this workflow. Each step should start with a verb.
-
-Return ONLY valid JSON, no markdown, no explanation.`;
-
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const raw = response.content?.[0]?.text?.trim() || '{}';
-    const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, ''));
-
-    return {
-      description: typeof parsed.description === 'string' ? parsed.description.trim() : '',
-      setupGuide:  Array.isArray(parsed.setupGuide)
-        ? parsed.setupGuide.map(s => String(s).trim()).filter(Boolean)
-        : [],
-    };
-  } catch (err) {
-    logger.error('[ai] generateDescription error:', err.message);
-    return { description: '', setupGuide: [] };
+  function classify(node) {
+    const t = (node.data?.type || node.type || '').toLowerCase();
+    for (const [bucket, rx] of Object.entries(BUCKETS)) {
+      if (rx.test(t)) return bucket;
+    }
+    return 'utility';
   }
+
+  const classified = nodes.map(n => ({ node: n, bucket: classify(n) }));
+  const bucketSet  = new Set(classified.map(c => c.bucket));
+
+  // ── 2. Topological order via BFS from trigger / root nodes ───────────────
+  const outMap = {};   // nodeId → [targetId, ...]
+  for (const e of edges) {
+    if (!outMap[e.source]) outMap[e.source] = [];
+    outMap[e.source].push(e.target);
+  }
+  const inDegree = {};
+  for (const n of nodes) inDegree[n.id] = 0;
+  for (const e of edges) inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+
+  const roots  = nodes.filter(n => !inDegree[n.id]);
+  const queue  = [...roots];
+  const ordered = [];
+  const visited = new Set();
+  while (queue.length) {
+    const cur = queue.shift();
+    if (visited.has(cur.id)) continue;
+    visited.add(cur.id);
+    ordered.push(cur);
+    for (const nextId of (outMap[cur.id] || [])) {
+      const next = nodes.find(n => n.id === nextId);
+      if (next && !visited.has(nextId)) queue.push(next);
+    }
+  }
+  // append any isolated nodes not reached by BFS
+  for (const n of nodes) if (!visited.has(n.id)) ordered.push(n);
+
+  // ── 3. Natural-language description ─────────────────────────────────────
+  // Trigger phrase
+  const triggerNode = classified.find(c => c.bucket === 'trigger');
+  let triggerPhrase = 'When triggered';
+  if (triggerNode) {
+    const t = (triggerNode.node.data?.type || triggerNode.node.type || '').toLowerCase();
+    if (/webhook/.test(t))  triggerPhrase = 'When an incoming webhook request is received';
+    else if (/schedule|cron/.test(t)) triggerPhrase = 'On a recurring schedule';
+    else if (/manual/.test(t)) triggerPhrase = 'When run manually';
+  }
+
+  // Middle actions (deduplicated natural phrases)
+  const midPhrases = [];
+  if (bucketSet.has('http'))      midPhrases.push('calls an external API');
+  if (bucketSet.has('ai'))        midPhrases.push('uses AI to process and enrich the data');
+  if (bucketSet.has('transform')) midPhrases.push('transforms the payload');
+  if (bucketSet.has('filter'))    midPhrases.push('applies conditional logic to route execution');
+  if (bucketSet.has('loop'))      midPhrases.push('iterates over a list of items');
+  if (bucketSet.has('storage'))   midPhrases.push('reads or writes records to a database');
+  if (bucketSet.has('crm'))       midPhrases.push('syncs data with a CRM system');
+  if (bucketSet.has('delay'))     midPhrases.push('waits before proceeding');
+
+  // Output phrase (last meaningful non-log step)
+  let outputPhrase = '';
+  if (bucketSet.has('approval'))     outputPhrase = 'waits for a human approval before continuing';
+  if (bucketSet.has('email'))        outputPhrase = 'sends an email notification';
+  if (bucketSet.has('slack'))        outputPhrase = 'posts a message to Slack';
+  if (bucketSet.has('notification')) outputPhrase = 'sends a push notification';
+
+  // Assemble
+  let description;
+  if (!nodes.length) {
+    // empty canvas — use the workflow name to infer intent
+    const nameLower = name.toLowerCase();
+    if (/email|notify|alert/.test(nameLower))      description = `${name}: automates email or alert notifications based on incoming events.`;
+    else if (/report|summary|digest/.test(nameLower)) description = `${name}: generates and delivers automated reports or summaries on a schedule.`;
+    else if (/sync|import|export/.test(nameLower)) description = `${name}: synchronises data between services automatically.`;
+    else if (/lead|crm|sales/.test(nameLower))     description = `${name}: automates lead processing and CRM data management.`;
+    else                                            description = `${name}: automates a multi-step process triggered by an event or schedule.`;
+  } else {
+    const midText = midPhrases.length
+      ? midPhrases.join(', ').replace(/,([^,]*)$/, ' and$1')
+      : 'processes data';
+    const outText = outputPhrase ? `, then ${outputPhrase}` : '';
+    description = `${triggerPhrase}, the workflow ${midText}${outText}.`;
+  }
+
+  // Cap at 200 chars
+  if (description.length > 200) description = description.slice(0, 197) + '…';
+
+  // ── 4. Setup guide ───────────────────────────────────────────────────────
+  const guide = [];
+  if (triggerNode) {
+    const t = (triggerNode.node.data?.type || '').toLowerCase();
+    if (/webhook/.test(t)) guide.push('Copy the generated webhook URL from the trigger node and add it to your source system.');
+    else if (/schedule/.test(t)) guide.push('Set the cron expression or interval in the Schedule trigger node.');
+    else guide.push('Open the trigger node and configure its settings before running the workflow.');
+  }
+  if (bucketSet.has('http'))     guide.push('Enter the target URL and any required auth headers in each HTTP Request node.');
+  if (bucketSet.has('ai'))       guide.push('Add your AI provider API key under Settings → Credentials.');
+  if (bucketSet.has('email'))    guide.push('Connect an SMTP / email credential under Settings → Credentials.');
+  if (bucketSet.has('slack'))    guide.push('Add your Slack Bot Token under Settings → Credentials.');
+  if (bucketSet.has('storage'))  guide.push('Configure the database connection string in the Storage node settings.');
+  if (bucketSet.has('crm'))      guide.push('Link your CRM credential (API key or OAuth) under Settings → Credentials.');
+  if (bucketSet.has('filter'))   guide.push('Review each condition node and adjust field paths to match your actual payload structure.');
+  if (bucketSet.has('approval')) guide.push('Set the approver email or Slack channel in the Approval node configuration.');
+  guide.push('Use the Run button with a sample payload to test the full execution path end-to-end.');
+
+  return { description, setupGuide: guide.slice(0, 5) };
 }
 
 module.exports = {
