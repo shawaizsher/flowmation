@@ -76,10 +76,17 @@ function EditorCanvas() {
   const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
 
-  // Publishing
+  // Publishing (version)
   const [publishing, setPublishing] = useState(false);
   const [showPublishPopover, setShowPublishPopover] = useState(false);
   const [publishLabel, setPublishLabel] = useState('');
+
+  // Publish to Marketplace
+  const [showMktModal, setShowMktModal]     = useState(false);
+  const [mktCategory, setMktCategory]       = useState('General');
+  const [mktSetupGuide, setMktSetupGuide]   = useState('');
+  const [publishingMkt, setPublishingMkt]   = useState(false);
+  const MKT_CATEGORIES = ['General','Sales','Marketing','Data','Finance','Productivity','AI','DevOps','Operations','Governance','Social'];
 
   // Panels — both open by default for easier understanding
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
@@ -775,6 +782,27 @@ function EditorCanvas() {
       toast.error(err.response?.data?.error || 'Failed to publish');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handlePublishToMarketplace = async () => {
+    if (!workspaceId || !id) return;
+    try {
+      setPublishingMkt(true);
+      const setupGuide = mktSetupGuide.split('\n').map(s => s.trim()).filter(Boolean);
+      await workflowApi.publishTemplate(workspaceId, {
+        workflowId: id,
+        category: mktCategory,
+        setupGuide,
+        requiredCredentials: [],
+      });
+      toast.success('Workflow published to Marketplace!');
+      setShowMktModal(false);
+      setMktSetupGuide('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to publish to marketplace');
+    } finally {
+      setPublishingMkt(false);
     }
   };
 
@@ -1520,6 +1548,16 @@ function EditorCanvas() {
               </div>
             )}
           </div>
+
+          {/* Publish to Marketplace button */}
+          <button
+            onClick={() => { setShowPublishPopover(false); setShowMktModal(true); }}
+            className="flex items-center gap-1.5 rounded-lg border border-brand-500/20 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-400 hover:bg-brand-500/20 transition"
+            title="Publish this workflow as a Marketplace template"
+          >
+            <Store size={13} />
+            To Marketplace
+          </button>
 
           <button
             onClick={handleExecute}
@@ -2859,6 +2897,86 @@ function EditorCanvas() {
         onClose={() => setCredModalOpen(false)}
         preselectedServiceId={credPreselectedService}
       />
+
+      {/* ── Publish to Marketplace Modal ── */}
+      {showMktModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-lg rounded-2xl border border-surface-border bg-surface-card p-6 shadow-2xl animate-scale-in">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+                <Store size={18} className="text-brand-400" />
+                Publish to Marketplace
+              </h2>
+              <button onClick={() => setShowMktModal(false)} className="text-foreground-muted hover:text-foreground transition">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-foreground-muted mb-5">
+              Share <span className="font-semibold text-foreground">"{workflowName}"</span> as a reusable template so anyone in your workspace can install it from the Marketplace.
+            </p>
+
+            <div className="space-y-4">
+              {/* Category */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">Category</label>
+                <div className="relative">
+                  <select
+                    value={mktCategory}
+                    onChange={(e) => setMktCategory(e.target.value)}
+                    className="input-field w-full appearance-none pr-8"
+                  >
+                    {MKT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+                </div>
+              </div>
+
+              {/* Setup guide */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Setup Guide <span className="text-foreground-muted font-normal">(one step per line, optional)</span>
+                </label>
+                <textarea
+                  value={mktSetupGuide}
+                  onChange={(e) => setMktSetupGuide(e.target.value)}
+                  placeholder={"Configure the webhook URL in the trigger node.\nAdd your API credentials in Settings.\nTest with a sample payload."}
+                  className="input-field min-h-[100px] resize-none w-full"
+                  autoFocus
+                />
+              </div>
+
+              {/* Info row */}
+              <div className="rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-xs text-foreground-muted flex items-start gap-2">
+                <Store size={12} className="mt-0.5 text-brand-400 shrink-0" />
+                The current workflow graph ({nodes.length} node{nodes.length !== 1 ? 's' : ''}) will be snapshotted and listed on the Marketplace. Installers get their own editable copy.
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowMktModal(false)}
+                className="rounded-lg px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublishToMarketplace}
+                disabled={publishingMkt}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50"
+              >
+                {publishingMkt ? (
+                  <><Loader2 size={14} className="animate-spin" /> Publishing…</>
+                ) : (
+                  <><Store size={14} /> Publish Template</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
