@@ -927,6 +927,7 @@ const INTENT_PROTOTYPES = {
   health:      'health score grade analyze quality check status validate review',
   simulate:    'simulate dry run preview test execution trace what happens',
   debug:       'debug fix problem error failure broken issue troubleshoot why',
+  suggest:     'suggest improve enhance optimize additions improvements recommendations what can add better missing next what should change tips advice ideas',
   help:        'help capabilities commands what can you do guide tutorial',
   greeting:    'hi hello hey good morning afternoon evening what is up sup',
 };
@@ -1372,9 +1373,13 @@ function buildConversationContext(history, nodes) {
     lastUserMsg: '',
     lastAction: null,
     lastAddedNodeType: null,
-    lastSuggestedNodes: [],
+    lastSuggestedNodes: [],   // backward-compat alias for pendingSuggestions
+    pendingSuggestions: [],   // [{type, desc}] from numbered list in last bot message — indexed for ordinal access
     pendingQuestion: false,
     nodeLabels: nodes.map(n => (n.data?.label || n.data?.type || '').toLowerCase()),
+    lastReferencedNodeLabel: null, // last node label explicitly mentioned in conversation
+    recentlyAddedTypes: [],   // node types added across last few bot turns
+    activeTopics: [],         // node types recently mentioned in any direction
   };
   if (!history || !history.length) return ctx;
 
@@ -1384,27 +1389,102 @@ function buildConversationContext(history, nodes) {
   ctx.lastUserMsg = userMsgs[userMsgs.length - 1]?.content || '';
 
   const lb = ctx.lastBotMsg.toLowerCase();
-  if (lb.includes('built') && lb.includes('workflow'))      ctx.lastAction = 'generated';
+  if (lb.includes('built') && lb.includes('workflow'))        ctx.lastAction = 'generated';
   else if (lb.includes('added a') || lb.includes('added an')) ctx.lastAction = 'added_node';
-  else if (lb.includes('removed'))                           ctx.lastAction = 'removed_node';
-  else if (lb.includes('connected'))                         ctx.lastAction = 'connected';
-  else if (lb.includes('cleared'))                           ctx.lastAction = 'cleared';
-  else if (lb.includes('suggest') || lb.includes('improve')) ctx.lastAction = 'suggested';
+  else if (lb.includes('removed'))                             ctx.lastAction = 'removed_node';
+  else if (lb.includes('connected'))                           ctx.lastAction = 'connected';
+  else if (lb.includes('cleared'))                             ctx.lastAction = 'cleared';
+  else if (lb.includes('suggest') || lb.includes('improve'))  ctx.lastAction = 'suggested';
   else if (lb.includes('schedule') || lb.includes('daily') || lb.includes('weekly')) ctx.lastAction = 'scheduled';
 
   ctx.pendingQuestion = ctx.lastBotMsg.includes('?');
 
-  // Extract nodes Freckles last suggested ("1. **Error Handler**")
+  // Extract nodes from numbered suggestion lists: "1. **Error Handler** — reason"
   for (const m of ctx.lastBotMsg.matchAll(/\d+\.\s+\*\*([^*]+)\*\*/g)) {
     const desc = m[1].trim();
     const found = NODE_INDEX.find(n =>
-      desc.toLowerCase().includes(n.desc.toLowerCase().split(' ').slice(0,2).join(' ')) ||
+      desc.toLowerCase().includes(n.desc.toLowerCase().split(' ').slice(0, 2).join(' ')) ||
       n.desc.toLowerCase().includes(desc.toLowerCase())
     );
-    if (found) ctx.lastSuggestedNodes.push(found);
+    if (found) {
+      ctx.lastSuggestedNodes.push(found);
+      ctx.pendingSuggestions.push(found);
+    }
+  }
+
+  // Detect last node type added from bot messages ("Added **Slack Send**", "I've added **Error Handler**")
+  for (const m of ctx.lastBotMsg.matchAll(/(?:added|added a|added an)\s+\*\*([^*]+)\*\*/gi)) {
+    const nodeDesc = m[1].trim();
+    const found = NODE_INDEX.find(n => n.desc.toLowerCase().includes(nodeDesc.toLowerCase()) || nodeDesc.toLowerCase().includes(n.desc.toLowerCase().split(' ')[0]));
+    if (found && !ctx.lastAddedNodeType) ctx.lastAddedNodeType = found.type;
+  }
+
+  // Track what was added across last 3 bot turns
+  for (const botMsg of botMsgs.slice(-3)) {
+    for (const m of botMsg.content.matchAll(/(?:added|added a|added an)\s+\*\*([^*]+)\*\*/gi)) {
+      const found = NODE_INDEX.find(n => n.desc.toLowerCase().includes(m[1].trim().toLowerCase()));
+      if (found && !ctx.recentlyAddedTypes.includes(found.type)) ctx.recentlyAddedTypes.push(found.type);
+    }
+  }
+
+  // Detect active topics — node types mentioned in recent conversation (both sides)
+  const recentText = history.slice(-6).map(h => h.content).join(' ').toLowerCase();
+  for (const node of NODE_INDEX) {
+    const firstKw = node.kw.split(' ')[0];
+    if (firstKw.length > 3 && recentText.includes(firstKw) && !ctx.activeTopics.includes(node.type)) {
+      ctx.activeTopics.push(node.type);
+    }
   }
 
   return ctx;
+}
+
+// Resolve ordinal references ("first one", "both", "all") to pending suggestions
+function resolveOrdinalSuggestion(lower, ctx) {
+  if (!ctx.pendingSuggestions.length) return null;
+  if (/\b(all|both|them|all of them|every one|each one)\b/.test(lower)) return { type: 'all', items: ctx.pendingSuggestions };
+  if (/\b(second|2nd)\b/.test(lower)) return { type: 'single', item: ctx.pendingSuggestions[1] || null };
+  if (/\b(third|3rd)\b/.test(lower))  return { type: 'single', item: ctx.pendingSuggestions[2] || null };
+  // "first one", "first", "the first", or generic "yes/add it" with suggestions → first item
+  return { type: 'single', item: ctx.pendingSuggestions[0] };
+}
+
+// Add one or more node specs to a workflow, chaining edges
+function addSuggestionsToWorkflow(specs, nodes, edges) {
+  let wf = { nodes: [...nodes], edges: [...edges] };
+  const added = [];
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i];
+    if (!spec) continue;
+    const id = `${spec.type}-${Date.now()}-${i}`;
+    const lastX = wf.nodes.length ? Math.max(...wf.nodes.map(n => n.position?.x || 0)) : 100;
+    const prevId = wf.nodes.length ? wf.nodes[wf.nodes.length - 1].id : null;
+    wf = applyWorkflowTool(wf, 'add_node', { id, nodeType: spec.type, label: spec.desc, position: { x: lastX + 280, y: 220 }, config: {} });
+    if (prevId) wf = applyWorkflowTool(wf, 'add_edge', { source: prevId, target: id });
+    added.push(spec.desc);
+  }
+  return { wf, added };
+}
+
+// Detect compatibility / hypothetical questions — should explain, never generate
+function isCompatibilityQuestion(msg) {
+  const lower = msg.trim().toLowerCase();
+  const endsWithQ   = lower.endsWith('?');
+  const isHypo      = /\b(what if|what happens if|what would happen|suppose|assuming|hypothetically)\b/.test(lower);
+  const isCompat    = /\b(can this work with|compatible with|integrate with|does it support|will it work with|is it possible|can it handle|work alongside|work with)\b/.test(lower);
+  const isReliab    = /\b(would .*(fail|break|crash|stop|error)|what if .*(fails|breaks|errors)|is .*(reliable|stable|safe))\b/.test(lower);
+  const hasAction   = /\b(add|build|create|make|generate|remove|connect|replace|put|insert|set up)\b/.test(lower);
+  return (endsWithQ || isHypo) && (isCompat || isReliab) && !hasAction;
+}
+
+// Resolve "it" / "this" / "that" to a specific canvas node using conversation context
+function resolveImpliedNode(lower, ctx, nodes) {
+  if (!/\b(it|this|that|the node|the last|the previous one)\b/.test(lower)) return null;
+  if (ctx.lastAddedNodeType) {
+    const match = nodes.find(n => (n.data?.type || '') === ctx.lastAddedNodeType);
+    if (match) return match;
+  }
+  return nodes.length > 0 ? nodes[nodes.length - 1] : null;
 }
 
 // Runs a pending action that was stored by a previous turn
@@ -1483,20 +1563,269 @@ const OFFTOPIC_REPLIES = [
   "That's a bit outside my area. I specialise in workflow automation. Want me to build something, or need help?",
 ];
 
-async function workflowChat({ message, history = [], workflow = {}, pendingAction = null }) {
+/* ════════════════════════════════════════════════════════════════════════
+ *  FRECKLES — INTELLIGENT AI WORKFLOW COPILOT
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const FRECKLES_SYSTEM_PROMPT = `You are Freckles, an intelligent AI copilot built into the Flowa workflow automation platform. You help users build, understand, and improve their automation workflows through natural conversation.
+
+## Personality
+- Intelligent, calm, and conversational — never robotic or repetitive
+- Human-like and adaptive; sound like a knowledgeable colleague
+- Proactively helpful — notice what's missing and mention it
+- Precise when modifying — always explain what you did and why
+
+## Core Intelligence Rules
+1. UNDERSTAND INTENT from the full conversational context, not just keywords
+2. RESOLVE REFERENCES — "it", "this", "them", "the first one", "that node" always refers to something specific in the conversation or workflow; figure out exactly what
+3. THINK BEFORE ACTING — determine whether the user wants a question answered, a change made, or clarification
+4. NEVER modify the workflow for questions, explanations, or ambiguous messages
+5. NEVER add random or unrelated nodes as a fallback
+
+## Decision Framework — Work through this before responding
+- Is this a QUESTION? → Explain clearly. Do NOT use tools or touch the canvas.
+- Is this a CONFIRMATION? → Apply the previously discussed pending action precisely.
+- Is this a REJECTION / "nah" / "no"? → Cancel/undo the pending action. Don't generate anything.
+- Is this a MODIFICATION REQUEST? → Use the appropriate tool to make exactly that change.
+- Is this AMBIGUOUS? → Ask one smart clarifying question with 2–3 concrete options.
+- Is this CONVERSATIONAL / CASUAL? → Respond naturally without touching the workflow.
+
+## Workflow Modification Safety
+Use tools ONLY when:
+- User explicitly requests a change: "add", "remove", "connect", "replace", "change", "build"
+- User confirms a pending action: "yes", "do it", "go ahead", "add it"
+- Modification intent is completely unambiguous from context
+
+NEVER use tools because:
+- A message mentions a service name like "slack" or "email" in a question ("can this work with Gmail too?" → answer the question, don't add Gmail)
+- You're unsure what to do and want to do *something*
+- A follow-up question could theoretically involve a node type
+
+## Reference Resolution
+When user says "it", "this", "them", "that", "the first one", "the last node", etc.:
+1. Check the most recent assistant message — what was just discussed or suggested?
+2. Check the workflow nodes — what was last added or last mentioned?
+3. Use conversation history to resolve the reference precisely
+4. If truly ambiguous, ask: "Just to confirm — are you referring to [X]?"
+
+## Node Format for replace_workflow
+When creating nodes use this exact structure:
+{ "id": "unique-id", "type": "flowNode", "position": { "x": 100, "y": 220 }, "data": { "label": "Human Name", "type": "node_type_id", "icon": "🔗", "config": {} } }
+Space nodes 280px apart horizontally (x: 100, 380, 660, 940...).
+
+## Response Style
+- Use **bold** for node names and key terms
+- Be concise — a clear sentence beats a verbose paragraph
+- Acknowledge prior context naturally ("Building on what I suggested...", "Since you already have X...")
+- Never dump a generic help text — respond to what was actually asked`;
+
+const WORKFLOW_TOOLS = [
+  {
+    name: 'add_node',
+    description: 'Add a new node to the workflow canvas. Use ONLY when the user explicitly wants to add something.',
+    input_schema: {
+      type: 'object',
+      required: ['nodeType', 'label'],
+      properties: {
+        nodeType: { type: 'string', description: 'Node type: trigger_webhook, trigger_cron, trigger_email, trigger_manual, http_request, google_gmail_read, google_sheets_read, google_sheets_write, postgres_query, postgres_insert, mongodb_find, aws_s3_read, aws_s3_upload, slack_send, discord_send, email_send, twilio_whatsapp, twilio_sms, transform_filter, transform_set, json_parse, ai_classify, ai_summarize, console_log, delay, error_handler, logic_if, logic_switch, wait_approval, jira_create, notion_page, hubspot_contact' },
+        label: { type: 'string', description: 'Human-readable label for the node' },
+        config: { type: 'object', description: 'Node configuration object (optional)' },
+        connectToLast: { type: 'boolean', description: 'Auto-connect to the last existing node (default: true)' },
+        connectAfterNodeId: { type: 'string', description: 'Connect this node after a specific node by ID (optional, overrides connectToLast)' }
+      }
+    }
+  },
+  {
+    name: 'remove_node',
+    description: 'Remove a node from the workflow by its exact ID. Also removes any connected edges.',
+    input_schema: {
+      type: 'object',
+      required: ['nodeId'],
+      properties: {
+        nodeId: { type: 'string', description: 'The exact node ID from the current workflow state' }
+      }
+    }
+  },
+  {
+    name: 'connect_nodes',
+    description: 'Add a directed edge connecting two existing nodes.',
+    input_schema: {
+      type: 'object',
+      required: ['sourceId', 'targetId'],
+      properties: {
+        sourceId: { type: 'string', description: 'ID of the source (upstream) node' },
+        targetId: { type: 'string', description: 'ID of the target (downstream) node' }
+      }
+    }
+  },
+  {
+    name: 'update_node',
+    description: "Update an existing node's type, label, or configuration fields.",
+    input_schema: {
+      type: 'object',
+      required: ['nodeId'],
+      properties: {
+        nodeId: { type: 'string', description: 'ID of the node to update' },
+        nodeType: { type: 'string', description: 'New node type identifier (optional)' },
+        label: { type: 'string', description: 'New human-readable label (optional)' },
+        config: { type: 'object', description: 'Config fields to merge into the node (optional)' }
+      }
+    }
+  },
+  {
+    name: 'replace_workflow',
+    description: 'Replace the ENTIRE workflow with a new one. Use ONLY when building from scratch on an empty canvas, or when the user explicitly asks to start over with a completely new workflow.',
+    input_schema: {
+      type: 'object',
+      required: ['nodes', 'edges'],
+      properties: {
+        nodes: { type: 'array', description: 'Full array of node objects in flowNode format' },
+        edges: { type: 'array', description: 'Full array of edge objects' }
+      }
+    }
+  }
+];
+
+function buildWorkflowContextForAI(nodes, edges) {
+  if (!nodes.length) return '**Canvas is empty** — no nodes have been added yet.';
+  const nodeList = nodes.map((n, i) => {
+    const type = n.data?.type || n.type || 'unknown';
+    const label = n.data?.label || type;
+    const config = n.data?.config || {};
+    const hint = Object.entries(config)
+      .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '' && String(v) !== '{}')
+      .slice(0, 2).map(([k, v]) => `${k}="${String(v).slice(0, 40)}"`).join(', ');
+    return `  ${i + 1}. [id: ${n.id}] **${label}** (${type})${hint ? ` — ${hint}` : ''}`;
+  }).join('\n');
+  const edgeList = edges.length
+    ? edges.map(e => {
+        const src = nodes.find(n => n.id === e.source)?.data?.label || e.source;
+        const tgt = nodes.find(n => n.id === e.target)?.data?.label || e.target;
+        return `  ${src} → ${tgt}`;
+      }).join('\n')
+    : '  (no connections yet)';
+  return `**Nodes (${nodes.length}):**\n${nodeList}\n\n**Connections:**\n${edgeList}`;
+}
+
+function executeClaudeTool(toolName, input, nodes, edges) {
+  switch (toolName) {
+    case 'add_node': {
+      const id = `${(input.nodeType || 'node').replace(/[^a-z0-9]/gi, '_')}-${Date.now()}`;
+      const lastX = nodes.length ? Math.max(...nodes.map(n => n.position?.x || 0)) : 100;
+      const newNode = makeNode(id, lastX + 280, 220, input.label, input.nodeType, input.config || {});
+      const newEdges = [...edges];
+      if (input.connectAfterNodeId) {
+        newEdges.push(makeEdge(`e-${input.connectAfterNodeId}-${id}`, input.connectAfterNodeId, id));
+      } else if (input.connectToLast !== false && nodes.length > 0) {
+        const last = nodes[nodes.length - 1];
+        newEdges.push(makeEdge(`e-${last.id}-${id}`, last.id, id));
+      }
+      return { nodes: [...nodes, newNode], edges: newEdges };
+    }
+    case 'remove_node':
+      return {
+        nodes: nodes.filter(n => n.id !== input.nodeId),
+        edges: edges.filter(e => e.source !== input.nodeId && e.target !== input.nodeId)
+      };
+    case 'connect_nodes': {
+      if (edges.some(e => e.source === input.sourceId && e.target === input.targetId)) return { nodes, edges };
+      return { nodes, edges: [...edges, makeEdge(`e-${input.sourceId}-${input.targetId}-${Date.now()}`, input.sourceId, input.targetId)] };
+    }
+    case 'update_node':
+      return {
+        nodes: nodes.map(n => n.id !== input.nodeId ? n : {
+          ...n, data: {
+            ...n.data,
+            ...(input.nodeType !== undefined && { type: input.nodeType }),
+            ...(input.label !== undefined && { label: input.label }),
+            ...(input.config !== undefined && { config: { ...(n.data?.config || {}), ...input.config } })
+          }
+        }),
+        edges
+      };
+    case 'replace_workflow':
+      return {
+        nodes: (input.nodes || []).map(n => ({
+          ...n, type: 'flowNode',
+          data: { ...(n.data || {}), type: n.data?.type || n.type || 'unknown', icon: n.data?.icon || '🔗', config: n.data?.config || {} }
+        })),
+        edges: (input.edges || []).map(e => ({ ...e, type: e.type || 'smoothstep', animated: false, style: e.style || { stroke: '#374151', strokeWidth: 1.5 } }))
+      };
+    default:
+      return null;
+  }
+}
+
+function frecklesSuggestions(nodes, updatedWorkflow, msgType) {
+  if (msgType === 'workflow_edited') return ['Check workflow health', 'Any more improvements?', 'Simulate the workflow'];
+  if ((updatedWorkflow?.nodes || nodes).length > 0) return ['What does this workflow do?', 'Check workflow health', 'Any suggestions?'];
+  return ['Build a Slack notification', 'Daily report from Postgres', 'What can you do?'];
+}
+
+async function frecklesWithClaude({ message, history, nodes, edges, pendingAction }) {
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const workflowCtx = buildWorkflowContextForAI(nodes, edges);
+  const pendingCtx = pendingAction
+    ? `\n\n**Pending action awaiting user confirmation:** ${JSON.stringify(pendingAction)}`
+    : '';
+  const system = `${FRECKLES_SYSTEM_PROMPT}\n\n---\n\n## Current Workflow State\n${workflowCtx}${pendingCtx}`;
+
+  // Format history — keep last 14 exchanges, enforce user/assistant alternation
+  const rawHistory = history.slice(-14).map(h => ({
+    role: h.role === 'assistant' ? 'assistant' : 'user',
+    content: String(h.content || '')
+  }));
+  const claudeHistory = [];
+  for (const msg of rawHistory) {
+    const last = claudeHistory[claudeHistory.length - 1];
+    if (last && last.role === msg.role) { last.content += '\n' + msg.content; }
+    else { claudeHistory.push({ ...msg }); }
+  }
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    system,
+    messages: [...claudeHistory, { role: 'user', content: message }],
+    tools: WORKFLOW_TOOLS,
+  });
+
+  let replyParts = [];
+  const toolCalls = [];
+  let currentNodes = [...nodes];
+  let currentEdges = [...edges];
+  let didModify = false;
+
+  for (const block of response.content) {
+    if (block.type === 'text') {
+      replyParts.push(block.text);
+    } else if (block.type === 'tool_use') {
+      toolCalls.push({ name: block.name });
+      const result = executeClaudeTool(block.name, block.input, currentNodes, currentEdges);
+      if (result) { currentNodes = result.nodes; currentEdges = result.edges; didModify = true; }
+    }
+  }
+
+  const reply = replyParts.join('\n').trim() ||
+    (didModify ? 'Done — workflow updated.' : "I'm here to help. What would you like to do?");
+  const updatedWorkflow = didModify ? { nodes: currentNodes, edges: currentEdges } : null;
+  const messageType = didModify ? 'workflow_edited' : 'message';
+  return { reply, toolCalls, updatedWorkflow, messageType, suggestions: frecklesSuggestions(nodes, updatedWorkflow, messageType), metadata: {} };
+}
+
+// ── Deterministic fallback (used when no ANTHROPIC_API_KEY is set) ────────────
+async function frecklesDeterministic({ message, history, nodes, edges, pendingAction }) {
+  const msg = (message || '').trim();
+  if (!msg) return { reply: "What would you like to build or change?", toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: frecklesSuggestions(nodes, null, 'message'), metadata: {} };
+
+  let { intent } = classifyIntent(msg);
+  const lower = msg.toLowerCase();
+  const ctx   = buildConversationContext(history, nodes);
+
   try {
-    const msg = (message || '').trim();
-    if (!msg) return { reply: 'Tell me what to build.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: [], metadata: {} };
-
-    let { intent, confidence } = classifyIntent(msg);
-
-    // ── Resolve workflow state FIRST so ctx and all handlers can use it ───
-    const nodes = workflow.nodes || [];
-    const edges = workflow.edges || [];
-
     // ── Pattern overrides: comprehensive natural language recognition ────────
-    const lower = msg.toLowerCase();
-    const ctx   = buildConversationContext(history, nodes);
 
     // Greetings
     if (/^(hi|hey|hello|sup|yo|howdy|hiya|greetings|good\s?(morning|afternoon|evening|day))\b/.test(lower)) intent = 'greeting';
@@ -1507,6 +1836,36 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
 
     if (IS_CONFIRM) intent = 'confirm';
     if (IS_REJECT)  intent = 'reject';
+
+    // ── Contextual reference resolution ─────────────────────────────────────
+
+    // Ordinal references to pending suggestions: "add the first one", "apply both", "yes add all"
+    const hasOrdinal  = /\b(first|1st|second|2nd|third|3rd|both|all of them|all|them)\b/.test(lower);
+    const hasApplyVerb = /\b(add|apply|use|insert|include|put in|go with|take)\b/.test(lower);
+    if (ctx.pendingSuggestions.length > 0 && (hasOrdinal || (IS_CONFIRM && !pendingAction)) && (hasApplyVerb || IS_CONFIRM || hasOrdinal)) {
+      intent = 'apply_suggestion';
+    }
+
+    // Rejection of a specific suggestion: "nah not that one", "skip the second", "not this one"
+    if (/\b(not that|skip (the |this )?one|not this one|that one no|not the .*(one|node)|never mind that)\b/.test(lower)) intent = 'reject';
+
+    // Implied "connect it to X" — resolve "it" / "this" to last node
+    if (/\b(connect|link|attach|wire|join)\b.*(it|this|that)\b.*(to|with)\b/.test(lower) ||
+        /\b(it|this|that)\b.*(to|with|into)\b.*(slack|email|discord|telegram|webhook|database|db|sheets|gmail)\b/.test(lower)) {
+      intent = 'connect';
+    }
+
+    // Compatibility / hypothetical questions — answer without touching the canvas
+    if (isCompatibilityQuestion(msg)) intent = 'explain';
+
+    // "what if I add X" / "what would happen if" → simulate / explain
+    if (/\bwhat (if|would happen if|happens if)\b/.test(lower)) intent = 'simulate';
+
+    // "that looks unnecessary" / "seems redundant" — contextual rejection
+    if (/\b(looks|seems|is|that'?s?) (unnecessary|redundant|useless|too much|overkill|not needed)\b/.test(lower)) intent = 'reject';
+
+    // "this might fail" / "could break" without a ? → proactively suggest error handling
+    if (/\b(might|could|may|will) (fail|break|crash|error|time.?out)\b/.test(lower) && !lower.trim().endsWith('?')) intent = 'add_error_handler';
 
     // Schedule modification: "make it weekly", "run daily", "change to hourly"
     if (/\b(make|set|change|switch|update|run|schedule)\b.*(it|this|the trigger|the workflow|the schedule)?.*(weekly|daily|hourly|monthly|every (day|week|hour|morning|night|minute|5 min|15 min))/.test(lower)) intent = 'modify_schedule';
@@ -1546,6 +1905,9 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
     if (/\bwhat (else|more) (can|could|should) (be|i|we) (add|do|improve|change)\b/.test(lower)) intent = 'suggest';
     if (/\b(make (it|this|the workflow) better|better(ify)?|level up)\b/.test(lower))        intent = 'suggest';
     if (/\bwhat (features?|capabilities|options|things?) (can|could|should) (be )?(add|include|build)\b/.test(lower)) intent = 'suggest';
+    if (/\b(tell me about|show me|list|what are).*(additions?|improvements?|suggestions?|things? (i can|that can|to) (add|improve|change))\b/.test(lower)) intent = 'suggest';
+    if (/\badditions? (that|which|i|we|can|could|should|might|to)\b/.test(lower)) intent = 'suggest';
+    if (/\b(can be|could be|should be) (added|improved|changed|done|made)\b.*(workflow|it|this|automation)?\b/.test(lower)) intent = 'suggest';
 
     // Health / quality check
     if (/\b(check|analyse|analyze|review|audit|assess|validate|score)\b.*(workflow|health|quality|status|it|this)/.test(lower)) intent = 'health';
@@ -1582,9 +1944,30 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
       };
     }
 
+    /* ── APPLY SUGGESTION (ordinal / all references to pending suggestions) ── */
+    if (intent === 'apply_suggestion') {
+      const resolution = resolveOrdinalSuggestion(lower, ctx);
+      const specs = resolution?.type === 'all' ? resolution.items : (resolution?.item ? [resolution.item] : []);
+      if (!specs.length) {
+        return {
+          reply: "I'm not sure which suggestion you mean — could you be more specific?",
+          toolCalls: [], updatedWorkflow: null, messageType: 'message',
+          suggestions: ctx.pendingSuggestions.map((s, i) => `Add the ${['first','second','third'][i] || (i+1)+'th'} one (${s.desc})`),
+          metadata: {},
+        };
+      }
+      const { wf, added } = addSuggestionsToWorkflow(specs, nodes, edges);
+      return {
+        reply: `Done! Added **${added.join('** and **')}** to the canvas.`,
+        toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+        suggestions: ['Check workflow health', 'Any more improvements?', 'Simulate the workflow'],
+        metadata: { changes: added.map(a => `+ ${a}`) },
+      };
+    }
+
     /* ── CONFIRM ──────────────────────────────────────────────── */
     if (intent === 'confirm') {
-      // Execute a pending action if one was passed from the frontend
+      // 1. Execute explicit pending action passed from the frontend
       if (pendingAction) {
         const result = executePendingAction(pendingAction, nodes, edges);
         if (result) {
@@ -1596,23 +1979,42 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
           };
         }
       }
-      // No pending action — respond gracefully
+      // 2. Apply conversation-context suggestions when no explicit pendingAction
+      if (ctx.pendingSuggestions.length > 0) {
+        const { wf, added } = addSuggestionsToWorkflow([ctx.pendingSuggestions[0]], nodes, edges);
+        if (added.length) {
+          return {
+            reply: `Done! Added **${added[0]}** to the canvas.`,
+            toolCalls: [{ name: 'add_node' }], updatedWorkflow: wf, messageType: 'workflow_edited',
+            suggestions: ['Check workflow health', 'Any more improvements?', 'Simulate the workflow'],
+            metadata: { changes: [`+ ${added[0]}`] },
+          };
+        }
+      }
+      // 3. Graceful fallback — nothing to confirm
       return {
-        reply: ctx.lastAction
-          ? `Sure! What would you like me to do?`
-          : `Got it! What would you like me to build or change?`,
+        reply: ctx.lastAction === 'generated'
+          ? `The workflow is ready. What would you like to add or change?`
+          : `Got it! What would you like me to do?`,
         toolCalls: [], updatedWorkflow: null, messageType: 'message',
-        suggestions: ['Add a node', 'Check workflow health', 'Any suggestions?'],
+        suggestions: nodes.length > 0 ? ['Add a node', 'Check workflow health', 'Any suggestions?'] : ['Build a workflow', 'What can you do?'],
         metadata: {},
       };
     }
 
     /* ── REJECT ───────────────────────────────────────────────── */
     if (intent === 'reject') {
+      const contextualReply = ctx.pendingSuggestions.length > 0
+        ? `No problem — I'll skip that. Would you like me to suggest something different, or leave the workflow as is?`
+        : ctx.lastAction === 'added_node'
+          ? `Understood. I'll leave the last change as is. Anything else you'd like to adjust?`
+          : `No problem. Let me know if you'd like to change anything else.`;
       return {
-        reply: `No problem, I'll leave it as is. Let me know if you'd like to change anything else.`,
+        reply: contextualReply,
         toolCalls: [], updatedWorkflow: null, messageType: 'message',
-        suggestions: ['Any suggestions?', 'Check workflow health', 'Explain this workflow'],
+        suggestions: nodes.length > 0
+          ? ['Any suggestions?', 'Check workflow health', 'Explain this workflow']
+          : ['Build a workflow', 'What can you do?'],
         metadata: {},
       };
     }
@@ -1763,8 +2165,12 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
       };
     }
 
-    // If entities are strong, treat as generate even when intent score is weak
-    const isStrongGenerate = entities.confidence >= 5 || entities.destinations.length >= 1;
+    // If entities are strong AND no specific intent was already detected, treat as generate
+    const SPECIFIC_INTENTS = new Set(['suggest','explain','health','simulate','debug','add_node',
+      'remove_node','connect','clear','help','greeting','confirm','reject','modify_schedule',
+      'add_condition','add_error_handler','add_delay','replace_node','add_after']);
+    const isStrongGenerate = !SPECIFIC_INTENTS.has(intent) &&
+      (entities.confidence >= 5 || entities.destinations.length >= 1);
 
     /* ── GENERATE ─────────────────────────────────────────────── */
     if (intent === 'generate' || isStrongGenerate) {
@@ -1866,14 +2272,17 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
       if (nodes.length < 2) {
         return { reply: "You'll need at least two nodes on the canvas before I can connect them. Want me to add some?", toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: ['Add a webhook trigger', 'Add a Slack node'], metadata: {} };
       }
+      // Try to resolve "it" / "this" as the source
+      const impliedSource = resolveImpliedNode(lower, ctx, nodes);
       const msgTokens = removeStopWords(tokenize(msg));
       const matches = [];
+      if (impliedSource) matches.push(impliedSource);
       for (const t of msgTokens) {
         const m = findNodeByText(nodes, t);
         if (m && !matches.find(x => x.id === m.id)) matches.push(m);
         if (matches.length === 2) break;
       }
-      const [source, target] = matches.length >= 2 ? matches : [nodes[nodes.length - 2], nodes[nodes.length - 1]];
+      const [source, target] = matches.length >= 2 ? [matches[0], matches[1]] : [nodes[nodes.length - 2], nodes[nodes.length - 1]];
       const updatedWorkflow = applyWorkflowTool({ nodes, edges }, 'add_edge', { source: source.id, target: target.id });
       return {
         reply: `Connected **${source.data?.label}** → **${target.data?.label}**.`,
@@ -2043,19 +2452,42 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
       };
     }
 
-    /* ── UNKNOWN (still topical) ──────────────────────────────── */
+    /* ── UNKNOWN — smart contextual clarification ────────────── */
+    const hasCanvas = nodes.length > 0;
+    const clarifyReply = hasCanvas
+      ? `I want to make sure I understand. Are you asking me to:\n\n• **Explain** what this workflow does?\n• **Suggest improvements** or missing pieces?\n• **Modify** something specific?\n• **Check** workflow health or simulate it?\n\nJust let me know and I'll take it from there.`
+      : `I'm not sure what you mean — could you rephrase? For example:\n\n• _"Build a Slack alert when a GitHub PR is opened"_\n• _"What can you do?"_\n• _"Add an error handler"_`;
     return {
-      reply: "I'm not quite sure what you're asking. Here's what I can help with:\n\n" + HELP_TEXT,
-      toolCalls: [], updatedWorkflow: null, messageType: 'message',
-      suggestions: ['Build a workflow', 'What can you do?', 'Check workflow health'],
+      reply: clarifyReply,
+      toolCalls: [], updatedWorkflow: null, messageType: 'clarification',
+      suggestions: hasCanvas
+        ? ['What does this workflow do?', 'Any suggestions?', 'Check workflow health']
+        : ['Build a Slack notification', 'Daily report from Postgres', 'What can you do?'],
       metadata: {},
     };
   } catch (err) {
-    logger.error('[intelligence] workflowChat error:', err);
-    return { reply: 'Something went wrong. Please try again.', toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: [], metadata: {} };
+    logger.error('[freckles-deterministic] error:', err);
+    return { reply: "I hit an unexpected snag. Could you rephrase what you'd like to do?", toolCalls: [], updatedWorkflow: null, messageType: 'message', suggestions: frecklesSuggestions(nodes, null, 'message'), metadata: {} };
   }
 }
 
+async function workflowChat({ message, history = [], workflow = {}, pendingAction = null }) {
+  const nodes = workflow.nodes || [];
+  const edges = workflow.edges || [];
+  try {
+    if (process.env.ANTHROPIC_API_KEY) {
+      return await frecklesWithClaude({ message, history, nodes, edges, pendingAction });
+    }
+    return await frecklesDeterministic({ message, history, nodes, edges, pendingAction });
+  } catch (err) {
+    logger.error('[freckles] workflowChat error:', err);
+    return {
+      reply: "I hit an unexpected snag. Could you rephrase what you'd like to do?",
+      toolCalls: [], updatedWorkflow: null, messageType: 'message',
+      suggestions: ['Check workflow health', 'Any suggestions?', 'What can you do?'], metadata: {}
+    };
+  }
+}
 
 module.exports = {
   generateWorkflow,
