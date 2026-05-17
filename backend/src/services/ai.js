@@ -2489,6 +2489,60 @@ async function workflowChat({ message, history = [], workflow = {}, pendingActio
   }
 }
 
+/**
+ * generateDescription — use Claude to write a concise marketplace description
+ * and a step-by-step setup guide for a workflow.
+ *
+ * @param {{ name:string, nodes:any[], edges:any[] }} workflow
+ * @returns {Promise<{ description:string, setupGuide:string[] }>}
+ */
+async function generateDescription({ name, nodes = [], edges = [] }) {
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const nodeList = nodes
+      .map(n => `- ${n.data?.label || n.data?.type || n.type || 'node'} (${n.data?.type || n.type || '?'})`)
+      .join('\n') || '(no nodes yet)';
+
+    const edgeSummary = edges.length
+      ? `${edges.length} connection${edges.length !== 1 ? 's' : ''} between nodes`
+      : 'no connections yet';
+
+    const prompt = `You are a technical writer for a workflow automation platform.
+
+Workflow name: "${name}"
+Nodes (${nodes.length}):
+${nodeList}
+Edges: ${edgeSummary}
+
+Write a JSON object with exactly two keys:
+1. "description" — 1-2 sentences (max 180 chars) describing what this workflow does in plain English. Be specific about the trigger, main action, and output. No jargon.
+2. "setupGuide" — an array of 3-5 short imperative strings (each max 90 chars) that tell a new user how to configure and use this workflow. Each step should start with a verb.
+
+Return ONLY valid JSON, no markdown, no explanation.`;
+
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const raw = response.content?.[0]?.text?.trim() || '{}';
+    const parsed = JSON.parse(raw.replace(/^```json\s*/i, '').replace(/```\s*$/, ''));
+
+    return {
+      description: typeof parsed.description === 'string' ? parsed.description.trim() : '',
+      setupGuide:  Array.isArray(parsed.setupGuide)
+        ? parsed.setupGuide.map(s => String(s).trim()).filter(Boolean)
+        : [],
+    };
+  } catch (err) {
+    logger.error('[ai] generateDescription error:', err.message);
+    return { description: '', setupGuide: [] };
+  }
+}
+
 module.exports = {
   generateWorkflow,
   explainError,
@@ -2497,4 +2551,5 @@ module.exports = {
   documentWorkflow,
   compileWorkflow,
   workflowChat,
+  generateDescription,
 };
