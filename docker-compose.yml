@@ -1,98 +1,90 @@
-version: '3.8'
+version: '3.9'
 
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
+    container_name: flowa-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-flowa}
+      POSTGRES_DB: ${DB_NAME:-flowa_db}
+      POSTGRES_USER: ${DB_USER:-flowa_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-flowa_password}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./backend/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-flowa_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    networks:
+      - flowa-network
 
+  # Redis Cache
   redis:
     image: redis:7-alpine
+    container_name: flowa-redis
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
     volumes:
-      - redisdata:/data
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - flowa-network
 
+  # Backend API Server
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: flowa-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${DB_USER:-flowa_user}:${DB_PASSWORD:-flowa_password}@postgres:5432/${DB_NAME:-flowa_db}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      API_PORT: 4000
+      CORS_ORIGIN: http://localhost:3000
     ports:
       - "4000:4000"
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: 4000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/flowa}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
+      - /app/node_modules
+    networks:
+      - flowa-network
     restart: unless-stopped
 
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: node src/worker.js
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/flowa}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET:-flowa-jwt-super-secret-change-me}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-flowa-encryption-key-change-in-production}
-    depends_on:
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
-    restart: unless-stopped
-
+  # Frontend Web Server
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:80"
+    container_name: flowa-frontend
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
-      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:4000/ws}
-      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:4000}
-      VITE_WS_PROXY_TARGET: ${VITE_WS_PROXY_TARGET:-ws://backend:4000}
+      VITE_API_URL: http://localhost:4000
+      VITE_WS_URL: ws://localhost:4000
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend/src:/app/src
+    networks:
+      - flowa-network
     restart: unless-stopped
 
 volumes:
-  pgdata:
-  redisdata:
+  postgres_data:
+  redis_data:
+
+networks:
+  flowa-network:
+    driver: bridge
