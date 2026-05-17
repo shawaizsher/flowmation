@@ -81,16 +81,40 @@ export default function DashboardPage() {
   const [showPublishModal, setShowPublishModal]     = useState(false);
   const [publishingWfId, setPublishingWfId]         = useState<string | null>(null);
   const [publishCategory, setPublishCategory]       = useState('General');
+  const [publishDescription, setPublishDescription] = useState('');
   const [publishSetupGuide, setPublishSetupGuide]   = useState('');
   const [publishing, setPublishing]                 = useState(false);
+  const [generatingDesc, setGeneratingDesc]         = useState(false);
 
   const PUBLISH_CATEGORIES = ['General','Sales','Marketing','Data','Finance','Productivity','AI','DevOps','Operations','Governance','Social'];
 
   const openPublishModal = (wfId: string) => {
     setPublishingWfId(wfId);
     setPublishCategory('General');
+    setPublishDescription('');
     setPublishSetupGuide('');
     setShowPublishModal(true);
+  };
+
+  const handleGenerateDescription = async () => {
+    if (!workspaceId || !publishingWfId) return;
+    const wf = workflows.find(w => w.id === publishingWfId);
+    if (!wf) return;
+    try {
+      setGeneratingDesc(true);
+      const res = await aiApi.generateDescription(workspaceId, {
+        name: wf.name,
+        nodes: [],
+        edges: [],
+      });
+      if (res.data.description) setPublishDescription(res.data.description);
+      if (res.data.setupGuide?.length) setPublishSetupGuide(res.data.setupGuide.join('\n'));
+      toast.success('Description generated!');
+    } catch {
+      toast.error('AI generation failed — check your ANTHROPIC_API_KEY');
+    } finally {
+      setGeneratingDesc(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -104,6 +128,7 @@ export default function DashboardPage() {
       await workflowApi.publishTemplate(workspaceId, {
         workflowId: publishingWfId,
         category: publishCategory,
+        description: publishDescription.trim() || undefined,
         setupGuide,
         requiredCredentials: [],
       });
@@ -1151,6 +1176,19 @@ export default function DashboardPage() {
             </p>
 
             <div className="space-y-4">
+              {/* AI generate button */}
+              <button
+                onClick={handleGenerateDescription}
+                disabled={generatingDesc}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-500/30 bg-gradient-to-r from-brand-500/10 to-accent-500/10 px-4 py-2.5 text-sm font-semibold text-brand-400 hover:from-brand-500/20 hover:to-accent-500/20 transition disabled:opacity-50"
+              >
+                {generatingDesc ? (
+                  <><div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-400/30 border-t-brand-400" /> Generating with AI…</>
+                ) : (
+                  <><Sparkles size={14} /> Generate Description with AI</>
+                )}
+              </button>
+
               {/* Category */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
@@ -1170,6 +1208,19 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Description */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Description <span className="text-foreground-muted font-normal">(shown on marketplace card)</span>
+                </label>
+                <textarea
+                  value={publishDescription}
+                  onChange={(e) => setPublishDescription(e.target.value)}
+                  placeholder="What does this workflow do? What problem does it solve?"
+                  className="input-field min-h-[72px] resize-none w-full"
+                />
+              </div>
+
               {/* Setup guide */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
@@ -1179,7 +1230,7 @@ export default function DashboardPage() {
                   value={publishSetupGuide}
                   onChange={(e) => setPublishSetupGuide(e.target.value)}
                   placeholder={"Configure your webhook URL in the trigger node.\nAdd your API credentials in Settings.\nTest with a sample payload."}
-                  className="input-field min-h-28 resize-none w-full"
+                  className="input-field min-h-[90px] resize-none w-full"
                 />
               </div>
             </div>
