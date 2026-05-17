@@ -10,6 +10,51 @@ const { formatNotification } = require('../services/collaboration');
 
 const router = express.Router();
 
+const LOGIN_RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
+const LOGIN_RATE_LIMIT_MAX = Number.parseInt(process.env.LOGIN_RATE_LIMIT_MAX, 10) || 8;
+const loginAttempts = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return String(forwarded[0]).trim();
+  }
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+function getLoginKey(req, email) {
+  const ip = getClientIp(req);
+  const safeEmail = String(email || '').trim().toLowerCase() || 'unknown';
+  return `${safeEmail}|${ip}`;
+}
+
+function isRateLimited(key) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.first > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    loginAttempts.set(key, { count: 0, first: now });
+    return false;
+  }
+  return entry.count >= LOGIN_RATE_LIMIT_MAX;
+}
+
+function recordFailedLogin(key) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.first > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, first: now });
+    return;
+  }
+  loginAttempts.set(key, { count: entry.count + 1, first: entry.first });
+}
+
+function clearLoginAttempts(key) {
+  loginAttempts.delete(key);
+}
+
 function parseUserSettings(rawSettings) {
   if (!rawSettings) return {};
   if (typeof rawSettings === 'object') return rawSettings;
@@ -359,25 +404,35 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    const loginKey = getLoginKey(req, email);
+    if (isRateLimited(loginKey)) {
+      return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+    }
+
     const result = await query(
       'SELECT id, email, password_hash, name, role, settings, is_active, email_verified FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
     if (result.rows.length === 0) {
+      recordFailedLogin(loginKey);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const user = result.rows[0];
 
     if (!user.is_active) {
+      recordFailedLogin(loginKey);
       return res.status(403).json({ error: 'Account is deactivated' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      recordFailedLogin(loginKey);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
+
+    clearLoginAttempts(loginKey);
 
     // Email verification is disabled; allow login without email checks.
 
