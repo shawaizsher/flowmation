@@ -81,6 +81,18 @@ export const authApi = {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Admin API                                                          */
+/* ------------------------------------------------------------------ */
+
+export const adminApi = {
+  listUsers: (params?: { search?: string; limit?: number; offset?: number }) =>
+    api.get('/admin/users', { params }),
+
+  deleteUser: (userId: string) =>
+    api.delete(`/admin/users/${userId}`),
+};
+
+/* ------------------------------------------------------------------ */
 /*  Workflow API  –  /api/workspaces/:wid/workflows                    */
 /* ------------------------------------------------------------------ */
 

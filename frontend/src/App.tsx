@@ -10,6 +10,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import InboxPage from './pages/InboxPage';
 import TeamPage from './pages/TeamPage';
 import MarketplacePage from './pages/MarketplacePage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import AppShell from './components/AppShell';
 import ErrorBoundary from './components/ErrorBoundary';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -24,6 +25,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const token = useStore((s) => s.token);
   if (token) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const user = useStore((s) => s.user);
+  if (!user || user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -46,6 +53,7 @@ export default function App() {
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
       </Route>
 
       <Route path="/workflows/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />

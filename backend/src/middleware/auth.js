@@ -102,4 +102,14 @@ function requireRole(...allowedRoles) {
   };
 }
 
-module.exports = { authenticate, requireWorkspace, requireRole };
+/**
+ * Require a global admin user (users.role === 'admin')
+ */
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+module.exports = { authenticate, requireWorkspace, requireRole, requireAdmin };

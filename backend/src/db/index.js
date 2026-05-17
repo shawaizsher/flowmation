@@ -70,6 +70,7 @@ async function initDb() {
   try {
     const result = await pool.query('SELECT NOW() as now');
     const migrations = [
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE',
       "ALTER TABLE users ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'",
       `CREATE TABLE IF NOT EXISTS workspace_invitations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
