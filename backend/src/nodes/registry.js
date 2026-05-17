@@ -101,27 +101,28 @@ registry.register('httpRequest', {
   ],
   configSchema: {
     // Basic request
-    method: { type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], default: 'GET' },
+    method: { type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT'], default: 'GET' },
     url: { type: 'text', label: 'URL', required: true },
 
     // Query Parameters
     parameters: { type: 'json', label: 'Query Parameters', default: '{}', description: 'URL query string parameters' },
 
     // Request Headers - Support both JSON and dynamic headers
-    headers: { type: 'json', label: 'Headers (JSON)', default: '{}', description: 'Optional: JSON object of headers' },
-    dynamicHeaders: { type: 'json', label: 'Dynamic Headers', default: '[]', description: 'Array of header objects: [{"key": "header-name", "value": "header-value"}]' },
+    headers: { type: 'json', label: 'Headers (JSON)', default: '{}', description: 'Optional: JSON object of headers. Can be combined with Dynamic Headers.' },
+    dynamicHeaders: { type: 'json', label: 'Dynamic Headers', default: '[]', description: 'Array of header objects: [{"key": "X-API-Key", "value": "abc123"}, {"key": "Authorization", "value": "Bearer token"}]. Add as many as needed!' },
 
     // Request Body
     body: { type: 'json', label: 'Request Body' },
-    bodyType: { type: 'select', options: ['auto', 'json', 'form', 'raw'], default: 'auto', description: 'Request body content type' },
+    bodyType: { type: 'select', options: ['auto', 'json', 'form', 'raw', 'xml'], default: 'auto', description: 'Request body content type' },
 
     // Authentication
-    authType: { type: 'select', options: ['none', 'basic', 'bearer', 'api_key', 'oauth2'], default: 'none' },
+    authType: { type: 'select', options: ['none', 'basic', 'bearer', 'api_key', 'oauth2', 'custom'], default: 'none' },
     basicAuthUsername: { type: 'text', label: 'Username', description: 'For Basic Auth' },
     basicAuthPassword: { type: 'text', label: 'Password', description: 'For Basic Auth' },
     bearerToken: { type: 'text', label: 'Bearer Token', description: 'For Bearer Token Auth' },
     apiKeyName: { type: 'text', label: 'API Key Header Name', description: 'e.g., X-API-Key' },
     apiKeyValue: { type: 'text', label: 'API Key Value' },
+    customAuthHeader: { type: 'text', label: 'Custom Auth Header', description: 'Full authorization header value for custom auth' },
 
     // Request Options
     timeout: { type: 'number', label: 'Timeout (seconds)', default: 30 },
@@ -133,7 +134,7 @@ registry.register('httpRequest', {
 
     // Response Options
     returnFullResponse: { type: 'boolean', label: 'Return Full Response', default: false },
-    responseType: { type: 'select', options: ['auto', 'json', 'text', 'arraybuffer'], default: 'auto' },
+    responseType: { type: 'select', options: ['auto', 'json', 'text', 'arraybuffer', 'blob', 'stream'], default: 'auto' },
 
     // Proxy (optional)
     useProxy: { type: 'boolean', label: 'Use Proxy', default: false },
@@ -146,7 +147,7 @@ registry.register('httpRequest', {
     }
     headers = headers || {};
 
-    // Merge dynamic headers (array format)
+    // Merge dynamic headers (array format) - supports unlimited headers
     let dynamicHeaders = config.dynamicHeaders;
     if (typeof dynamicHeaders === 'string') {
       try { dynamicHeaders = JSON.parse(dynamicHeaders); } catch { dynamicHeaders = []; }
@@ -154,7 +155,7 @@ registry.register('httpRequest', {
     if (Array.isArray(dynamicHeaders)) {
       dynamicHeaders.forEach(headerObj => {
         if (headerObj && headerObj.key && headerObj.value !== undefined) {
-          headers[headerObj.key] = headerObj.value;
+          headers[headerObj.key] = String(headerObj.value);
         }
       });
     }
@@ -173,6 +174,8 @@ registry.register('httpRequest', {
       headers['Authorization'] = `Bearer ${config.bearerToken}`;
     } else if (config.authType === 'api_key' && config.apiKeyName && config.apiKeyValue) {
       headers[config.apiKeyName] = config.apiKeyValue;
+    } else if (config.authType === 'custom' && config.customAuthHeader) {
+      headers['Authorization'] = config.customAuthHeader;
     }
 
     let body = config.body;
@@ -181,12 +184,16 @@ registry.register('httpRequest', {
     }
 
     // Set content-type based on body type
-    if (body && config.bodyType === 'form') {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    } else if (body && config.bodyType === 'json') {
-      headers['Content-Type'] = 'application/json';
-    } else if (body && config.bodyType === 'auto' && typeof body === 'object') {
-      headers['Content-Type'] = 'application/json';
+    if (body) {
+      if (config.bodyType === 'form') {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      } else if (config.bodyType === 'json') {
+        headers['Content-Type'] = 'application/json';
+      } else if (config.bodyType === 'xml') {
+        headers['Content-Type'] = 'application/xml';
+      } else if (config.bodyType === 'auto' && typeof body === 'object') {
+        headers['Content-Type'] = 'application/json';
+      }
     }
 
     // Build axios config
@@ -220,7 +227,9 @@ registry.register('httpRequest', {
       statusCode: response.status,
       body: response.data,
       headers: response.headers,
-      success: response.status >= 200 && response.status < 300
+      success: response.status >= 200 && response.status < 300,
+      method: config.method,
+      url: config.url
     };
 
     if (config.returnFullResponse) {
