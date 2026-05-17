@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Store,
+  Shield,
 } from 'lucide-react';
 import FlowaLogo from './FlowaLogo';
 import { useEffect, useState } from 'react';
@@ -18,7 +19,7 @@ import toast from 'react-hot-toast';
 import { UserAvatar } from './UserAvatar';
 import { authApi } from '../utils/api';
 
-const navItems = [
+const baseNavItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/team', icon: UserPlus, label: 'Team' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
@@ -33,6 +34,9 @@ export default function AppShell() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const navigate = useNavigate();
   const { user, token, workspace, workspaces, logout, setUser, setWorkspaces, setWorkspace } = useStore();
+  const navItems = user?.role === 'admin'
+    ? [...baseNavItems, { to: '/admin/users', icon: Shield, label: 'Admin' }]
+    : baseNavItems;
 
   useEffect(() => {
     if (!token) return;

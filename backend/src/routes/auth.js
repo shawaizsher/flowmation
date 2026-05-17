@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, transaction } = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require('../services/email');
+const { generateToken, sendPasswordResetEmail } = require('../services/email');
 const logger = require('../utils/logger');
 const { formatNotification } = require('../services/collaboration');
 
@@ -96,12 +96,11 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const isDev = process.env.NODE_ENV !== 'production';
 
     const result = await transaction(async (client) => {
       const userResult = await client.query(
         "INSERT INTO users (email, password_hash, name, email_verified, settings) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, settings",
-        [email.toLowerCase(), passwordHash, name, false, JSON.stringify({})]
+        [email.toLowerCase(), passwordHash, name, true, JSON.stringify({})]
       );
       const user = userResult.rows[0];
 
@@ -117,33 +116,30 @@ router.post('/register', async (req, res) => {
         [workspace.id, user.id, 'owner']
       );
 
-      // Always generate OTP — Ethereal SMTP is used as dev fallback
-      const verificationToken = generateToken();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-      await client.query(
-        'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-        [user.id, verificationToken, expiresAt]
-      );
-
-      return { user, workspace, verificationToken };
+      return { user, workspace };
     });
 
-    // Send OTP via email (Ethereal in dev, real SMTP in production)
-    sendVerificationEmail(email.toLowerCase(), name, result.verificationToken).catch((err) => {
-      logger.error('Failed to send OTP email:', err);
-    });
+    const token = jwt.sign(
+      { userId: result.user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d', algorithm: 'HS256' }
+    );
 
-    // Dev only: print OTP to terminal at debug level — never in production
-    if (isDev) {
-      logger.debug(`[DEV] OTP for ${email}: ${result.verificationToken}`);
-    }
-
-    logger.info(`User registered (OTP sent): ${result.user.email}`);
+    logger.info(`User registered: ${result.user.email}`);
 
     res.status(201).json({
-      message: 'Account created! Enter the 6-digit code we sent to your email.',
+      message: 'Account created successfully.',
+      token,
       user: formatUser(result.user),
-      emailVerificationRequired: true,
+      workspaces: [
+        {
+          id: result.workspace.id,
+          name: result.workspace.name,
+          slug: result.workspace.slug,
+          role: 'owner',
+        },
+      ],
+      emailVerificationRequired: false,
     });
   } catch (err) {
     logger.error('Registration error:', err);
@@ -383,14 +379,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Check email verification
-    if (!user.email_verified) {
-      return res.status(403).json({
-        error: 'Please verify your email address before signing in.',
-        emailVerificationRequired: true,
-        email: user.email,
-      });
-    }
+    // Email verification is disabled; allow login without email checks.
 
     // Get user's workspaces
     const workspaces = await query(

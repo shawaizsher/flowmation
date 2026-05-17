@@ -1,4 +1,5 @@
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const express = require('express');
 const cors = require('cors');
@@ -17,6 +18,7 @@ const versionRoutes = require('./routes/versions');
 const aiRoutes = require('./routes/ai');
 const nodeRoutes = require('./routes/nodes');
 const collaborationRoutes = require('./routes/collaboration');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -80,6 +82,7 @@ app.use('/api/workspaces/:wid/workflows', versionRoutes);
 app.use('/api/workspaces/:wid/ai', aiRoutes);
 app.use('/api/workspaces/:wid/collaboration', collaborationRoutes);
 app.use('/api/nodes', nodeRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ── Webhook endpoint ──
 app.all('/webhook/:path', async (req, res) => {
