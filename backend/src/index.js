@@ -32,6 +32,20 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ── Serve frontend static files (when running as consolidated image) ──
+const publicPath = path.join(__dirname, '..', 'public');
+if (require('fs').existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  // SPA fallback: serve index.html for unknown routes (before API routes)
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/health') && !req.path.startsWith('/webhook')) {
+      res.sendFile(path.join(publicPath, 'index.html'));
+    } else {
+      next();
+    }
+  });
+}
+
 // ── Request logging ──
 app.use((req, res, next) => {
   const start = Date.now();

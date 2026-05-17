@@ -1,3 +1,9 @@
+# Docker Compose for pulling pre-built consolidated image from Docker Hub
+# Usage:
+#   DOCKER_USERNAME=yourusername VERSION=1.0.0 docker-compose -f docker-compose.pull.yml up -d
+#   OR
+#   DOCKER_USERNAME=yourusername docker-compose -f docker-compose.pull.yml up -d  (uses latest)
+
 version: '3.9'
 
 services:
@@ -20,6 +26,7 @@ services:
       retries: 5
     networks:
       - flowa-network
+    restart: unless-stopped
 
   # Redis Cache
   redis:
@@ -36,18 +43,14 @@ services:
       retries: 5
     networks:
       - flowa-network
+    restart: unless-stopped
 
-  # Consolidated Backend + Frontend (single image)
+  # Consolidated Backend + Frontend (single image from Docker Hub)
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${API_URL:-http://localhost:4000}
-        VITE_WS_URL: ${WS_URL:-ws://localhost:4000}
+    image: ${DOCKER_USERNAME:-yourusername}/flowa:${VERSION:-latest}
     container_name: flowa-app
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: postgresql://${DB_USER:-flowa_user}:${DB_PASSWORD:-flowa_password}@postgres:5432/${DB_NAME:-flowa_db}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
@@ -61,16 +64,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
-      - /app/node_modules
     networks:
       - flowa-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health/live', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
   flowa-network:
