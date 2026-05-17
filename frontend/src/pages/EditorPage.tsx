@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background,
@@ -104,35 +104,21 @@ function EditorCanvas() {
   const [nodeSuggestions, setNodeSuggestions] = useState<{ type: string; score: number; reason: string }[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
-  // Quick-add popover
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [quickSearch, setQuickSearch] = useState('');
-  const [quickAddSourceId, setQuickAddSourceId] = useState<string | null>(null);
-  const quickAddRef = useRef<HTMLDivElement>(null);
+  // Source node id remembered when the user clicks "+" on a canvas node — the
+  // next palette pick auto-connects from this node.
+  const [paletteSourceId, setPaletteSourceId] = useState<string | null>(null);
+  const paletteSearchRef = useRef<HTMLInputElement>(null);
 
-  // Close quick-add when clicking outside
-  useEffect(() => {
-    if (!showQuickAdd) return;
-    const handler = (e: MouseEvent) => {
-      if (quickAddRef.current && !quickAddRef.current.contains(e.target as globalThis.Node)) {
-        setShowQuickAdd(false);
-        setQuickAddSourceId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showQuickAdd]);
-
-  // Listen for + button clicks on individual nodes
+  // "+" on a canvas node → focus the left palette search and remember the source.
   useEffect(() => {
     const handler = (e: Event) => {
-      const { sourceNodeId } = (e as CustomEvent).detail;
-      setQuickAddSourceId(sourceNodeId);
-      setQuickSearch('');
-      setShowQuickAdd(true);
+      const sourceNodeId = (e as CustomEvent).detail?.sourceNodeId || null;
+      setPaletteSourceId(sourceNodeId);
+      // Defer focus until after layout so the input is mounted/visible
+      setTimeout(() => paletteSearchRef.current?.focus(), 50);
     };
-    window.addEventListener('flowa:node-quick-add', handler);
-    return () => window.removeEventListener('flowa:node-quick-add', handler);
+    window.addEventListener('flowa:focus-palette', handler);
+    return () => window.removeEventListener('flowa:focus-palette', handler);
   }, []);
 
   // Execution
@@ -711,11 +697,11 @@ function EditorCanvas() {
           ...connection,
           id: edgeId,
           type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#334155', strokeWidth: 1.6 },
+          animated: false,
+          style: { stroke: '#374151', strokeWidth: 1.5 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#334155',
+            color: '#374151',
           },
         },
         eds
@@ -922,7 +908,7 @@ function EditorCanvas() {
       ]);
     }
 
-    setQuickAddSourceId(null);
+    setPaletteSourceId(null);
   };
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
@@ -1187,15 +1173,20 @@ function EditorCanvas() {
     }
   };
 
-  // ── ML node suggestions: re-fetch (debounced) whenever canvas nodes change ──
+  // ── ML node suggestions: re-fetch only when the SET of node types changes ──
+  // (NOT on every drag/select, which would re-fetch constantly and flicker)
+  const currentTypesKey = useMemo(
+    () => [...new Set(
+      nodes.map((n) => (n.data?.type || n.type || '') as string).filter(Boolean)
+    )].sort().join('|'),
+    [nodes]
+  );
   useEffect(() => {
-    if (!workspaceId || nodes.length === 0) {
+    if (!workspaceId) {
       setNodeSuggestions([]);
       return;
     }
-    const currentTypes = [...new Set(
-      nodes.map((n) => (n.data?.type || n.type || '') as string).filter(Boolean)
-    )];
+    const currentTypes = currentTypesKey ? currentTypesKey.split('|') : [];
     const timer = setTimeout(async () => {
       try {
         setSuggestionsLoading(true);
@@ -1206,9 +1197,9 @@ function EditorCanvas() {
       } finally {
         setSuggestionsLoading(false);
       }
-    }, 800); // 800 ms debounce
+    }, 800);
     return () => clearTimeout(timer);
-  }, [nodes, workspaceId]);
+  }, [currentTypesKey, workspaceId]);
 
   const loadTemplatesMarketplace = async () => {
     if (!workspaceId) return;
@@ -1611,11 +1602,14 @@ function EditorCanvas() {
               <div className="relative">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
                 <input
+                  ref={paletteSearchRef}
                   type="text"
-                  placeholder="Search nodes…"
+                  placeholder={paletteSourceId ? 'Pick the next node…' : 'Search nodes…'}
                   value={nodeSearch}
                   onChange={(e) => setNodeSearch(e.target.value)}
-                  className="w-full rounded-lg border border-surface-border bg-surface-input py-2 pl-8 pr-8 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal"
+                  className={`w-full rounded-lg border bg-surface-input py-2 pl-8 pr-8 text-sm font-medium text-foreground outline-none transition placeholder:font-normal ${
+                    paletteSourceId ? 'border-brand-500/60 ring-2 ring-brand-500/20' : 'border-surface-border focus:border-brand-500/50'
+                  }`}
                 />
                 {nodeSearch && (
                   <button onClick={() => setNodeSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
@@ -1641,7 +1635,7 @@ function EditorCanvas() {
                     return (
                       <button
                         key={s.type}
-                        onClick={() => handleAddNode(def)}
+                        onClick={() => { handleAddNode(def, paletteSourceId); setPaletteSourceId(null); }}
                         title={s.reason}
                         className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-brand-500/10 group/sug border border-transparent hover:border-brand-500/20"
                       >
@@ -1679,7 +1673,7 @@ function EditorCanvas() {
                         {defs.map((def) => (
                           <button
                             key={def.type}
-                            onClick={() => handleAddNode(def)}
+                            onClick={() => { handleAddNode(def, paletteSourceId); setPaletteSourceId(null); }}
                             className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition hover:bg-surface-hover group/node"
                           >
                             <NodeIcon nodeType={def.type} size="sm" />
@@ -1738,82 +1732,6 @@ function EditorCanvas() {
             <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} />
             <Controls className="!rounded-lg !bg-[#1a1f2e] !border-white/[0.07] !shadow-xl [&>button]:!bg-[#1a1f2e] [&>button]:!border-white/[0.07] [&>button]:!text-white/50 [&>button:hover]:!bg-white/[0.06] [&>button:hover]:!text-white/80" />
           </ReactFlow>
-
-          {/* ── Floating quick-add button ── */}
-          <div
-            ref={quickAddRef}
-            className="absolute bottom-20 right-5 z-30"
-          >
-            {/* Popover */}
-            {showQuickAdd && (
-              <div className="absolute bottom-14 right-0 w-72 rounded-xl border border-white/[0.08] bg-[#1a1f2e] shadow-2xl flex flex-col overflow-hidden"
-                style={{ maxHeight: 420 }}>
-                {/* Search */}
-                <div className="p-3 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2">
-                    <Search size={13} className="text-white/30 shrink-0" />
-                    <input
-                      autoFocus
-                      value={quickSearch}
-                      onChange={e => setQuickSearch(e.target.value)}
-                      placeholder="Search nodes…"
-                      className="flex-1 bg-transparent text-sm text-white/80 outline-none placeholder:text-white/25"
-                    />
-                    {quickSearch && (
-                      <button onClick={() => setQuickSearch('')} className="text-white/30 hover:text-white/60">
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Node list */}
-                <div className="overflow-y-auto flex-1 p-2">
-                  {(() => {
-                    const results = quickSearch.trim()
-                      ? searchNodes(quickSearch)
-                      : allNodes;
-                    const grouped = quickSearch.trim()
-                      ? { Results: results }
-                      : Object.fromEntries(
-                          Object.entries(getGroupedCatalog()).map(([cat, defs]) => [cat, defs])
-                        );
-                    return Object.entries(grouped).map(([cat, defs]) => (
-                      <div key={cat} className="mb-2">
-                        {!quickSearch.trim() && (
-                          <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-white/25">
-                            {cat}
-                          </div>
-                        )}
-                        {(defs as NodeDef[]).slice(0, quickSearch ? 20 : 5).map(def => (
-                          <button
-                            key={def.type}
-                            onClick={() => { handleAddNode(def, quickAddSourceId); setShowQuickAdd(false); setQuickSearch(''); }}
-                            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.05] transition"
-                          >
-                            <NodeIcon nodeType={def.type} size="sm" className="!h-7 !w-7 !rounded-md shrink-0" />
-                            <div className="min-w-0">
-                              <div className="truncate text-[12px] font-medium text-white/80">{def.label}</div>
-                              <div className="truncate text-[10px] text-white/30">{def.description}</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-            )}
-
-            {/* + button */}
-            <button
-              onClick={() => { setShowQuickAdd(v => !v); setQuickSearch(''); }}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.1] bg-[#1a1f2e] text-white/70 shadow-xl transition-all duration-200 hover:bg-white/[0.08] hover:text-white hover:scale-110 hover:shadow-2xl"
-              title="Add node"
-            >
-              <Plus size={20} className={`transition-transform duration-200 ${showQuickAdd ? 'rotate-45' : ''}`} />
-            </button>
-          </div>
 
           {/* I/O Panel — bottom of canvas */}
           <IOPanel

@@ -8,6 +8,7 @@ import { useStore } from '../store';
 
 const OTP_LENGTH = 6;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_PATTERN = /^[a-zA-Z\s'\-]+$/;
 
 export default function RegisterPage() {
   const navigate  = useNavigate();
@@ -15,13 +16,14 @@ export default function RegisterPage() {
   const setShowTutorial = useStore((s) => s.setShowTutorial);
 
   // Registration form state
-  const [fullName, setFullName]   = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [showPw, setShowPw]       = useState(false);
   const [loading, setLoading]     = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [touched, setTouched] = useState({ fullName: false, email: false, password: false });
+  const [touched, setTouched] = useState({ firstName: false, lastName: false, email: false, password: false });
 
   // Step state: form → otp → experience
   const [step, setStep]           = useState<'form' | 'otp' | 'experience'>('form');
@@ -29,16 +31,27 @@ export default function RegisterPage() {
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const inputRefs                 = useRef<(HTMLInputElement | null)[]>([]);
+  const [otpError, setOtpError]   = useState('');
 
   // Pending auth data — held until experience is selected
   const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any; workspaces: any[] } | null>(null);
 
-  /* ── Submit registration form ── */
-  const validateName = (value: string) => {
+  /* ── Validators ── */
+  const validateFirstName = (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed) return 'Full name is required.';
-    if (trimmed.length < 2) return 'Full name must be at least 2 characters.';
-    if (trimmed.length > 80) return 'Full name must be 80 characters or fewer.';
+    if (!trimmed) return 'First name is required.';
+    if (trimmed.length < 2) return 'Must be at least 2 characters.';
+    if (trimmed.length > 40) return 'Must be 40 characters or fewer.';
+    if (!NAME_PATTERN.test(trimmed)) return 'Only letters, hyphens, or apostrophes allowed.';
+    return '';
+  };
+
+  const validateLastName = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Last name is required.';
+    if (trimmed.length < 2) return 'Must be at least 2 characters.';
+    if (trimmed.length > 40) return 'Must be 40 characters or fewer.';
+    if (!NAME_PATTERN.test(trimmed)) return 'Only letters, hyphens, or apostrophes allowed.';
     return '';
   };
 
@@ -55,23 +68,24 @@ export default function RegisterPage() {
     return '';
   };
 
+  /* ── Submit registration form ── */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const nameError = validateName(fullName);
-    const emailError = validateEmail(email);
-    const passwordError = validatePassword(password);
+    const firstNameError = validateFirstName(firstName);
+    const lastNameError  = validateLastName(lastName);
+    const emailError     = validateEmail(email);
+    const passwordError  = validatePassword(password);
     setShowErrors(true);
-    setTouched({ fullName: true, email: true, password: true });
+    setTouched({ firstName: true, lastName: true, email: true, password: true });
 
-    if (nameError || emailError || passwordError) {
+    if (firstNameError || lastNameError || emailError || passwordError) {
       toast.error('Please fix the highlighted fields.');
       return;
     }
 
     const normalizedEmail = email.trim();
-    const normalizedName = fullName.trim();
+    const normalizedName  = `${firstName.trim()} ${lastName.trim()}`;
     setEmail(normalizedEmail);
-    setFullName(normalizedName);
 
     setLoading(true);
     try {
@@ -99,6 +113,7 @@ export default function RegisterPage() {
     const next = [...digits];
     next[idx] = char;
     setDigits(next);
+    if (otpError) setOtpError('');
     if (char && idx < OTP_LENGTH - 1) focusBox(idx + 1);
     if (char && next.every(d => d !== '') && idx === OTP_LENGTH - 1) submitOtp(next.join(''));
   };
@@ -131,7 +146,6 @@ export default function RegisterPage() {
     setVerifying(true);
     try {
       const { data } = await authApi.verifyOtp(email, code);
-      // Store auth but don't navigate yet — show experience question first
       setPendingAuth({
         token: data.token,
         user: data.user,
@@ -141,6 +155,7 @@ export default function RegisterPage() {
       setStep('experience');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Invalid code';
+      setOtpError(msg);
       toast.error(msg);
       setDigits(Array(OTP_LENGTH).fill(''));
       setTimeout(() => focusBox(0), 80);
@@ -156,6 +171,7 @@ export default function RegisterPage() {
       await authApi.resendVerification(email);
       toast.success('New code sent! Check your inbox.');
       setDigits(Array(OTP_LENGTH).fill(''));
+      setOtpError('');
       setTimeout(() => focusBox(0), 80);
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Failed to resend');
@@ -170,20 +186,22 @@ export default function RegisterPage() {
     setAuth(pendingAuth.token, pendingAuth.user, pendingAuth.workspaces || []);
     if (isNew) {
       setShowTutorial(true);
-      toast.success('Welcome! We\'ll show you around.');
+      toast.success("Welcome! We'll show you around.");
     } else {
       setShowTutorial(false);
-      toast.success('Welcome back! Let\'s build something.');
+      toast.success("Welcome back! Let's build something.");
     }
     navigate('/dashboard');
   };
 
-  const nameError = validateName(fullName);
-  const emailError = validateEmail(email);
-  const passwordError = validatePassword(password);
-  const showNameError = (showErrors || touched.fullName) && nameError;
-  const showEmailError = (showErrors || touched.email) && emailError;
-  const showPasswordError = (showErrors || touched.password) && passwordError;
+  const firstNameError  = validateFirstName(firstName);
+  const lastNameError   = validateLastName(lastName);
+  const emailError      = validateEmail(email);
+  const passwordError   = validatePassword(password);
+  const showFirstNameError  = (showErrors || touched.firstName) && firstNameError;
+  const showLastNameError   = (showErrors || touched.lastName) && lastNameError;
+  const showEmailError      = (showErrors || touched.email) && emailError;
+  const showPasswordError   = (showErrors || touched.password) && passwordError;
 
   return (
     <div className="min-h-screen bg-surface-base flex items-center justify-center px-4 relative">
@@ -279,6 +297,12 @@ export default function RegisterPage() {
                 ))}
               </div>
 
+              {otpError ? (
+                <p className="text-xs text-red-400 mb-3">{otpError}</p>
+              ) : (
+                <p className="text-xs text-foreground-muted mb-3">Enter all 6 digits to continue.</p>
+              )}
+
               <button
                 onClick={() => submitOtp(digits.join(''))}
                 disabled={digits.some(d => !d) || verifying}
@@ -304,6 +328,7 @@ export default function RegisterPage() {
               <div className="mt-6 pt-4 border-t border-surface-border w-full">
                 <button
                   onClick={() => { setStep('form'); setDigits(Array(OTP_LENGTH).fill('')); }}
+                  onMouseDown={() => setOtpError('')}
                   className="text-sm text-foreground-muted hover:text-foreground transition-colors"
                 >
                   ← Use a different email
@@ -323,23 +348,41 @@ export default function RegisterPage() {
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Full Name *</label>
-                  <input
-                    type="text"
-                    className={`input-field w-full ${showNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                    placeholder="Jane Doe"
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                    onBlur={() => setTouched((prev) => ({ ...prev, fullName: true }))}
-                    autoComplete="name"
-                    aria-invalid={Boolean(showNameError)}
-                  />
-                  {showNameError ? (
-                    <p className="mt-1 text-xs text-red-400">{nameError}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-foreground-muted">Use your real name (2-80 characters).</p>
-                  )}
+                {/* First + Last name side by side */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1.5">First Name *</label>
+                    <input
+                      type="text"
+                      className={`input-field w-full ${showFirstNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+                      placeholder="Jane"
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      onBlur={() => setTouched(prev => ({ ...prev, firstName: true }))}
+                      autoComplete="given-name"
+                      aria-invalid={Boolean(showFirstNameError)}
+                    />
+                    {showFirstNameError && (
+                      <p className="mt-1 text-xs text-red-400">{firstNameError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Last Name *</label>
+                    <input
+                      type="text"
+                      className={`input-field w-full ${showLastNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      onBlur={() => setTouched(prev => ({ ...prev, lastName: true }))}
+                      autoComplete="family-name"
+                      aria-invalid={Boolean(showLastNameError)}
+                    />
+                    {showLastNameError && (
+                      <p className="mt-1 text-xs text-red-400">{lastNameError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -350,14 +393,14 @@ export default function RegisterPage() {
                     placeholder="you@example.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                    onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
                     autoComplete="email"
                     aria-invalid={Boolean(showEmailError)}
                   />
                   {showEmailError ? (
                     <p className="mt-1 text-xs text-red-400">{emailError}</p>
                   ) : (
-                    <p className="mt-1 text-xs text-foreground-muted">We will send a 6-digit code to this email.</p>
+                    <p className="mt-1 text-xs text-foreground-muted">We'll send a 6-digit code to this email.</p>
                   )}
                 </div>
 
@@ -370,7 +413,7 @@ export default function RegisterPage() {
                       placeholder="Min 8 characters"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
+                      onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
                       autoComplete="new-password"
                       aria-invalid={Boolean(showPasswordError)}
                     />

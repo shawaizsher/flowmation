@@ -412,7 +412,7 @@ router.post('/login', async (req, res) => {
 
     if (result.rows.length === 0) {
       recordFailedLogin(loginKey);
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'No account found with this email.' });
     }
 
     const user = result.rows[0];
@@ -425,7 +425,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       recordFailedLogin(loginKey);
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Incorrect password.' });
     }
 
     if (!user.email_verified) {

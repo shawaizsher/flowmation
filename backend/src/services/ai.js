@@ -258,8 +258,16 @@ const ENTITY_PATTERNS = {
     filter:   ['filter', 'where', 'only', 'exclude', 'narrow', 'remove', 'drop', 'skip'],
     store:    ['store', 'save', 'insert', 'write', 'persist', 'add to', 'log to', 'append', 'record', 'archive'],
     notify:   ['notify', 'alert', 'inform', 'tell', 'ping', 'message', 'warn', 'remind'],
-    classify: ['classify', 'categorize', 'label', 'tag', 'sort by', 'bucket', 'group'],
-    summarize:['summarize', 'summary', 'shorten', 'abstract', 'condense', 'digest'],
+    classify: ['classify', 'categorize', 'label', 'tag', 'sort by', 'bucket', 'group', 'sentiment', 'detect spam', 'is spam', 'urgent or not'],
+    summarize:['summarize', 'summary', 'shorten', 'abstract', 'condense', 'digest', 'tldr', 'tl;dr'],
+    ai_chat:  ['ask ai', 'ask gpt', 'ask claude', 'ask gemini', 'use ai', 'use gpt', 'use gemini', 'use claude', 'llm', 'gpt', 'chatgpt', 'claude', 'gemini', 'openai', 'anthropic', 'ai response', 'ai reply', 'generate text', 'generate with ai', 'rewrite with ai', 'ai writes', 'prompt ai', 'ai answer', 'ai generates'],
+    approval: ['approval', 'approve', 'review before', 'manual review', 'wait for approval', 'human in the loop', 'hitl', 'sign off', 'sign-off', 'require approval', 'needs approval'],
+    retry:    ['retry', 'on failure', 'on error', 'if fails', 'if it fails', 'catch errors', 'handle errors', 'error handler', 'try catch'],
+    log:      ['log', 'log it', 'console log', 'print', 'debug', 'audit', 'audit log'],
+    loop:     ['for each', 'foreach', 'every item', 'each item', 'loop through', 'iterate', 'iterate over', 'one by one'],
+    delay:    ['delay', 'wait', 'sleep', 'pause', 'throttle', 'rate limit'],
+    compute:  ['calculate', 'compute', 'sum of', 'average', 'multiply', 'add up', 'total', 'math'],
+    respond:  ['respond', 'reply', 'send back', 'return response', 'return result', 'respond with', 'reply with', 'webhook response'],
   },
   destinations: {
     slack:         ['slack'],
@@ -372,9 +380,20 @@ const NODE_SPECS = {
   transform: {
     filter:    { type: 'transform_filter', label: 'Filter Items',    config: { condition: '' } },
     transform: { type: 'transform_set',    label: 'Transform Data',  config: { mapping: '{}' } },
-    parse:     { type: 'json_parse',       label: 'Parse JSON',      config: {} },
+    parse:     { type: 'json_parse',       label: 'Parse JSON',      config: { field: 'body' } },
     classify:  { type: 'ai_classify',      label: 'Classify Text',   config: { categories: 'positive,negative,neutral' } },
     summarize: { type: 'ai_summarize',     label: 'Summarize Text',  config: { maxLength: 100 } },
+    ai_chat:   { type: 'gemini_chat',      label: 'AI Chat (Gemini)', config: { model: 'gemini-2.0-flash', systemPrompt: 'You are a helpful assistant.', message: '{{body.prompt}}', temperature: 0.7, maxTokens: 2048 } },
+    loop:      { type: 'loop_for_each',    label: 'For Each Item',   config: { field: 'items' } },
+    delay:     { type: 'delay',            label: 'Delay',           config: { seconds: 2 } },
+    compute:   { type: 'math_operation',   label: 'Math Operation',  config: { operation: 'add', valueA: '', valueB: '' } },
+  },
+  control: {
+    approval:    { type: 'wait_approval',  label: 'Wait for Approval', config: { message: 'Please review and approve before continuing.', timeout: 60 } },
+    error:       { type: 'error_handler',  label: 'Error Handler',     config: { action: 'continue', message: 'Workflow recovered from error.' } },
+    log:         { type: 'console_log',    label: 'Log Output',        config: { message: '{{data}}', logLevel: 'info' } },
+    if:          { type: 'logic_if',       label: 'If Condition',      config: { field: 'category', operator: 'equals', value: '' } },
+    respond:     { type: 'respondWebhook', label: 'Respond Webhook',   config: { statusCode: 200, body: '{{data}}' } },
   },
   destination: {
     slack:         { type: 'slack_send',         label: 'Send to Slack',     config: { channel: '#general', message: '{{data}}' } },
@@ -401,11 +420,70 @@ function makeNode(id, x, y, label, type, config = {}) {
   return { id, type: 'flowNode', position: { x, y }, data: { label, type, icon: '🔗', config } };
 }
 
+/**
+ * Extract concrete configuration values from the user's natural-language prompt.
+ * Examples extracted: URLs, emails, Slack channels, comma-separated categories,
+ * quoted AI prompts, and named tables/fields.
+ */
+function extractConfigHints(prompt) {
+  const hints = {};
+  if (!prompt) return hints;
+  const text = String(prompt);
+
+  // URL — first http(s) URL
+  const urlMatch = text.match(/https?:\/\/[^\s"'<>)]+/i);
+  if (urlMatch) hints.url = urlMatch[0];
+
+  // Email recipient — only treat as recipient if preceded by send/email/to keywords
+  const emailMatch = text.match(/(?:to|email|recipient|notify)\s+[^@\s]*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i)
+                  || text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailMatch) hints.email = emailMatch[1] || emailMatch[0];
+
+  // Slack channel — #channel-name
+  const channelMatch = text.match(/#([a-z0-9][a-z0-9_-]{1,40})/i);
+  if (channelMatch) hints.channel = '#' + channelMatch[1];
+
+  // Categories — "categorize/classify into A, B, C" or "as A or B or C"
+  const catMatch = text.match(/(?:into|as|categories?:?|classify (?:them )?(?:as|into))\s+([a-zA-Z][a-zA-Z\s,/]+?)(?:\.|$|then|and then)/i);
+  if (catMatch) {
+    const parts = catMatch[1].split(/,|\bor\b|\band\b|\//i).map(s => s.trim()).filter(s => s && s.length < 24 && /^[a-zA-Z][a-zA-Z\s-]*$/.test(s));
+    if (parts.length >= 2) hints.categories = parts.slice(0, 6).join(',').toLowerCase();
+  }
+
+  // Quoted AI prompt — anything inside "..." or '...'
+  const quotedMatch = text.match(/["'`]([^"'`]{8,400})["'`]/);
+  if (quotedMatch) hints.aiPrompt = quotedMatch[1];
+
+  // Subject line / message body keywords
+  const subjectMatch = text.match(/subject(?:\s*line)?\s*[:=]?\s*["']?([^"'\n.]{3,80})/i);
+  if (subjectMatch) hints.subject = subjectMatch[1].trim();
+
+  // Table name — "into table users" / "from the orders table"
+  const tableMatch = text.match(/(?:table|from|into)\s+([a-z_][a-z0-9_]{2,40})\s+(?:table|where|with|set|then|and|\.|$)/i)
+                   || text.match(/(?:table|insert into|select from)\s+["`]?([a-z_][a-z0-9_]{2,40})["`]?/i);
+  if (tableMatch) hints.table = tableMatch[1];
+
+  // Topic / subject of the AI prompt — "ask AI about <topic>"
+  const aiTopicMatch = text.match(/(?:ask ai|ask gpt|ask claude|ask gemini|use ai|use gpt|ai to|gemini to|claude to)\s+(?:about|to|for|with)?\s*([^.,]+)/i);
+  if (aiTopicMatch && !hints.aiPrompt) hints.aiPrompt = aiTopicMatch[1].trim();
+
+  return hints;
+}
+
+/**
+ * Smart compositional workflow builder.
+ * Combines entity intent, prompt-extracted config hints, and structural rules
+ * (HTTP→parse, multi-destination branching, AI→classify routing, approval gates,
+ *  error handlers, loops, respond-webhook for webhook+AI prompt patterns).
+ */
 function buildWorkflowFromEntities(entities) {
   const nodes = [];
   const edges = [];
-  const Y = 220, X0 = 100, SPACING = 280, BRANCH_DY = 160;
+  const Y = 220, X0 = 100, SPACING = 300, BRANCH_DY = 160;
   let x = X0, lastId = null;
+
+  const hints = extractConfigHints(entities.rawPrompt || '');
+  const acts = new Set(entities.actions || []);
 
   const addNode = (spec, posX, posY) => {
     const id = `${spec.type}-${nodes.length + 1}-${Date.now()}`;
@@ -413,79 +491,186 @@ function buildWorkflowFromEntities(entities) {
     return id;
   };
   const link = (from, to) => from && to && edges.push(makeEdge(`e-${from}-${to}`, from, to));
+  const cloneSpec = (spec, configOverrides = {}) => ({
+    ...spec,
+    config: { ...(spec.config || {}), ...configOverrides },
+  });
 
-  // 1) Trigger
+  /* ── 1) Trigger ──────────────────────────────────────────────────────── */
   let triggerKind = entities.triggers.length ? entities.triggers[0].type
                   : entities.schedule       ? 'cron'
                   : entities.sources.length ? 'webhook'
+                  : acts.has('ai_chat') || acts.has('respond') ? 'webhook'
                   : 'manual';
-  const triggerSpec = { ...NODE_SPECS.trigger[triggerKind] };
+  let triggerSpec = { ...NODE_SPECS.trigger[triggerKind] };
   if (triggerKind === 'cron' && entities.schedule) {
-    triggerSpec.config = { expression: entities.schedule.cron };
+    triggerSpec = cloneSpec(triggerSpec, { expression: entities.schedule.cron });
     triggerSpec.label = `Schedule (${entities.schedule.label})`;
+  }
+  if (triggerKind === 'webhook') {
+    triggerSpec = cloneSpec(triggerSpec, { path: '/incoming', method: 'POST' });
   }
   lastId = addNode(triggerSpec, x, Y);
   x += SPACING;
 
-  // 2) Source
+  /* ── 2) Source / API fetch ───────────────────────────────────────────── */
   const HTTP_SOURCES = new Set(['api', 'github']);
   if (entities.sources.length && NODE_SPECS.source[entities.sources[0]]) {
     const srcKey = entities.sources[0];
-    const id = addNode(NODE_SPECS.source[srcKey], x, Y);
+    let sourceSpec = NODE_SPECS.source[srcKey];
+    if (HTTP_SOURCES.has(srcKey) && hints.url) {
+      sourceSpec = cloneSpec(sourceSpec, { url: hints.url });
+    }
+    if (srcKey === 'postgres' || srcKey === 'mysql') {
+      if (hints.table) sourceSpec = cloneSpec(sourceSpec, { query: `SELECT * FROM ${hints.table}` });
+    }
+    const id = addNode(sourceSpec, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
 
-    // HTTP sources almost always return JSON — auto-insert a parse step
-    if (HTTP_SOURCES.has(srcKey) && !entities.actions.includes('parse')) {
+    if (HTTP_SOURCES.has(srcKey) && !acts.has('parse')) {
       const parseId = addNode(NODE_SPECS.transform.parse, x, Y);
       link(lastId, parseId); lastId = parseId; x += SPACING;
     }
   }
 
-  // 3) Parse / JSON if explicitly requested (and not already added above)
-  if (entities.actions.includes('parse') && !HTTP_SOURCES.has(entities.sources[0])) {
+  /* ── 3) Explicit parse ──────────────────────────────────────────────── */
+  if (acts.has('parse') && !HTTP_SOURCES.has(entities.sources[0])) {
     const id = addNode(NODE_SPECS.transform.parse, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   }
 
-  // 4) Filter (conditional)
-  if (entities.actions.includes('filter') || entities.hasCondition) {
+  /* ── 4) Loop over array ─────────────────────────────────────────────── */
+  if (acts.has('loop')) {
+    const id = addNode(NODE_SPECS.transform.loop, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+
+  /* ── 5) Filter ─────────────────────────────────────────────────────── */
+  if (acts.has('filter') || entities.hasCondition) {
     const id = addNode(NODE_SPECS.transform.filter, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   }
 
-  // 5) AI / transform processing — only when explicitly asked
-  if (entities.actions.includes('classify')) {
-    const id = addNode(NODE_SPECS.transform.classify, x, Y);
-    link(lastId, id); lastId = id; x += SPACING;
-  } else if (entities.actions.includes('summarize')) {
-    const id = addNode(NODE_SPECS.transform.summarize, x, Y);
-    link(lastId, id); lastId = id; x += SPACING;
-  } else if (entities.actions.includes('transform')) {
+  /* ── 6) Transform mapping ──────────────────────────────────────────── */
+  if (acts.has('transform')) {
     const id = addNode(NODE_SPECS.transform.transform, x, Y);
     link(lastId, id); lastId = id; x += SPACING;
   }
 
-  // 6) Destinations — branch if multiple
-  const dests = entities.destinations.length ? entities.destinations
-              : entities.actions.includes('store')  ? ['database']
-              : entities.actions.includes('notify') ? ['email']
-              : [];
+  /* ── 7) Compute / math ─────────────────────────────────────────────── */
+  if (acts.has('compute')) {
+    const id = addNode(NODE_SPECS.transform.compute, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+
+  /* ── 8) AI processing ──────────────────────────────────────────────── */
+  // Priority: explicit AI chat → classify → summarize (each is its own kind of "process")
+  let classifyId = null;
+  if (acts.has('ai_chat')) {
+    const promptText = hints.aiPrompt
+      || (triggerKind === 'webhook' ? '{{body.prompt}}' : entities.rawPrompt || 'Process the input.');
+    const aiSpec = cloneSpec(NODE_SPECS.transform.ai_chat, { message: promptText });
+    const id = addNode(aiSpec, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+  if (acts.has('classify')) {
+    const categories = hints.categories || NODE_SPECS.transform.classify.config.categories;
+    const classifySpec = cloneSpec(NODE_SPECS.transform.classify, { categories });
+    classifyId = addNode(classifySpec, x, Y);
+    link(lastId, classifyId); lastId = classifyId; x += SPACING;
+  }
+  if (acts.has('summarize')) {
+    const id = addNode(NODE_SPECS.transform.summarize, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+
+  /* ── 9) Wait for approval (human-in-the-loop) ──────────────────────── */
+  if (acts.has('approval')) {
+    const id = addNode(NODE_SPECS.control.approval, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+
+  /* ── 10) Delay ─────────────────────────────────────────────────────── */
+  if (acts.has('delay')) {
+    const id = addNode(NODE_SPECS.transform.delay, x, Y);
+    link(lastId, id); lastId = id; x += SPACING;
+  }
+
+  /* ── 11) Destinations ──────────────────────────────────────────────── */
+  let dests = entities.destinations.length ? [...entities.destinations]
+            : acts.has('store')  ? ['database']
+            : acts.has('notify') ? ['email']
+            : [];
+
+  // If we classified, branch destinations per category if 2+ destinations exist
+  // Otherwise simple sequential
+  const buildDestinationSpec = (d) => {
+    let spec = NODE_SPECS.destination[d];
+    if (!spec) return null;
+    if (d === 'email' && hints.email) {
+      spec = cloneSpec(spec, { to: hints.email, subject: hints.subject || spec.config.subject });
+    }
+    if (d === 'slack' && hints.channel) {
+      spec = cloneSpec(spec, { channel: hints.channel });
+    }
+    if ((d === 'database') && hints.table) {
+      spec = cloneSpec(spec, { table: hints.table });
+    }
+    return spec;
+  };
+
+  let destinationOriginId = lastId;
+  let destinationIds = [];
 
   if (dests.length === 1) {
-    const spec = NODE_SPECS.destination[dests[0]];
-    if (spec) link(lastId, addNode(spec, x, Y));
+    const spec = buildDestinationSpec(dests[0]);
+    if (spec) {
+      const id = addNode(spec, x, Y);
+      link(destinationOriginId, id);
+      destinationIds.push(id);
+    }
   } else if (dests.length > 1) {
-    const branchOrigin = lastId;
     const startY = Y - ((dests.length - 1) * BRANCH_DY) / 2;
     dests.forEach((d, i) => {
-      const spec = NODE_SPECS.destination[d];
+      const spec = buildDestinationSpec(d);
       if (!spec) return;
       const id = addNode(spec, x, startY + i * BRANCH_DY);
-      link(branchOrigin, id);
+      link(destinationOriginId, id);
+      destinationIds.push(id);
     });
-  } else {
-    const id = addNode({ type: 'console_log', label: 'Log Output', config: { message: '{{data}}' } }, x, Y);
+  }
+
+  /* ── 12) Respond to webhook (only when webhook trigger) ─────────────── */
+  // For AI-chat-over-webhook patterns we automatically wire a "Respond Webhook"
+  // so the caller gets the AI output back.
+  if (triggerKind === 'webhook' && (acts.has('respond') || acts.has('ai_chat')) && !destinationIds.length) {
+    x += SPACING;
+    const respondSpec = cloneSpec(NODE_SPECS.control.respond, { body: '{{response}}' });
+    const id = addNode(respondSpec, x, Y);
     link(lastId, id);
+    destinationIds.push(id);
+  }
+
+  /* ── 13) Always-on log when nothing else terminates the graph ──────── */
+  if (!destinationIds.length) {
+    const id = addNode(NODE_SPECS.control.log, x, Y);
+    link(lastId, id);
+    destinationIds.push(id);
+  }
+
+  /* ── 14) Logging side-branch when user explicitly asked for it ─────── */
+  if (acts.has('log') && nodes.findIndex(n => n.data.type === 'console_log') === -1) {
+    const logId = addNode(NODE_SPECS.control.log, x, Y + BRANCH_DY + 40);
+    link(destinationOriginId, logId);
+  }
+
+  /* ── 15) Error handler — pure side-branch from trigger ─────────────── */
+  if (acts.has('retry')) {
+    const errSpec = cloneSpec(NODE_SPECS.control.error, { action: 'retry', message: 'Retrying on failure.' });
+    const errId = addNode(errSpec, X0, Y - BRANCH_DY - 40);
+    // No edge — error handlers are wired up by the engine on failure events.
+    // Adding the node alone signals intent on the canvas.
+    void errId;
   }
 
   return { nodes, edges };

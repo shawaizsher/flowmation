@@ -30,9 +30,11 @@ let   _cacheAt     = 0;
 const COLD_START_DEFAULTS = [
   { type: 'trigger_webhook',  reason: 'Most workflows start with a Webhook trigger' },
   { type: 'http_request',     reason: 'HTTP Request is the most versatile integration node' },
-  { type: 'ai_prompt',        reason: 'AI nodes are widely used for processing and enrichment' },
-  { type: 'if_condition',     reason: 'Branching logic is used in most real-world workflows' },
-  { type: 'send_email',       reason: 'Email notification is a common workflow output' },
+  { type: 'gemini_chat',      reason: 'AI nodes are widely used for processing and enrichment' },
+  { type: 'logic_if',         reason: 'Branching logic is used in most real-world workflows' },
+  { type: 'email_send',       reason: 'Email notification is a common workflow output' },
+  { type: 'json_parse',       reason: 'Parse JSON responses from API calls' },
+  { type: 'console_log',      reason: 'Log node values for easier debugging' },
 ];
 
 // ── Parse a workflow graph safely ────────────────────────────────────────────

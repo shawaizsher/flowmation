@@ -450,7 +450,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
         )}
       </AnimatePresence>
 
-      {/* ── Quick-add button (right of box) ── */}
+      {/* ── Quick-add button (right of box) — focuses the left palette ── */}
       <AnimatePresence>
         {isHovered && !dragging && (
           <motion.button
@@ -461,7 +461,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              window.dispatchEvent(new CustomEvent('flowa:node-quick-add', { detail: { sourceNodeId: id } }));
+              window.dispatchEvent(new CustomEvent('flowa:focus-palette', { detail: { sourceNodeId: id } }));
             }}
             className="absolute z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-lg backdrop-blur-sm transition-colors"
             style={{
@@ -471,7 +471,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
               border: `1px solid var(--node-quickadd-border)`,
               color: 'var(--node-quickadd-icon)',
             }}
-            title="Add connected node"
+            title="Add next node — opens palette"
           >
             <Plus size={12} />
           </motion.button>
