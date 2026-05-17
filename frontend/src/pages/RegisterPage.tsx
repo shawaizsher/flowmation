@@ -7,6 +7,7 @@ import { authApi } from '../utils/api';
 import { useStore } from '../store';
 
 const OTP_LENGTH = 6;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterPage() {
   const navigate  = useNavigate();
@@ -19,6 +20,8 @@ export default function RegisterPage() {
   const [password, setPassword]   = useState('');
   const [showPw, setShowPw]       = useState(false);
   const [loading, setLoading]     = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
+  const [touched, setTouched] = useState({ fullName: false, email: false, password: false });
 
   // Step state: form → otp → experience
   const [step, setStep]           = useState<'form' | 'otp' | 'experience'>('form');
@@ -31,14 +34,48 @@ export default function RegisterPage() {
   const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any; workspaces: any[] } | null>(null);
 
   /* ── Submit registration form ── */
+  const validateName = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Full name is required.';
+    if (trimmed.length < 2) return 'Full name must be at least 2 characters.';
+    if (trimmed.length > 80) return 'Full name must be 80 characters or fewer.';
+    return '';
+  };
+
+  const validateEmail = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Email is required.';
+    if (!EMAIL_PATTERN.test(trimmed)) return 'Enter a valid email like name@example.com.';
+    return '';
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) return 'Password is required.';
+    if (value.length < 8) return 'Password must be at least 8 characters.';
+    return '';
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email || !password) return toast.error('Fill in all required fields');
-    if (password.length < 8) return toast.error('Password must be at least 8 characters');
+    const nameError = validateName(fullName);
+    const emailError = validateEmail(email);
+    const passwordError = validatePassword(password);
+    setShowErrors(true);
+    setTouched({ fullName: true, email: true, password: true });
+
+    if (nameError || emailError || passwordError) {
+      toast.error('Please fix the highlighted fields.');
+      return;
+    }
+
+    const normalizedEmail = email.trim();
+    const normalizedName = fullName.trim();
+    setEmail(normalizedEmail);
+    setFullName(normalizedName);
 
     setLoading(true);
     try {
-      const { data } = await authApi.register({ name: fullName, email, password });
+      const { data } = await authApi.register({ name: normalizedName, email: normalizedEmail, password });
       if (data.emailVerificationRequired) {
         setStep('otp');
         toast.success('A 6-digit code was sent to your email!');
@@ -140,6 +177,13 @@ export default function RegisterPage() {
     }
     navigate('/dashboard');
   };
+
+  const nameError = validateName(fullName);
+  const emailError = validateEmail(email);
+  const passwordError = validatePassword(password);
+  const showNameError = (showErrors || touched.fullName) && nameError;
+  const showEmailError = (showErrors || touched.email) && emailError;
+  const showPasswordError = (showErrors || touched.password) && passwordError;
 
   return (
     <div className="min-h-screen bg-surface-base flex items-center justify-center px-4 relative">
@@ -283,24 +327,38 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Full Name *</label>
                   <input
                     type="text"
-                    className="input-field w-full"
+                    className={`input-field w-full ${showNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
                     placeholder="Jane Doe"
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, fullName: true }))}
                     autoComplete="name"
+                    aria-invalid={Boolean(showNameError)}
                   />
+                  {showNameError ? (
+                    <p className="mt-1 text-xs text-red-400">{nameError}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-foreground-muted">Use your real name (2-80 characters).</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Email *</label>
                   <input
                     type="email"
-                    className="input-field w-full"
+                    className={`input-field w-full ${showEmailError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
                     placeholder="you@example.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                     autoComplete="email"
+                    aria-invalid={Boolean(showEmailError)}
                   />
+                  {showEmailError ? (
+                    <p className="mt-1 text-xs text-red-400">{emailError}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-foreground-muted">We will send a 6-digit code to this email.</p>
+                  )}
                 </div>
 
                 <div>
@@ -308,11 +366,13 @@ export default function RegisterPage() {
                   <div className="relative">
                     <input
                       type={showPw ? 'text' : 'password'}
-                      className="input-field w-full pr-10"
+                      className={`input-field w-full pr-10 ${showPasswordError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
                       placeholder="Min 8 characters"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
                       autoComplete="new-password"
+                      aria-invalid={Boolean(showPasswordError)}
                     />
                     <button
                       type="button"
@@ -323,6 +383,11 @@ export default function RegisterPage() {
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {showPasswordError ? (
+                    <p className="mt-1 text-xs text-red-400">{passwordError}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-foreground-muted">Use at least 8 characters.</p>
+                  )}
                 </div>
 
                 <button
