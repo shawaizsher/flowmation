@@ -82,10 +82,12 @@ function EditorCanvas() {
   const [publishLabel, setPublishLabel] = useState('');
 
   // Publish to Marketplace
-  const [showMktModal, setShowMktModal]     = useState(false);
-  const [mktCategory, setMktCategory]       = useState('General');
-  const [mktSetupGuide, setMktSetupGuide]   = useState('');
-  const [publishingMkt, setPublishingMkt]   = useState(false);
+  const [showMktModal, setShowMktModal]       = useState(false);
+  const [mktCategory, setMktCategory]         = useState('General');
+  const [mktDescription, setMktDescription]   = useState('');
+  const [mktSetupGuide, setMktSetupGuide]     = useState('');
+  const [publishingMkt, setPublishingMkt]     = useState(false);
+  const [generatingDesc, setGeneratingDesc]   = useState(false);
   const MKT_CATEGORIES = ['General','Sales','Marketing','Data','Finance','Productivity','AI','DevOps','Operations','Governance','Social'];
 
   // Panels — both open by default for easier understanding
@@ -785,6 +787,25 @@ function EditorCanvas() {
     }
   };
 
+  const handleGenerateDescription = async () => {
+    if (!workspaceId) return;
+    try {
+      setGeneratingDesc(true);
+      const res = await aiApi.generateDescription(workspaceId, {
+        name: workflowName,
+        nodes,
+        edges,
+      });
+      if (res.data.description) setMktDescription(res.data.description);
+      if (res.data.setupGuide?.length) setMktSetupGuide(res.data.setupGuide.join('\n'));
+      toast.success('Description generated!');
+    } catch {
+      toast.error('AI generation failed — check your ANTHROPIC_API_KEY');
+    } finally {
+      setGeneratingDesc(false);
+    }
+  };
+
   const handlePublishToMarketplace = async () => {
     if (!workspaceId || !id) return;
     try {
@@ -793,11 +814,13 @@ function EditorCanvas() {
       await workflowApi.publishTemplate(workspaceId, {
         workflowId: id,
         category: mktCategory,
+        description: mktDescription.trim() || undefined,
         setupGuide,
         requiredCredentials: [],
       });
       toast.success('Workflow published to Marketplace!');
       setShowMktModal(false);
+      setMktDescription('');
       setMktSetupGuide('');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to publish to marketplace');
@@ -2917,6 +2940,19 @@ function EditorCanvas() {
             </p>
 
             <div className="space-y-4">
+              {/* AI generate button */}
+              <button
+                onClick={handleGenerateDescription}
+                disabled={generatingDesc}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-500/30 bg-gradient-to-r from-brand-500/10 to-accent-500/10 px-4 py-2.5 text-sm font-semibold text-brand-400 hover:from-brand-500/20 hover:to-accent-500/20 transition disabled:opacity-50"
+              >
+                {generatingDesc ? (
+                  <><Loader2 size={14} className="animate-spin" /> Generating with AI…</>
+                ) : (
+                  <><Sparkles size={14} /> Generate Description with AI</>
+                )}
+              </button>
+
               {/* Category */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">Category</label>
@@ -2934,6 +2970,20 @@ function EditorCanvas() {
                 </div>
               </div>
 
+              {/* Description */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+                  Description <span className="text-foreground-muted font-normal">(shown on marketplace card)</span>
+                </label>
+                <textarea
+                  value={mktDescription}
+                  onChange={(e) => setMktDescription(e.target.value)}
+                  placeholder="What does this workflow do? What problem does it solve?"
+                  className="input-field min-h-[72px] resize-none w-full"
+                  autoFocus
+                />
+              </div>
+
               {/* Setup guide */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
@@ -2943,8 +2993,7 @@ function EditorCanvas() {
                   value={mktSetupGuide}
                   onChange={(e) => setMktSetupGuide(e.target.value)}
                   placeholder={"Configure the webhook URL in the trigger node.\nAdd your API credentials in Settings.\nTest with a sample payload."}
-                  className="input-field min-h-[100px] resize-none w-full"
-                  autoFocus
+                  className="input-field min-h-[90px] resize-none w-full"
                 />
               </div>
 
