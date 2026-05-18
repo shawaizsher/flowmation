@@ -8,6 +8,15 @@ const logger = require('../utils/logger');
 function resolveVariables(config, context) {
   let str = JSON.stringify(config);
 
+  // Build label→id map so expressions like {{ My Node.field }} resolve correctly
+  const labelToId = {};
+  if (context.nodes) {
+    for (const n of context.nodes) {
+      const label = n.data?.label || n.id;
+      labelToId[label] = n.id;
+    }
+  }
+
   str = str.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     const parts = path.trim().split('.');
     let value;
@@ -16,29 +25,49 @@ function resolveVariables(config, context) {
       value = context.triggerPayload;
       for (let i = 1; i < parts.length; i++) {
         if (value == null) break;
-        // Handle array access: items[0]
         const arrayMatch = parts[i].match(/^(\w+)\[(\d+)\]$/);
         if (arrayMatch) {
           value = value[arrayMatch[1]];
-          if (Array.isArray(value)) {
-            value = value[parseInt(arrayMatch[2])];
-          }
+          if (Array.isArray(value)) value = value[parseInt(arrayMatch[2])];
         } else {
           value = value[parts[i]];
         }
       }
     } else {
-      // nodeId.field.nestedField
-      const nodeId = parts[0];
+      // Resolve first segment: try exact nodeId, then label→id, then label with spaces
+      // (labels can contain spaces, e.g. "JSON Parse" → parts[0]="JSON Parse" after trim)
+      // Re-join until we find a match since the label may contain dots... but dots are rare.
+      let nodeId = null;
+      let fieldStart = 1;
+
+      // Try progressively longer prefixes to handle labels with spaces reconstructed from dot-split
+      for (let end = parts.length; end >= 1; end--) {
+        const candidate = parts.slice(0, end).join('.');
+        if (context.nodeOutputs[candidate] !== undefined) {
+          nodeId = candidate;
+          fieldStart = end;
+          break;
+        }
+        if (labelToId[candidate] && context.nodeOutputs[labelToId[candidate]] !== undefined) {
+          nodeId = labelToId[candidate];
+          fieldStart = end;
+          break;
+        }
+      }
+
+      if (nodeId === null) {
+        // Last resort: first part as nodeId
+        nodeId = labelToId[parts[0]] || parts[0];
+        fieldStart = 1;
+      }
+
       value = context.nodeOutputs[nodeId];
-      for (let i = 1; i < parts.length; i++) {
+      for (let i = fieldStart; i < parts.length; i++) {
         if (value == null) break;
         const arrayMatch = parts[i].match(/^(\w+)\[(\d+)\]$/);
         if (arrayMatch) {
           value = value[arrayMatch[1]];
-          if (Array.isArray(value)) {
-            value = value[parseInt(arrayMatch[2])];
-          }
+          if (Array.isArray(value)) value = value[parseInt(arrayMatch[2])];
         } else {
           value = value[parts[i]];
         }
@@ -171,7 +200,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
       nodeOutputs: {},
       executionId,
       workflowId,
-      credentials
+      credentials,
+      nodes  // needed by resolveVariables to map labels → IDs
     };
 
     // Track completion
@@ -312,15 +342,32 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
           // Get handler from registry
           const handler = registry.get(nodeType);
           if (!handler) {
-            throw new Error(`Unknown node type: ${nodeType}`);
+            logger.warn(`No handler for node type "${nodeType}" — passing input through`);
+            const output = { ...input, __skipped: true, __nodeType: nodeType };
+            context.nodeOutputs[node.id] = output;
+            completed.add(node.id);
+            await query(
+              `UPDATE node_logs SET status = 'skipped', output = $1, finished_at = NOW(), duration_ms = $2
+               WHERE id = $3`,
+              [JSON.stringify(output), Date.now() - nodeStartTime, logId]
+            );
+            return;
           }
 
-          // Execute the node
-          const output = await handler.execute({
-            config: resolvedConfig,
-            input,
-            context
-          });
+          // Execute the node (retry once on 429 rate-limit with 2s backoff)
+          let output;
+          try {
+            output = await handler.execute({ config: resolvedConfig, input, context });
+          } catch (execErr) {
+            const status = execErr?.response?.status || execErr?.status;
+            if (status === 429) {
+              logger.warn(`Rate limited on node ${nodeType}, retrying in 3s…`);
+              await new Promise(r => setTimeout(r, 3000));
+              output = await handler.execute({ config: resolvedConfig, input, context });
+            } else {
+              throw execErr;
+            }
+          }
 
           const duration = Date.now() - nodeStartTime;
 

@@ -1708,7 +1708,7 @@ router.post('/:id/execute', async (req, res) => {
     res.json({ executionId });
   } catch (err) {
     logger.error('Execute workflow error:', err);
-    res.status(500).json({ error: 'Failed to execute workflow' });
+    res.status(500).json({ error: 'Failed to execute workflow', detail: err.message, stack: err.stack });
   }
 });
 
@@ -1740,10 +1740,11 @@ router.post('/suggest-nodes', async (req, res) => {
       return res.status(400).json({ error: 'currentNodeTypes must be an array of strings' });
     }
 
-    // Collect all available node types from the registry
-    const allTypes = registry.getAll
-      ? registry.getAll().map(n => n.type || n.id).filter(Boolean)
-      : [];
+    // Collect all available node types from the registry.
+    const registeredNodes = registry.getAll ? registry.getAll() : {};
+    const allTypes = Array.isArray(registeredNodes)
+      ? registeredNodes.map((node) => node.type || node.id).filter(Boolean)
+      : Object.keys(registeredNodes);
 
     const suggestions = await suggestNodes(currentNodeTypes, allTypes, 5);
     res.json({ suggestions });

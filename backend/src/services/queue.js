@@ -1,9 +1,12 @@
 const { Queue, Worker } = require('bullmq');
-const { getRedis } = require('../db/redis');
+const { getRedis, getRedisServerVersion, isRedisVersionAtLeast } = require('../db/redis');
 const { query } = require('../db');
 const logger = require('../utils/logger');
 
 let executionQueue = null;
+let warnedUnsupportedRedis = false;
+
+const BULLMQ_MIN_REDIS_VERSION = '5.0.0';
 
 function shouldUseInlineFallback() {
   return process.env.ENABLE_INLINE_EXECUTION_FALLBACK !== 'false';
@@ -40,7 +43,26 @@ function runExecutionInline({ executionId, workflowId, triggerPayload, credentia
   });
 }
 
+function isBullMqRedisSupported() {
+  const version = getRedisServerVersion();
+  const supported = version && isRedisVersionAtLeast(version, BULLMQ_MIN_REDIS_VERSION);
+
+  if (!supported && !warnedUnsupportedRedis) {
+    logger.warn(
+      `BullMQ disabled: Redis ${version || 'unknown'} is below required ${BULLMQ_MIN_REDIS_VERSION}. ` +
+      'Workflow executions will run inline. Upgrade Redis to enable the worker queue.'
+    );
+    warnedUnsupportedRedis = true;
+  }
+
+  return supported;
+}
+
 function getQueue() {
+  if (!isBullMqRedisSupported()) {
+    return null;
+  }
+
   if (!executionQueue) {
     try {
       executionQueue = new Queue('workflow-executions', {
@@ -105,6 +127,12 @@ async function addExecutionJob({ workflowId, workspaceId, triggerType, triggerPa
  * Create a BullMQ worker (called from worker.js)
  */
 function createWorker(processJob) {
+  if (!isBullMqRedisSupported()) {
+    throw new Error(
+      `Worker queue requires Redis ${BULLMQ_MIN_REDIS_VERSION}+; current Redis is ${getRedisServerVersion() || 'unknown'}`
+    );
+  }
+
   const worker = new Worker('workflow-executions', processJob, {
     connection: getRedis(),
     concurrency: 5,
@@ -129,4 +157,4 @@ function createWorker(processJob) {
   return worker;
 }
 
-module.exports = { getQueue, addExecutionJob, createWorker };
+module.exports = { getQueue, addExecutionJob, createWorker, BULLMQ_MIN_REDIS_VERSION };

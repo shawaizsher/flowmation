@@ -55,6 +55,7 @@ import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
 import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
 import DynamicHeadersInput from '../components/DynamicHeadersInput';
+import NodeConfigModal from '../components/NodeConfigModal';
 import { UserAvatar } from '../components/UserAvatar';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
@@ -95,6 +96,7 @@ function EditorCanvas() {
   const [leftPanel, setLeftPanel] = useState<'nodes' | 'none'>('nodes');
   const [rightPanel, setRightPanel] = useState<'config' | 'logs' | 'versions' | 'debug' | 'ai' | 'advanced' | 'templates' | 'collaboration' | 'none'>('config');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [nodeModalOpen, setNodeModalOpen] = useState(false);
 
   // Node catalog (local)
   const [nodeSearch, setNodeSearch] = useState('');
@@ -711,7 +713,7 @@ function EditorCanvas() {
 
   const onNodeClick = useCallback((_: any, node: Node) => {
     setSelectedNode(node);
-    setRightPanel('config');
+    setNodeModalOpen(true);
 
     // Broadcast node selection
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -844,6 +846,9 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
+      // Auto-save so credentialIds are persisted before executor reads the graph from DB
+      await workflowApi.update(workspaceId, id, { name: workflowName, graph: toPersistedGraph() });
+
       const credentialsMap = buildCredentialsMap();
       const res = await workflowApi.execute(workspaceId, id, undefined, credentialsMap);
       setExecutionId(res.data.executionId);
@@ -918,6 +923,14 @@ function EditorCanvas() {
       changedNodeId: selectedNode.id,
       changedField: key,
     };
+    if (key === '__label__') {
+      setNodes((nds) =>
+        nds.map((n) => n.id === selectedNode.id ? { ...n, data: { ...n.data, label: value } } : n)
+      );
+      setSelectedNode((prev) => prev ? { ...prev, data: { ...prev.data, label: value } } : null);
+      return;
+    }
+
     if (key === 'credentialId') {
       setNodes((nds) =>
         nds.map((n) =>
@@ -952,7 +965,7 @@ function EditorCanvas() {
     }
 
     setSelectedNode(node);
-    setRightPanel('config');
+    setNodeModalOpen(true);
     reactFlowInstance.setCenter(
       node.position.x + 120,
       node.position.y + 40,
@@ -2844,6 +2857,23 @@ function EditorCanvas() {
         onClose={() => setCredModalOpen(false)}
         preselectedServiceId={credPreselectedService}
       />
+
+      {/* Node Config Modal */}
+      {nodeModalOpen && selectedNode && (
+        <NodeConfigModal
+          node={selectedNode}
+          nodes={nodes}
+          edges={edges}
+          onClose={() => setNodeModalOpen(false)}
+          onUpdateConfig={handleUpdateNodeConfig}
+          nodeOutputMap={Object.fromEntries(ioEntries.filter(e => e.output).map(e => [e.nodeId, e.output]))}
+          onOpenCredManager={(serviceId) => {
+            setNodeModalOpen(false);
+            setCredPreselectedService(serviceId);
+            setCredModalOpen(true);
+          }}
+        />
+      )}
 
       {/* ── Publish to Marketplace Modal ── */}
       {showMktModal && (

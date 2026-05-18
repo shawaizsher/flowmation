@@ -12,7 +12,7 @@ export interface NodeDefinition {
 }
 
 export interface ConfigField {
-  type: 'string' | 'number' | 'boolean' | 'select' | 'code' | 'json';
+  type: 'string' | 'number' | 'boolean' | 'select' | 'code' | 'json' | 'dynamic_headers';
   label: string;
   default?: any;
   placeholder?: string;
@@ -640,10 +640,20 @@ export const nodeCatalog: NodeDefinition[] = [
     icon: '🌐',
     color: 'text-indigo-400',
     configSchema: {
-      method: { type: 'select', label: 'Method', default: 'GET', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+      method: { type: 'select', label: 'Method', default: 'GET', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] },
       url: { type: 'string', label: 'URL', default: '', placeholder: 'https://api.example.com/data' },
-      headers: { type: 'json', label: 'Headers (JSON)', default: '{}' },
+      dynamicHeaders: { type: 'dynamic_headers', label: 'Headers', default: [] },
+      bodyType: { type: 'select', label: 'Body Type', default: 'auto', options: ['auto', 'json', 'form', 'raw'] },
       body: { type: 'code', label: 'Body', default: '' },
+      authType: { type: 'select', label: 'Auth Type', default: 'none', options: ['none', 'basic', 'bearer', 'api_key'] },
+      basicAuthUsername: { type: 'string', label: 'Username', default: '' },
+      basicAuthPassword: { type: 'string', label: 'Password', default: '' },
+      bearerToken: { type: 'string', label: 'Bearer Token', default: '' },
+      apiKeyName: { type: 'string', label: 'API Key Name', default: '' },
+      apiKeyValue: { type: 'string', label: 'API Key Value', default: '' },
+      timeout: { type: 'number', label: 'Timeout (s)', default: 30 },
+      followRedirects: { type: 'boolean', label: 'Follow Redirects', default: true },
+      returnFullResponse: { type: 'boolean', label: 'Return Full Response', default: false },
     },
   },
   {

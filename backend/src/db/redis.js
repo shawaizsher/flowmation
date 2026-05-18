@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 let redis = null;
 let redisSub = null;
 let selectedRedisUrl = null;
+let selectedRedisVersion = null;
 
 const REDIS_OPTIONS = {
   maxRetriesPerRequest: null,
@@ -59,6 +60,25 @@ function sanitizeRedisUrl(url) {
   }
 }
 
+function parseRedisVersion(info) {
+  const match = String(info || '').match(/^redis_version:([^\r\n]+)/m);
+  return match ? match[1].trim() : null;
+}
+
+function isRedisVersionAtLeast(version, minimum) {
+  const current = String(version || '').split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const required = String(minimum || '').split('.').map((part) => Number.parseInt(part, 10) || 0);
+
+  for (let i = 0; i < Math.max(current.length, required.length); i += 1) {
+    const currentPart = current[i] || 0;
+    const requiredPart = required[i] || 0;
+    if (currentPart > requiredPart) return true;
+    if (currentPart < requiredPart) return false;
+  }
+
+  return true;
+}
+
 async function probeRedis(url) {
   const probeClient = new Redis(url, {
     lazyConnect: true,
@@ -74,10 +94,11 @@ async function probeRedis(url) {
   try {
     await probeClient.connect();
     await probeClient.ping();
-    return true;
+    const info = await probeClient.info('server');
+    return { ok: true, version: parseRedisVersion(info) };
   } catch (err) {
     logger.warn(`Redis probe failed for ${sanitizeRedisUrl(url)}: ${err.message}`);
-    return false;
+    return { ok: false, version: null };
   } finally {
     try {
       await probeClient.quit();
@@ -123,9 +144,10 @@ async function initRedis() {
     const candidates = buildRedisCandidates();
 
     for (const url of candidates) {
-      const ok = await probeRedis(url);
-      if (ok) {
+      const result = await probeRedis(url);
+      if (result.ok) {
         selectedRedisUrl = url;
+        selectedRedisVersion = result.version;
         break;
       }
     }
@@ -134,7 +156,7 @@ async function initRedis() {
       throw new Error(`Unable to connect to Redis. Tried: ${candidates.map(sanitizeRedisUrl).join(', ')}`);
     }
 
-    logger.info(`Redis URL selected: ${sanitizeRedisUrl(selectedRedisUrl)}`);
+    logger.info(`Redis URL selected: ${sanitizeRedisUrl(selectedRedisUrl)}${selectedRedisVersion ? ` (${selectedRedisVersion})` : ''}`);
   }
 
   const client = getRedis();
@@ -143,4 +165,8 @@ async function initRedis() {
   return client;
 }
 
-module.exports = { getRedis, getRedisSub, initRedis };
+function getRedisServerVersion() {
+  return selectedRedisVersion;
+}
+
+module.exports = { getRedis, getRedisSub, initRedis, getRedisServerVersion, isRedisVersionAtLeast };

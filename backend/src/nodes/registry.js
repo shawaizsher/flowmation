@@ -268,6 +268,94 @@ registry.register('respondWebhook', {
 });
 
 // ═══════════════════════════════════════════════════════
+// MESSAGING NODES
+// ═══════════════════════════════════════════════════════
+
+registry.register('twilio_sms', {
+  label: 'Twilio – Send SMS',
+  description: 'Send SMS via Twilio',
+  category: 'messaging',
+  icon: '📲',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    to: { type: 'string', label: 'To Phone', default: '' },
+    body: { type: 'string', label: 'Message', default: '' },
+  },
+  execute: async ({ config, input }) => {
+    const creds = config._credentials || {};
+
+    const accountSid = creds.account_sid || config.accountSid || config.account_sid;
+    const authToken  = creds.auth_token  || config.authToken  || config.auth_token;
+    const from       = creds.from_number || config.from       || config.from_number;
+
+    if (!accountSid || !authToken || !from) {
+      throw new Error('Twilio credentials missing — connect a Twilio credential to this node (Account SID, Auth Token, From Number)');
+    }
+
+    const to   = String(config.to   || input?.to   || '').trim();
+    const body = String(config.body || input?.body || '').trim();
+
+    if (!to)   throw new Error('Twilio SMS: "to" phone number is required');
+    if (!body) throw new Error('Twilio SMS: message body is required');
+
+    const response = await axios.post(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+      {
+        auth: { username: accountSid, password: authToken },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+
+    return { sid: response.data.sid, status: response.data.status, to, body };
+  }
+});
+
+registry.register('whatsapp_send', {
+  label: 'WhatsApp – Send Message',
+  description: 'Send a WhatsApp message via Twilio or Meta API',
+  category: 'messaging',
+  icon: '📱',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    to: { type: 'string', label: 'Phone Number', default: '' },
+    message: { type: 'string', label: 'Message', default: '' },
+  },
+  execute: async ({ config, input }) => {
+    const creds = config._credentials || {};
+
+    const accountSid = creds.account_sid || config.accountSid || config.account_sid;
+    const authToken  = creds.auth_token  || config.authToken  || config.auth_token;
+    const fromRaw    = creds.from_number || config.from       || config.from_number || 'whatsapp:+14155238886';
+    const from       = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
+
+    if (!accountSid || !authToken) {
+      throw new Error('WhatsApp credentials missing — connect a Twilio credential to this node');
+    }
+
+    const rawTo = String(config.to      || input?.to      || '').trim();
+    const body  = String(config.message || input?.message || config.body || '').trim();
+    const to    = rawTo.startsWith('whatsapp:') ? rawTo : `whatsapp:${rawTo}`;
+
+    if (!rawTo) throw new Error('WhatsApp: "to" phone number is required');
+    if (!body)  throw new Error('WhatsApp: message is required');
+
+    const response = await axios.post(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+      {
+        auth: { username: accountSid, password: authToken },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+
+    return { sid: response.data.sid, status: response.data.status, to: rawTo, body };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
 // DATA TRANSFORMATION NODES
 // ═══════════════════════════════════════════════════════
 
@@ -1335,9 +1423,28 @@ registerAlias('postgres_insert', 'writeDatabase');
 registerAlias('database_insert', 'writeDatabase');
 
 registerAlias('console_log', 'consoleLog');
+registerAlias('util_logger', 'consoleLog');
 registerAlias('error_handler', 'errorHandler');
 registerAlias('wait_approval', 'waitForApproval');
 registerAlias('date_time', 'dateTime');
+registerAlias('util_date_format', 'dateTime');
 registerAlias('math_operation', 'mathOperation');
+registerAlias('logic_delay', 'delay');
+registerAlias('logic_loop', 'loop');
+registerAlias('logic_retry', 'errorHandler');
+registerAlias('logic_parallel', 'mergeData');
+registerAlias('transform_map', 'setVariable');
+registerAlias('transform_aggregate', 'mergeData');
+registerAlias('util_set_variable', 'setVariable');
+registerAlias('webhook_response', 'respondWebhook');
+registerAlias('rest_api_poll', 'httpRequest');
+registerAlias('graphql_query', 'httpRequest', {
+  execute: withConfig('httpRequest', (config) => ({
+    method: 'POST',
+    url: config.endpoint || config.url || '',
+    body: JSON.stringify({ query: config.query, variables: config.variables || {} }),
+    headers: '{"Content-Type":"application/json"}',
+  }))
+});
 
 module.exports = registry;
