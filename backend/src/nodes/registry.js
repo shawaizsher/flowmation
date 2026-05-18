@@ -287,28 +287,40 @@ registry.register('twilio_sms', {
 
     const accountSid = creds.account_sid || config.accountSid || config.account_sid;
     const authToken  = creds.auth_token  || config.authToken  || config.auth_token;
-    const from       = creds.from_number || config.from       || config.from_number;
+    const fromRaw    = creds.from_number || config.from       || config.from_number;
 
-    if (!accountSid || !authToken || !from) {
-      throw new Error('Twilio credentials missing — connect a Twilio credential to this node (Account SID, Auth Token, From Number)');
+    if (!accountSid || !authToken || !fromRaw) {
+      throw new Error('Twilio credentials missing — connect a Twilio credential (Account SID, Auth Token, From Number)');
     }
 
-    const to   = String(config.to   || input?.to   || '').trim();
-    const body = String(config.body || input?.body || '').trim();
+    const normalizePhone = (n) => {
+      const s = String(n || '').replace(/\s/g, '');
+      return s && !s.startsWith('+') ? '+' + s : s;
+    };
 
-    if (!to)   throw new Error('Twilio SMS: "to" phone number is required');
+    const to   = normalizePhone(config.to   || input?.to   || '');
+    const from = normalizePhone(fromRaw);
+    const body = String(config.body || config.message || input?.body || input?.message || '').trim();
+
+    if (!to)   throw new Error('Twilio SMS: "to" phone number is required (e.g. +12125551234)');
     if (!body) throw new Error('Twilio SMS: message body is required');
 
-    const response = await axios.post(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-      {
-        auth: { username: accountSid, password: authToken },
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }
-    );
-
-    return { sid: response.data.sid, status: response.data.status, to, body };
+    try {
+      const response = await axios.post(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+        new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+        {
+          auth: { username: accountSid, password: authToken },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
+      return { sid: response.data.sid, status: response.data.status, to, body };
+    } catch (err) {
+      const twilioMsg = err.response?.data?.message || err.response?.data?.error_message;
+      const twilioCode = err.response?.data?.code;
+      if (twilioMsg) throw new Error(`Twilio error ${twilioCode || ''}: ${twilioMsg}`);
+      throw err;
+    }
   }
 });
 
@@ -335,23 +347,34 @@ registry.register('whatsapp_send', {
       throw new Error('WhatsApp credentials missing — connect a Twilio credential to this node');
     }
 
-    const rawTo = String(config.to      || input?.to      || '').trim();
-    const body  = String(config.message || input?.message || config.body || '').trim();
-    const to    = rawTo.startsWith('whatsapp:') ? rawTo : `whatsapp:${rawTo}`;
+    const normalizePhone = (n) => {
+      const s = String(n || '').replace(/\s/g, '');
+      return s && !s.startsWith('+') ? '+' + s : s;
+    };
 
-    if (!rawTo) throw new Error('WhatsApp: "to" phone number is required');
+    const rawTo  = normalizePhone(config.to || input?.to || '');
+    const body   = String(config.message || input?.message || config.body || '').trim();
+    const to     = rawTo.startsWith('whatsapp:') ? rawTo : `whatsapp:${rawTo}`;
+
+    if (!rawTo) throw new Error('WhatsApp: "to" phone number is required (e.g. +12125551234)');
     if (!body)  throw new Error('WhatsApp: message is required');
 
-    const response = await axios.post(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-      {
-        auth: { username: accountSid, password: authToken },
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }
-    );
-
-    return { sid: response.data.sid, status: response.data.status, to: rawTo, body };
+    try {
+      const response = await axios.post(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+        new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+        {
+          auth: { username: accountSid, password: authToken },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
+      return { sid: response.data.sid, status: response.data.status, to: rawTo, body };
+    } catch (err) {
+      const twilioMsg = err.response?.data?.message || err.response?.data?.error_message;
+      const twilioCode = err.response?.data?.code;
+      if (twilioMsg) throw new Error(`Twilio error ${twilioCode || ''}: ${twilioMsg}`);
+      throw err;
+    }
   }
 });
 
