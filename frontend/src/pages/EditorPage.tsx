@@ -518,6 +518,44 @@ function EditorCanvas() {
     };
   }, [clearExecutionMonitors]);
 
+  // Highlight disconnected (unreachable) nodes with 'disconnected' status
+  useEffect(() => {
+    if (!nodes.length) return;
+
+    // Build adjacency list
+    const adj: Record<string, string[]> = {};
+    nodes.forEach(n => { adj[n.id] = []; });
+    edges.forEach(e => { if (adj[e.source]) adj[e.source].push(e.target); });
+
+    // Start BFS from trigger nodes (fallback: nodes with no incoming edges)
+    const triggers = nodes.filter(n => (n.data?.type || '').includes('trigger'));
+    const starts   = triggers.length
+      ? triggers
+      : nodes.filter(n => !edges.some(e => e.target === n.id));
+
+    const visited = new Set<string>();
+    const queue   = starts.map(n => n.id);
+    queue.forEach(id => visited.add(id));
+    while (queue.length) {
+      const curr = queue.shift()!;
+      for (const next of adj[curr] || []) {
+        if (!visited.has(next)) { visited.add(next); queue.push(next); }
+      }
+    }
+
+    // Mark unreachable nodes — but don't overwrite active execution statuses
+    setNodeStatuses((prev: Record<string, string>) => {
+      const next = { ...prev };
+      const EXEC_STATUSES = new Set(['running', 'success', 'failed', 'skipped']);
+      nodes.forEach(n => {
+        if (EXEC_STATUSES.has(prev[n.id])) return;
+        if (!visited.has(n.id)) next[n.id] = 'disconnected';
+        else if (prev[n.id] === 'disconnected') delete next[n.id];
+      });
+      return next;
+    });
+  }, [nodes, edges, setNodeStatuses]);
+
   const handleWsMessage = useCallback((msg: any) => {
     switch (msg.type) {
       case 'presence_init':

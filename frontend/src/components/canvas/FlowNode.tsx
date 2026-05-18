@@ -316,6 +316,9 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
   } else if (status === 'failed') {
     borderColor = '#EF4444';
     boxShadow   = `0 0 0 1.5px rgba(239,68,68,0.6), 0 0 22px rgba(239,68,68,0.22), ${isDark ? '0 4px 16px rgba(0,0,0,0.35)' : '0 2px 10px rgba(0,0,0,0.08)'}`;
+  } else if (status === 'disconnected') {
+    borderColor = '#F59E0B';
+    boxShadow   = `0 0 0 1.5px rgba(245,158,11,0.6), 0 0 18px rgba(245,158,11,0.18), ${isDark ? '0 4px 16px rgba(0,0,0,0.35)' : '0 2px 10px rgba(0,0,0,0.08)'}`;
   } else if (selected) {
     borderColor = vc.selectedBorder;
     boxShadow   = vc.selectedShadow;
@@ -379,6 +382,17 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             className="absolute inset-0 rounded-2xl pointer-events-none"
             style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.07) 0%, transparent 70%)' }}
           />
+        )}
+
+        {/* Disconnected warning badge */}
+        {status === 'disconnected' && (
+          <div
+            className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 rounded-full pointer-events-none"
+            style={{ background: '#F59E0B', boxShadow: '0 0 6px rgba(245,158,11,0.6)' }}
+            title="Node is disconnected from the workflow"
+          >
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#000', lineHeight: 1 }}>!</span>
+          </div>
         )}
 
         {/* Status dot */}
