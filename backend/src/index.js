@@ -1,6 +1,4 @@
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -17,34 +15,26 @@ const executionRoutes = require('./routes/executions');
 const versionRoutes = require('./routes/versions');
 const aiRoutes = require('./routes/ai');
 const nodeRoutes = require('./routes/nodes');
-const collaborationRoutes = require('./routes/collaboration');
-const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 
 // ── Middleware ──
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',').map(o => o.trim()).filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, cb) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// ── Serve frontend static files (when running as consolidated image) ──
-const publicPath = path.join(__dirname, '..', 'public');
-if (require('fs').existsSync(publicPath)) {
-  app.use(express.static(publicPath));
-  // SPA fallback: serve index.html for unknown routes (before API routes)
-  app.use((req, res, next) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/health') && !req.path.startsWith('/webhook')) {
-      res.sendFile(path.join(publicPath, 'index.html'));
-    } else {
-      next();
-    }
-  });
-}
 
 // ── Request logging ──
 app.use((req, res, next) => {
@@ -94,9 +84,7 @@ app.use('/api/workspaces/:wid/workflows', workflowRoutes);
 app.use('/api/workspaces/:wid/executions', executionRoutes);
 app.use('/api/workspaces/:wid/workflows', versionRoutes);
 app.use('/api/workspaces/:wid/ai', aiRoutes);
-app.use('/api/workspaces/:wid/collaboration', collaborationRoutes);
 app.use('/api/nodes', nodeRoutes);
-app.use('/api/admin', adminRoutes);
 
 // ── Webhook endpoint ──
 app.all('/webhook/:path', async (req, res) => {
@@ -150,46 +138,21 @@ app.use((err, req, res, next) => {
 
 // ── Start server ──
 async function start() {
-  // Database is required — fail fast if unavailable
   try {
     await initDb();
+    await initRedis();
+    await initEmail();
+    const wsManager = initWebSocket(server);
+    wsManager.initRedisSubscriber();
+
+    server.listen(PORT, () => {
+      logger.info(`🚀 Flowa backend running on port ${PORT}`);
+      logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
   } catch (err) {
-    logger.error('Fatal: cannot connect to database:', err.message);
+    logger.error('Failed to start server:', err);
     process.exit(1);
   }
-
-  // Redis is optional — server functions without it (WebSocket pub/sub disabled)
-  let redisOk = false;
-  try {
-    await initRedis();
-    redisOk = true;
-  } catch (err) {
-    logger.warn('Redis unavailable — real-time collaboration and job queue disabled:', err.message);
-    logger.warn('Start Redis to enable these features.');
-  }
-
-  // Email is optional — log but continue
-  try {
-    await initEmail();
-  } catch (err) {
-    logger.warn('Email service unavailable:', err.message);
-  }
-
-  // WebSocket init — only subscribe to Redis if it connected
-  const wsManager = initWebSocket(server);
-  if (redisOk) {
-    try {
-      wsManager.initRedisSubscriber();
-    } catch (err) {
-      logger.warn('WebSocket Redis subscriber failed:', err.message);
-    }
-  }
-
-  server.listen(PORT, () => {
-    logger.info(`🚀 Flowa backend running on port ${PORT}`);
-    logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-    if (!redisOk) logger.warn('   ⚠  Redis offline — real-time features disabled');
-  });
 }
 
 start();
