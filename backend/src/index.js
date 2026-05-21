@@ -15,6 +15,8 @@ const executionRoutes = require('./routes/executions');
 const versionRoutes = require('./routes/versions');
 const aiRoutes = require('./routes/ai');
 const nodeRoutes = require('./routes/nodes');
+const collaborationRoutes = require('./routes/collaboration');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -84,6 +86,8 @@ app.use('/api/workspaces/:wid/workflows', workflowRoutes);
 app.use('/api/workspaces/:wid/executions', executionRoutes);
 app.use('/api/workspaces/:wid/workflows', versionRoutes);
 app.use('/api/workspaces/:wid/ai', aiRoutes);
+app.use('/api/workspaces/:wid/collaboration', collaborationRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/nodes', nodeRoutes);
 
 // ── Webhook endpoint ──

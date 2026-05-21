@@ -134,74 +134,6 @@ function interpolateString(str, context) {
  *   {{$json.field}}                      — current node's input
  */
 function resolveVariables(config, context) {
-<<<<<<< Updated upstream
-  let str = JSON.stringify(config);
-
-  // Build label→id map so expressions like {{ My Node.field }} resolve correctly
-  const labelToId = {};
-  if (context.nodes) {
-    for (const n of context.nodes) {
-      const label = n.data?.label || n.id;
-      labelToId[label] = n.id;
-    }
-  }
-
-  str = str.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
-    const parts = path.trim().split('.');
-    let value;
-
-    if (parts[0] === 'trigger') {
-      value = context.triggerPayload;
-      for (let i = 1; i < parts.length; i++) {
-        if (value == null) break;
-        const arrayMatch = parts[i].match(/^(\w+)\[(\d+)\]$/);
-        if (arrayMatch) {
-          value = value[arrayMatch[1]];
-          if (Array.isArray(value)) value = value[parseInt(arrayMatch[2])];
-        } else {
-          value = value[parts[i]];
-        }
-      }
-    } else {
-      // Resolve first segment: try exact nodeId, then label→id, then label with spaces
-      // (labels can contain spaces, e.g. "JSON Parse" → parts[0]="JSON Parse" after trim)
-      // Re-join until we find a match since the label may contain dots... but dots are rare.
-      let nodeId = null;
-      let fieldStart = 1;
-
-      // Try progressively longer prefixes to handle labels with spaces reconstructed from dot-split
-      for (let end = parts.length; end >= 1; end--) {
-        const candidate = parts.slice(0, end).join('.');
-        if (context.nodeOutputs[candidate] !== undefined) {
-          nodeId = candidate;
-          fieldStart = end;
-          break;
-        }
-        if (labelToId[candidate] && context.nodeOutputs[labelToId[candidate]] !== undefined) {
-          nodeId = labelToId[candidate];
-          fieldStart = end;
-          break;
-        }
-      }
-
-      if (nodeId === null) {
-        // Last resort: first part as nodeId
-        nodeId = labelToId[parts[0]] || parts[0];
-        fieldStart = 1;
-      }
-
-      value = context.nodeOutputs[nodeId];
-      for (let i = fieldStart; i < parts.length; i++) {
-        if (value == null) break;
-        const arrayMatch = parts[i].match(/^(\w+)\[(\d+)\]$/);
-        if (arrayMatch) {
-          value = value[arrayMatch[1]];
-          if (Array.isArray(value)) value = value[parseInt(arrayMatch[2])];
-        } else {
-          value = value[parts[i]];
-        }
-      }
-=======
   const walk = (val) => {
     if (val == null) return val;
     if (typeof val === 'string') return interpolateString(val, context);
@@ -210,7 +142,6 @@ function resolveVariables(config, context) {
       const out = {};
       for (const k of Object.keys(val)) out[k] = walk(val[k]);
       return out;
->>>>>>> Stashed changes
     }
     return val;
   };
