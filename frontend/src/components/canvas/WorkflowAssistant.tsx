@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Bot, Workflow, X, Trash2, Activity, Play, CheckCircle2, Sparkles } from 'lucide-react';
-import { aiApi } from '../../utils/api';
+import { Send, Bot, Workflow, X, Trash2, Activity, Play, CheckCircle2, Sparkles, Cpu } from 'lucide-react';
+import { aiApi, ragApi } from '../../utils/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -256,8 +256,15 @@ export default function WorkflowAssistant({
   const [input, setInput]             = useState('');
   const [loading, setLoading]         = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [useRag, setUseRag]           = useState(false);
+  const [ragReady, setRagReady]       = useState<boolean | null>(null);
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
+
+  // Check RAG status on mount
+  useEffect(() => {
+    ragApi.status().then(r => setRagReady(r.data.ready)).catch(() => setRagReady(false));
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify(messages)); } catch {}
@@ -285,6 +292,28 @@ export default function WorkflowAssistant({
 
     try {
       const history = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
+
+      // RAG mode: use local HuggingFace + Groq pipeline
+      if (useRag) {
+        const isGenerate = /build|create|make|generate|workflow for|automate/i.test(trimmed);
+        const res = isGenerate
+          ? await ragApi.generate(trimmed, history)
+          : await ragApi.chat(trimmed, history);
+        const { response, workflow } = res.data;
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response,
+          workflowUpdated: !!workflow,
+          messageType: workflow ? 'workflow_update' : 'message',
+          suggestions: [],
+          metadata: {},
+        }]);
+        if (workflow) onWorkflowUpdate(workflow.nodes, workflow.edges);
+        return;
+      }
+
+      // Default: existing Claude-powered assistant
+      const actionToSend = overridePendingAction !== undefined ? overridePendingAction : pendingAction;
       const res = await aiApi.workflowChat(workspaceId, {
         message: trimmed,
         history,
@@ -293,7 +322,6 @@ export default function WorkflowAssistant({
       });
       const { reply, updatedWorkflow, messageType, suggestions, metadata } = res.data;
 
-      // Update pending action from response
       const newPending = metadata?.pendingAction ?? null;
       setPendingAction(newPending);
 
@@ -312,7 +340,7 @@ export default function WorkflowAssistant({
       setLoading(false);
       textareaRef.current?.focus();
     }
-  }, [messages, loading, workspaceId, workflowNodes, workflowEdges, onWorkflowUpdate, pendingAction]);
+  }, [messages, loading, workspaceId, workflowNodes, workflowEdges, onWorkflowUpdate, pendingAction, useRag]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
@@ -340,6 +368,19 @@ export default function WorkflowAssistant({
           </div>
         </div>
         <div className="flex items-center gap-0.5">
+          {/* RAG mode toggle */}
+          <button
+            onClick={() => setUseRag(v => !v)}
+            title={useRag ? 'Using RAG (HuggingFace + Groq) — click to switch to Claude' : 'Using Claude — click to switch to RAG (HuggingFace + Groq)'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition border ${
+              useRag
+                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                : 'border-surface-border text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            <Cpu size={11} />
+            {useRag ? (ragReady ? 'RAG' : 'RAG ⚠') : 'Claude'}
+          </button>
           <button onClick={clearHistory} title="Clear chat"
             className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-border transition">
             <Trash2 size={13} />

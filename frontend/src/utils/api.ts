@@ -318,6 +318,19 @@ export const aiApi = {
 };
 
 /* ------------------------------------------------------------------ */
+/*  RAG API                                                            */
+/* ------------------------------------------------------------------ */
+
+export const ragApi = {
+  status: () => api.get('/rag/status'),
+  ingest: () => api.post('/rag/ingest'),
+  chat: (message: string, history: { role: string; content: string }[]) =>
+    api.post('/rag/chat', { message, history }),
+  generate: (message: string, history: { role: string; content: string }[]) =>
+    api.post('/rag/generate', { message, history }),
+};
+
+/* ------------------------------------------------------------------ */
 /*  Node Catalog API                                                   */
 /* ------------------------------------------------------------------ */
 
