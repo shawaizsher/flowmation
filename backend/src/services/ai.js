@@ -142,10 +142,15 @@ OUTPUT: A single JSON object with this exact shape:
       return { type: 'invalid_input', success: false, error: 'Could not generate a valid workflow for that prompt. Try being more specific.' };
     }
 
-    // Ensure data.label mirrors label
-    graph.nodes = graph.nodes.map(n => ({
+    // Ensure position, data.label, and edge ids are present
+    graph.nodes = graph.nodes.map((n, i) => ({
       ...n,
+      position: n.position || { x: 250 + (i % 3) * 300, y: Math.floor(i / 3) * 180 + 100 },
       data: { ...(n.data || {}), label: n.label || n.data?.label || n.type, config: n.data?.config || n.config || {} }
+    }));
+    graph.edges = graph.edges.map((e, i) => ({
+      ...e,
+      id: e.id || `e${i + 1}`,
     }));
 
     return {
@@ -210,10 +215,20 @@ RESPONSE FORMAT (always valid JSON):
       return { reply: raw, messageType: 'message', updatedWorkflow: null, suggestions: [], metadata: {} };
     }
 
+    let updatedWorkflow = parsed.updatedWorkflow || null;
+    if (updatedWorkflow?.nodes) {
+      updatedWorkflow.nodes = updatedWorkflow.nodes.map((n, i) => ({
+        ...n,
+        position: n.position || { x: 250 + (i % 3) * 300, y: Math.floor(i / 3) * 180 + 100 },
+        data: { ...(n.data || {}), label: n.label || n.data?.label || n.type, config: n.data?.config || n.config || {} }
+      }));
+      updatedWorkflow.edges = (updatedWorkflow.edges || []).map((e, i) => ({ ...e, id: e.id || `e${i + 1}` }));
+    }
+
     return {
       reply: parsed.reply || raw,
       messageType: parsed.messageType || 'message',
-      updatedWorkflow: parsed.updatedWorkflow || null,
+      updatedWorkflow,
       suggestions: parsed.suggestions || [],
       metadata: parsed.metadata || {}
     };
