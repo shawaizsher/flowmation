@@ -5,9 +5,11 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "freeport": "powershell -NoProfile -Command \"Get-NetTCPConnection -State Listen -LocalPort 4000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }; exit 0\"",
+    "predev": "npm run freeport",
     "dev": "node --watch src/index.js",
     "worker": "node src/worker.js",
-    "worker:dev": "node --watch src/worker.js",
+    "worker:dev": "node --watch-path=src --watch src/worker.js",
     "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {

@@ -33,28 +33,30 @@ export default function DynamicHeadersInput({ value, onChange }: DynamicHeadersI
         <p className="text-xs text-foreground-muted/70 italic">No headers yet</p>
       ) : (
         headers.map((header, index) => (
-          <div key={index} className="flex gap-2 items-center">
-            <input
-              type="text"
-              placeholder="Header name (e.g., Authorization)"
-              value={header.key}
-              onChange={(e) => updateHeader(index, 'key', e.target.value)}
-              className="flex-1 rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
-            />
+          <div key={index} className="rounded-lg border border-surface-border bg-surface-input/30 p-2 space-y-2">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Header name (e.g., Authorization)"
+                value={header.key}
+                onChange={(e) => updateHeader(index, 'key', e.target.value)}
+                className="flex-1 rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
+              />
+              <button
+                onClick={() => removeHeader(index)}
+                className="p-2 rounded-lg text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition"
+                title="Remove header"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
             <input
               type="text"
               placeholder="Value (e.g., Bearer token123)"
               value={header.value}
               onChange={(e) => updateHeader(index, 'value', e.target.value)}
-              className="flex-1 rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
+              className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2 text-sm text-foreground outline-none focus:border-brand-500/50 transition"
             />
-            <button
-              onClick={() => removeHeader(index)}
-              className="p-2 rounded-lg text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition"
-              title="Remove header"
-            >
-              <Trash2 size={16} />
-            </button>
           </div>
         ))
       )}

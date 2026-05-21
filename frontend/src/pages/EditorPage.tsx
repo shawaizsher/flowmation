@@ -55,7 +55,7 @@ import IOPanel, { type NodeIOEntry } from '../components/canvas/IOPanel';
 import CredentialsManager from '../components/modals/CredentialsManager';
 import WorkflowAssistant from '../components/canvas/WorkflowAssistant';
 import DynamicHeadersInput from '../components/DynamicHeadersInput';
-import NodeConfigModal from '../components/NodeConfigModal';
+import NodeEditorModal from '../components/canvas/NodeEditorModal';
 import { UserAvatar } from '../components/UserAvatar';
 import { useCredentialStore, getServiceForNodeType, type SavedCredential } from '../store/credentials';
 import { nodeCatalog as allNodes, categoryMeta, searchNodes, getGroupedCatalog, type NodeDefinition } from '../data/nodeCatalog';
@@ -749,15 +749,29 @@ function EditorCanvas() {
     );
   }, [nodes, setEdges]);
 
+  // n8n-style full-screen node editor modal
+  const [nodeEditorOpen, setNodeEditorOpen] = useState(false);
+
   const onNodeClick = useCallback((_: any, node: Node) => {
     setSelectedNode(node);
-    setNodeModalOpen(true);
+    setRightPanel('config');
+    setNodeEditorOpen(true);
 
     // Broadcast node selection
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'node_select', workflowId: id, nodeId: node.id }));
     }
   }, [id]);
+
+  const handleUpdateNodeLabel = useCallback((label: string) => {
+    if (!selectedNode) return;
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === selectedNode.id ? { ...n, data: { ...n.data, label } } : n
+      )
+    );
+    setSelectedNode((prev) => (prev ? { ...prev, data: { ...prev.data, label } } : null));
+  }, [selectedNode, setNodes]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
@@ -884,8 +898,15 @@ function EditorCanvas() {
       setIoEntries(initialEntries);
       setIoVisible(true);
 
-      // Auto-save so credentialIds are persisted before executor reads the graph from DB
-      await workflowApi.update(workspaceId, id, { name: workflowName, graph: toPersistedGraph() });
+      // Auto-save current graph before executing so the worker sees fresh edits
+      try {
+        const graph = toPersistedGraph();
+        await workflowApi.update(workspaceId, id, { name: workflowName, graph });
+      } catch (saveErr: any) {
+        toast.error(saveErr.response?.data?.error || 'Failed to save before run');
+        setExecuting(false);
+        return;
+      }
 
       const credentialsMap = buildCredentialsMap();
       const res = await workflowApi.execute(workspaceId, id, undefined, credentialsMap);
@@ -953,6 +974,39 @@ function EditorCanvas() {
 
     setPaletteSourceId(null);
   };
+
+  /**
+   * Drop handler factory for config inputs. Accepts plain-text tokens dragged
+   * from the IOPanel's draggable JSON tree (e.g. `{{$node["X"].json.price}}`)
+   * and inserts them at the cursor position of the target input/textarea.
+   */
+  const makeTokenDropHandler = (key: string, current: string) => ({
+    onDragOver: (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.dataTransfer.types.includes('application/flowa-token') || e.dataTransfer.types.includes('text/plain')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        e.currentTarget.classList.add('ring-2', 'ring-brand-500/40');
+      }
+    },
+    onDragLeave: (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.currentTarget.classList.remove('ring-2', 'ring-brand-500/40');
+    },
+    onDrop: (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('ring-2', 'ring-brand-500/40');
+      const token = e.dataTransfer.getData('application/flowa-token') || e.dataTransfer.getData('text/plain');
+      if (!token) return;
+      const target = e.currentTarget;
+      const start = target.selectionStart ?? current.length;
+      const end = target.selectionEnd ?? current.length;
+      const next = current.slice(0, start) + token + current.slice(end);
+      handleUpdateNodeConfig(key, next);
+      // Restore caret after React re-renders
+      requestAnimationFrame(() => {
+        try { target.focus(); target.setSelectionRange(start + token.length, start + token.length); } catch { /* ignore */ }
+      });
+    },
+  });
 
   const handleUpdateNodeConfig = (key: string, value: any) => {
     if (!selectedNode) return;
@@ -1791,6 +1845,21 @@ function EditorCanvas() {
             visible={ioVisible}
             onToggle={() => setIoVisible(!ioVisible)}
           />
+
+          {/* n8n-style full-screen node editor — opens on node click */}
+          <NodeEditorModal
+            open={nodeEditorOpen && !!selectedNode}
+            node={selectedNode}
+            nodes={nodes}
+            edges={edges}
+            ioEntries={ioEntries}
+            onClose={() => setNodeEditorOpen(false)}
+            onUpdateConfig={handleUpdateNodeConfig}
+            onUpdateLabel={handleUpdateNodeLabel}
+            onExecuteStep={handleExecute}
+            makeTokenDropHandler={makeTokenDropHandler}
+            isExecuting={executing}
+          />
         </div>
 
         {/* Right panel — always visible */}
@@ -1818,11 +1887,13 @@ function EditorCanvas() {
                   const config = selectedNode.data.config;
                   const nodeType = selectedNode.data.type || '';
 
-                  // Field grouping for HTTP Request nodes
-                  const fieldGroups = nodeType === 'httpRequest' ? {
+                  // Field grouping for HTTP Request nodes (catalog uses snake_case,
+                  // legacy/registry uses camelCase — match both)
+                  const isHttpRequest = nodeType === 'httpRequest' || nodeType === 'http_request';
+                  const fieldGroups = isHttpRequest ? {
                     'Basic Request': ['method', 'url'],
                     'Query & Parameters': ['parameters'],
-                    'Headers': ['headers'],
+                    'Headers': ['headers', 'dynamicHeaders'],
                     'Request Body': ['body', 'bodyType'],
                     'Authentication': ['authType', 'basicAuthUsername', 'basicAuthPassword', 'bearerToken', 'apiKeyName', 'apiKeyValue'],
                     'Request Options': ['timeout', 'followRedirects', 'maxRedirects', 'responseType', 'returnFullResponse'],
@@ -1832,7 +1903,7 @@ function EditorCanvas() {
 
                   // Conditional field visibility
                   const shouldShowField = (fieldName: string, allConfig: Record<string, any>) => {
-                    if (nodeType !== 'httpRequest') return true;
+                    if (!isHttpRequest) return true;
 
                     // Show auth fields only if their auth type is selected
                     if (fieldName.startsWith('basicAuth') && allConfig.authType !== 'basic') return false;
@@ -1901,13 +1972,21 @@ function EditorCanvas() {
                                     </select>
                                   ) : key === 'dynamicHeaders' ? (
                                     <DynamicHeadersInput
-                                      value={Array.isArray(value) ? value : typeof value === 'string' ? JSON.parse(value || '[]').catch(() => []) : []}
+                                      value={(() => {
+                                        if (Array.isArray(value)) return value;
+                                        if (typeof value === 'string') {
+                                          try { const p = JSON.parse(value || '[]'); return Array.isArray(p) ? p : []; }
+                                          catch { return []; }
+                                        }
+                                        return [];
+                                      })()}
                                       onChange={(headers) => handleUpdateNodeConfig(key, headers)}
                                     />
                                   ) : (value as string)?.length > 80 || key === 'body' || key === 'headers' || key === 'parameters' ? (
                                     <textarea
                                       value={String(value ?? '')}
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                                      {...makeTokenDropHandler(key, String(value ?? ''))}
                                       className="w-full rounded-lg border border-surface-border bg-surface-input p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
                                       rows={key === 'body' ? 5 : 3}
                                       placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
@@ -1917,6 +1996,7 @@ function EditorCanvas() {
                                       type={key.includes('Password') || key.includes('Token') || key.includes('Key') ? 'password' : 'text'}
                                       value={String(value ?? '')}
                                       onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                                      {...makeTokenDropHandler(key, String(value ?? ''))}
                                       className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
                                       placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
                                     />
@@ -1946,6 +2026,7 @@ function EditorCanvas() {
                           <textarea
                             value={String(value ?? '')}
                             onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                            {...makeTokenDropHandler(key, String(value ?? ''))}
                             className="w-full rounded-lg border border-surface-border bg-surface-input p-3 font-mono text-sm text-foreground outline-none focus:border-brand-500/50 transition resize-none"
                             rows={4}
                           />
@@ -1954,6 +2035,7 @@ function EditorCanvas() {
                             type="text"
                             value={String(value ?? '')}
                             onChange={(e) => handleUpdateNodeConfig(key, e.target.value)}
+                            {...makeTokenDropHandler(key, String(value ?? ''))}
                             className="w-full rounded-lg border border-surface-border bg-surface-input px-3 py-2.5 text-sm font-medium text-foreground outline-none focus:border-brand-500/50 transition placeholder:font-normal placeholder:text-foreground-muted/50"
                             placeholder={`Enter ${formatLabel(key).toLowerCase()}…`}
                           />
@@ -2896,22 +2978,20 @@ function EditorCanvas() {
         preselectedServiceId={credPreselectedService}
       />
 
-      {/* Node Config Modal */}
-      {nodeModalOpen && selectedNode && (
-        <NodeConfigModal
-          node={selectedNode}
-          nodes={nodes}
-          edges={edges}
-          onClose={() => setNodeModalOpen(false)}
-          onUpdateConfig={handleUpdateNodeConfig}
-          nodeOutputMap={Object.fromEntries(ioEntries.filter(e => e.output).map(e => [e.nodeId, e.output]))}
-          onOpenCredManager={(serviceId) => {
-            setNodeModalOpen(false);
-            setCredPreselectedService(serviceId);
-            setCredModalOpen(true);
-          }}
-        />
-      )}
+      {/* n8n-style full-screen node editor */}
+      <NodeEditorModal
+        open={nodeEditorOpen && !!selectedNode}
+        node={selectedNode}
+        nodes={nodes}
+        edges={edges}
+        ioEntries={ioEntries}
+        onClose={() => setNodeEditorOpen(false)}
+        onUpdateConfig={handleUpdateNodeConfig}
+        onUpdateLabel={handleUpdateNodeLabel}
+        onExecuteStep={handleExecute}
+        makeTokenDropHandler={makeTokenDropHandler}
+        isExecuting={executing}
+      />
 
       {/* ── Publish to Marketplace Modal ── */}
       {showMktModal && (

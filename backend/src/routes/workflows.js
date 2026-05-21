@@ -1740,11 +1740,9 @@ router.post('/suggest-nodes', async (req, res) => {
       return res.status(400).json({ error: 'currentNodeTypes must be an array of strings' });
     }
 
-    // Collect all available node types from the registry.
-    const registeredNodes = registry.getAll ? registry.getAll() : {};
-    const allTypes = Array.isArray(registeredNodes)
-      ? registeredNodes.map((node) => node.type || node.id).filter(Boolean)
-      : Object.keys(registeredNodes);
+    // Collect all available node types from the registry. getAll() returns
+    // a plain object keyed by type — just take the keys.
+    const allTypes = registry.getAll ? Object.keys(registry.getAll()) : [];
 
     const suggestions = await suggestNodes(currentNodeTypes, allTypes, 5);
     res.json({ suggestions });

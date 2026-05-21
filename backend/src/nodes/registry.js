@@ -948,6 +948,107 @@ registry.register('slackMessage', {
   }
 });
 
+// ── Twilio: SMS ─────────────────────────────────────────────────────────────
+async function sendTwilioMessage({ accountSid, authToken, to, from, body }) {
+  if (!accountSid || !authToken) {
+    throw new Error('Twilio credentials missing — set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env (or add via Credentials Manager).');
+  }
+  const missing = [];
+  if (!to)   missing.push(`To (got: "${to ?? ''}")`);
+  if (!from) missing.push(`From (got: "${from ?? ''}")`);
+  if (!body) missing.push(`Message body (got: "${body ?? ''}")`);
+  if (missing.length) {
+    throw new Error(
+      `Twilio: missing ${missing.join(', ')}. ` +
+      `If a value was set via {{...}} placeholder, it may have resolved to empty — ` +
+      `verify the upstream node ran successfully and the path exists.`
+    );
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const params = new URLSearchParams({ To: to, From: from, Body: body });
+
+  const response = await axios.post(url, params.toString(), {
+    auth: { username: accountSid, password: authToken },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 30000,
+    validateStatus: () => true,
+  });
+
+  if (response.status >= 400) {
+    const msg = response.data?.message || JSON.stringify(response.data);
+    throw new Error(`Twilio API ${response.status}: ${msg}`);
+  }
+
+  return {
+    sid: response.data.sid,
+    status: response.data.status,
+    to: response.data.to,
+    from: response.data.from,
+    body: response.data.body,
+    success: true,
+  };
+}
+
+function resolveTwilioCreds(config) {
+  const userCreds = config._credentials || {};
+  return {
+    accountSid: userCreds.accountSid || userCreds.account_sid || config.accountSid || process.env.TWILIO_ACCOUNT_SID,
+    authToken:  userCreds.authToken  || userCreds.auth_token  || config.authToken  || process.env.TWILIO_AUTH_TOKEN,
+    fromNumber: userCreds.from_number || userCreds.fromNumber || '',
+  };
+}
+
+registry.register('twilio_sms', {
+  label: 'Send SMS (Twilio)',
+  description: 'Send an SMS message via Twilio',
+  category: 'communication',
+  icon: '📱',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    to: { type: 'text', label: 'To (E.164, e.g. +923001234567)', required: true },
+    from: { type: 'text', label: 'From (your Twilio number — leave blank to use credential default)' },
+    message: { type: 'textarea', label: 'Message', required: true },
+  },
+  execute: async ({ config }) => {
+    const { accountSid, authToken, fromNumber } = resolveTwilioCreds(config);
+    return sendTwilioMessage({
+      accountSid,
+      authToken,
+      to: config.to,
+      from: config.from || fromNumber,
+      body: config.message || config.body,
+    });
+  },
+});
+
+registry.register('twilio_whatsapp', {
+  label: 'Send WhatsApp (Twilio)',
+  description: 'Send a WhatsApp message via Twilio',
+  category: 'communication',
+  icon: '🟢',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    to: { type: 'text', label: 'To (e.g. whatsapp:+923001234567)', required: true },
+    from: { type: 'text', label: 'From (sandbox or business)', default: 'whatsapp:+14155238886' },
+    message: { type: 'textarea', label: 'Message', required: true },
+  },
+  execute: async ({ config }) => {
+    const { accountSid, authToken, fromNumber } = resolveTwilioCreds(config);
+    const ensureWaPrefix = (v) => v && !String(v).startsWith('whatsapp:') ? `whatsapp:${v}` : v;
+
+    return sendTwilioMessage({
+      accountSid,
+      authToken,
+      to: ensureWaPrefix(config.to),
+      from: ensureWaPrefix(config.from || fromNumber || 'whatsapp:+14155238886'),
+      body: config.message || config.body,
+    });
+  },
+});
+
 function parseJsonConfig(value, fallback = {}) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NodeIcon from './NodeIcon';
+import DraggableJsonTree from './DraggableJsonTree';
 
 /* ────────── Types ────────── */
 export interface NodeIOEntry {
@@ -519,6 +520,36 @@ export default function IOPanel({ entries, edges, visible, onToggle }: IOPanelPr
                       <p className="px-4 py-6 text-sm text-foreground-muted text-center">
                         No data available.
                       </p>
+                    ) : activeTab === 'output' && viewMode !== 'raw' && selectedNode ? (
+                      <div className="overflow-auto p-3 max-h-[420px]">
+                        <p className="mb-2 text-[10px] text-foreground-muted/70 italic">
+                          Drag any value into a node's config field to reference it.
+                        </p>
+                        <DraggableJsonTree data={activePayload} nodeLabel={selectedNode.nodeLabel} />
+                      </div>
+                    ) : activeTab === 'input' && viewMode !== 'raw' && selectedNode && activePayload && typeof activePayload === 'object' ? (
+                      <div className="overflow-auto p-3 max-h-[420px] space-y-3">
+                        <p className="text-[10px] text-foreground-muted/70 italic">
+                          Drag any value into a config field on the right panel.
+                        </p>
+                        {Object.entries(activePayload as Record<string, unknown>).map(([sourceId, sourceData]) => {
+                          // Look up the upstream node's label so tokens read {{$node["Real Label"]...}}
+                          const sourceLabel =
+                            sourceId === 'trigger'
+                              ? 'Trigger'
+                              : entries.find((e) => e.nodeId === sourceId)?.nodeLabel || sourceId;
+                          return (
+                            <div key={sourceId} className="rounded-md border border-surface-border bg-surface-hover/40 p-2.5">
+                              <div className="mb-1.5 flex items-center gap-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">
+                                  From: {sourceLabel}
+                                </span>
+                              </div>
+                              <DraggableJsonTree data={sourceData} nodeLabel={sourceLabel} />
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <pre className="overflow-auto p-4 whitespace-pre-wrap break-words text-[13px] leading-relaxed font-mono text-slate-700 dark:text-slate-200">
                         {viewMode === 'raw'

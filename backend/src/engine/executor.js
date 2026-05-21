@@ -3,9 +3,138 @@ const registry = require('../nodes/registry');
 const logger = require('../utils/logger');
 
 /**
- * Resolve variable interpolation in config: {{nodeId.field}} → actual value
+ * Walk a value down a sequence of "parts" (e.g. ['body', 'price'] or ['items[0]', 'name']).
+ * Supports object property access and array indexing via `key[N]`.
+ */
+function walkPath(value, parts) {
+  for (const raw of parts) {
+    if (value == null) return value;
+    const arrayMatch = raw.match(/^(\w+)\[(\d+)\]$/);
+    if (arrayMatch) {
+      value = value[arrayMatch[1]];
+      if (Array.isArray(value)) value = value[parseInt(arrayMatch[2], 10)];
+    } else {
+      value = value[raw];
+    }
+  }
+  return value;
+}
+
+/**
+ * Split a token path into segments. Handles n8n-style `$node["Some Label"].json.field`
+ * by extracting the bracketed quoted name first.
+ *  - 'trigger.body.foo'                              → ['trigger', 'body', 'foo']
+ *  - '$node["My Webhook"].json.price'                → ['$node:My Webhook', 'json', 'price']
+ *  - '$json.field'                                   → ['$json', 'field']
+ *  - 'nodeId123.field.sub'                           → ['nodeId123', 'field', 'sub']
+ */
+function tokenizePath(path) {
+  const trimmed = path.trim();
+  // n8n-style: $node["..."].rest...
+  const m = trimmed.match(/^\$node\[(['"])(.+?)\1\]\.?(.*)$/);
+  if (m) {
+    const label = m[2];
+    const rest = m[3] ? m[3].split('.').filter(Boolean) : [];
+    return [`$node:${label}`, ...rest];
+  }
+  return trimmed.split('.');
+}
+
+/**
+ * Resolve a single `{{...}}` token against the execution context.
+ * Returns the resolved value (any type) or undefined when the path doesn't exist.
+ */
+function resolveToken(rawPath, context) {
+  const outputsByLabel = context.outputsByLabel || {};
+  const currentInput  = context.currentInput || {};
+  const parts = tokenizePath(rawPath);
+  if (!parts.length) return undefined;
+  const head = parts[0];
+  const tail = parts.slice(1);
+
+  if (head === 'trigger') {
+    return walkPath(context.triggerPayload, tail);
+  }
+  if (head === '$json') {
+    const firstBucket = Object.values(currentInput)[0];
+    return walkPath(firstBucket, tail);
+  }
+  if (head.startsWith('$node:')) {
+    const label = head.slice('$node:'.length);
+    // Primary lookup: outputsByLabel (populated as nodes complete)
+    let nodeOut = outputsByLabel[label];
+    // Fallback 1: case-insensitive label match
+    if (nodeOut === undefined) {
+      const lowerLabel = label.toLowerCase();
+      const matchKey = Object.keys(outputsByLabel).find((k) => k.toLowerCase() === lowerLabel);
+      if (matchKey) nodeOut = outputsByLabel[matchKey];
+    }
+    // Fallback 2: scan the workflow's nodes for a matching label, then look up by id
+    if (nodeOut === undefined && Array.isArray(context.nodes)) {
+      const match = context.nodes.find((n) => {
+        const l = n.data?.label;
+        return l && (l === label || l.toLowerCase() === label.toLowerCase());
+      });
+      if (match) nodeOut = context.nodeOutputs[match.id];
+    }
+    // Fallback 3: maybe the user typed the node id instead of label
+    if (nodeOut === undefined && context.nodeOutputs[label] !== undefined) {
+      nodeOut = context.nodeOutputs[label];
+    }
+    if (nodeOut === undefined) {
+      logger.warn(`[resolver] No output found for $node["${label}"]. Available labels: ${Object.keys(outputsByLabel).join(', ') || '(none)'}`);
+    }
+    // Skip the optional "json"/"body" namespace
+    const skip = (tail[0] === 'json' || tail[0] === 'body') ? 1 : 0;
+    return walkPath(nodeOut, tail.slice(skip));
+  }
+  // Legacy: nodeId.field.nestedField
+  return walkPath(context.nodeOutputs[head], tail);
+}
+
+/**
+ * Replace all `{{...}}` tokens inside a string. If the entire string is a
+ * single token and the resolved value is an object/array, return the value
+ * directly so structured data flows through unchanged.
+ */
+function interpolateString(str, context) {
+  const tokenRe = /\{\{([^}]+)\}\}/g;
+
+  // Whole-string-is-a-single-token → return raw value (preserve type)
+  const wholeMatch = str.match(/^\{\{([^}]+)\}\}$/);
+  if (wholeMatch) {
+    const v = resolveToken(wholeMatch[1], context);
+    if (v === undefined) logger.warn(`[resolver] token "${wholeMatch[1]}" resolved to undefined`);
+    return v === undefined || v === null ? '' : v;
+  }
+
+  return str.replace(tokenRe, (_m, raw) => {
+    const v = resolveToken(raw, context);
+    if (v === undefined) {
+      logger.warn(`[resolver] token "${raw}" resolved to undefined`);
+      return '';
+    }
+    if (v === null) return '';
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
+  });
+}
+
+/**
+ * Resolve variable interpolation throughout a config object. Walks the object
+ * recursively and replaces `{{...}}` tokens in every string value. Avoids the
+ * JSON.stringify/parse hack so n8n-style tokens with embedded quotes
+ * (e.g. {{$node["Parse JSON"].json.price}}) work correctly.
+ *
+ * Supported syntaxes:
+ *   {{trigger.field.sub}}                — webhook/manual trigger payload
+ *   {{nodeId.field}}                     — upstream node output (by id)
+ *   {{$node["My Webhook"].json.price}}   — n8n-style by label
+ *   {{$node["My Webhook"].body.foo}}     — alias for .json.foo
+ *   {{$json.field}}                      — current node's input
  */
 function resolveVariables(config, context) {
+<<<<<<< Updated upstream
   let str = JSON.stringify(config);
 
   // Build label→id map so expressions like {{ My Node.field }} resolve correctly
@@ -72,18 +201,20 @@ function resolveVariables(config, context) {
           value = value[parts[i]];
         }
       }
+=======
+  const walk = (val) => {
+    if (val == null) return val;
+    if (typeof val === 'string') return interpolateString(val, context);
+    if (Array.isArray(val)) return val.map(walk);
+    if (typeof val === 'object') {
+      const out = {};
+      for (const k of Object.keys(val)) out[k] = walk(val[k]);
+      return out;
+>>>>>>> Stashed changes
     }
-
-    if (value === undefined || value === null) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  });
-
-  try {
-    return JSON.parse(str);
-  } catch {
-    return config;
-  }
+    return val;
+  };
+  return walk(config);
 }
 
 /**
@@ -194,10 +325,13 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
     // Build graph structures
     const { adjacency, inDegree } = buildGraph(nodes, edges);
 
-    // Context holds all node outputs
+    // Context holds all node outputs (by id AND by label for n8n-style refs)
     const context = {
       triggerPayload,
       nodeOutputs: {},
+      outputsByLabel: {},
+      currentInput: {},
+      nodes,  // for label→id resolver fallback
       executionId,
       workflowId,
       credentials,
@@ -217,6 +351,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
     // Seed triggers with payload
     for (const trigger of triggerNodes) {
       context.nodeOutputs[trigger.id] = triggerPayload;
+      const triggerLabel = trigger.data?.label;
+      if (triggerLabel) context.outputsByLabel[triggerLabel] = triggerPayload;
       completed.add(trigger.id);
 
       // Log trigger execution
@@ -327,7 +463,8 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
         }
 
         try {
-          // Resolve variables in config
+          // Resolve variables in config — expose this node's input so {{$json.x}} works
+          context.currentInput = input;
           const resolvedConfig = resolveVariables(nodeConfig, context);
 
           // ── Inject per-user credentials into config ──
@@ -371,8 +508,9 @@ async function executeWorkflow(executionId, workflowId, triggerPayload = {}, wsM
 
           const duration = Date.now() - nodeStartTime;
 
-          // Store output
+          // Store output (by id AND by label so n8n-style refs can find it)
           context.nodeOutputs[node.id] = output;
+          if (nodeLabel) context.outputsByLabel[nodeLabel] = output;
           completed.add(node.id);
 
           // Update log
