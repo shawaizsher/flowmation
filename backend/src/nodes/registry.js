@@ -1442,6 +1442,1291 @@ registry.register('mathOperation', {
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// EMAIL (SMTP – real nodemailer implementation)
+// ═══════════════════════════════════════════════════════
+
+registry.register('email_send', {
+  label: 'Send Email (SMTP)',
+  description: 'Send an email via SMTP using Nodemailer',
+  category: 'messaging',
+  icon: '📧',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    host: { type: 'text', label: 'SMTP Host', default: 'smtp.gmail.com' },
+    port: { type: 'number', label: 'Port', default: 587 },
+    to: { type: 'text', label: 'To', required: true },
+    subject: { type: 'text', label: 'Subject', required: true },
+    body: { type: 'textarea', label: 'Body (HTML)', required: true },
+    from: { type: 'text', label: 'From', default: '' }
+  },
+  execute: async ({ config }) => {
+    const nodemailer = require('nodemailer');
+    const creds = config._credentials || {};
+    const host = creds.host || config.host || process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = Number(creds.port || config.port || process.env.SMTP_PORT || 587);
+    const user = creds.user || creds.username || config.user || process.env.SMTP_USER;
+    const pass = creds.pass || creds.password || config.password || process.env.SMTP_PASS;
+    const from = config.from || creds.from || process.env.SMTP_FROM || user;
+    if (!user || !pass) throw new Error('SMTP credentials missing — set SMTP_USER and SMTP_PASS in .env or connect an Email credential');
+    const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+    const info = await transporter.sendMail({ from, to: config.to, subject: config.subject, html: config.body });
+    return { success: true, messageId: info.messageId, to: config.to, subject: config.subject };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// DISCORD
+// ═══════════════════════════════════════════════════════
+
+registry.register('discord_message', {
+  label: 'Discord – Send Message',
+  description: 'Send a message via Discord webhook',
+  category: 'messaging',
+  icon: '🎮',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    webhookUrl: { type: 'text', label: 'Webhook URL', required: true },
+    content: { type: 'textarea', label: 'Message', required: true },
+    username: { type: 'text', label: 'Username Override', default: 'Flowa Bot' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const webhookUrl = creds.webhook_url || creds.webhookUrl || config.webhookUrl;
+    if (!webhookUrl) throw new Error('Discord webhook URL is required');
+    const response = await axios.post(webhookUrl, { content: config.content, username: config.username || 'Flowa Bot' });
+    return { success: true, statusCode: response.status };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// TELEGRAM
+// ═══════════════════════════════════════════════════════
+
+registry.register('telegram_send', {
+  label: 'Telegram – Send Message',
+  description: 'Send a message via Telegram Bot API',
+  category: 'messaging',
+  icon: '✈️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    botToken: { type: 'text', label: 'Bot Token', required: true },
+    chatId: { type: 'text', label: 'Chat ID', required: true },
+    text: { type: 'textarea', label: 'Message', required: true },
+    parseMode: { type: 'select', options: ['HTML', 'Markdown', 'MarkdownV2', 'none'], default: 'HTML' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const token = creds.bot_token || creds.botToken || config.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = config.chatId || creds.chat_id;
+    if (!token) throw new Error('Telegram bot token is required');
+    if (!chatId) throw new Error('Telegram chat ID is required');
+    const response = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+      chat_id: chatId,
+      text: config.text,
+      ...(config.parseMode !== 'none' && { parse_mode: config.parseMode })
+    });
+    return { success: true, messageId: response.data.result?.message_id };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// GITHUB
+// ═══════════════════════════════════════════════════════
+
+registry.register('github_create_issue', {
+  label: 'GitHub – Create Issue',
+  description: 'Create an issue on a GitHub repo',
+  category: 'cloud',
+  icon: '🐙',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'issue', type: 'object' }],
+  configSchema: {
+    owner: { type: 'text', label: 'Owner', required: true },
+    repo: { type: 'text', label: 'Repo', required: true },
+    title: { type: 'text', label: 'Title', required: true },
+    body: { type: 'textarea', label: 'Body', default: '' },
+    labels: { type: 'text', label: 'Labels (comma-sep)', default: '' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const token = creds.token || creds.access_token || config.token || process.env.GITHUB_TOKEN;
+    if (!token) throw new Error('GitHub token required — set GITHUB_TOKEN in .env or add a GitHub credential');
+    const labels = config.labels ? config.labels.split(',').map(l => l.trim()).filter(Boolean) : [];
+    const response = await axios.post(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/issues`,
+      { title: config.title, body: config.body || '', labels },
+      { headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'Flowa-Automation' } }
+    );
+    return { success: true, issue: response.data, number: response.data.number, url: response.data.html_url };
+  }
+});
+
+registry.register('github_pr', {
+  label: 'GitHub – List PRs',
+  description: 'List pull requests from a GitHub repo',
+  category: 'cloud',
+  icon: '🔃',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'pullRequests', type: 'array' }],
+  configSchema: {
+    owner: { type: 'text', label: 'Owner', required: true },
+    repo: { type: 'text', label: 'Repo', required: true },
+    state: { type: 'select', options: ['open', 'closed', 'all'], default: 'open' },
+    limit: { type: 'number', label: 'Limit', default: 30 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const token = creds.token || creds.access_token || config.token || process.env.GITHUB_TOKEN;
+    if (!token) throw new Error('GitHub token required — set GITHUB_TOKEN in .env');
+    const response = await axios.get(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/pulls`,
+      { params: { state: config.state || 'open', per_page: Math.min(config.limit || 30, 100) }, headers: { Authorization: `token ${token}`, 'User-Agent': 'Flowa-Automation' } }
+    );
+    return { success: true, pullRequests: response.data, count: response.data.length };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// STRIPE
+// ═══════════════════════════════════════════════════════
+
+registry.register('stripe_charge', {
+  label: 'Stripe – Create Charge',
+  description: 'Create a payment charge via Stripe',
+  category: 'payments',
+  icon: '💳',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'charge', type: 'object' }],
+  configSchema: {
+    amount: { type: 'number', label: 'Amount (cents)', required: true },
+    currency: { type: 'text', label: 'Currency', default: 'usd' },
+    customerId: { type: 'text', label: 'Customer ID', default: '' },
+    source: { type: 'text', label: 'Source Token (tok_...)', default: '' },
+    description: { type: 'text', label: 'Description', default: '' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.secret_key || creds.api_key || config.apiKey || process.env.STRIPE_SECRET_KEY;
+    if (!apiKey) throw new Error('Stripe secret key required — set STRIPE_SECRET_KEY in .env');
+    const params = new URLSearchParams({ amount: String(config.amount), currency: config.currency || 'usd' });
+    if (config.description) params.append('description', config.description);
+    if (config.customerId) params.append('customer', config.customerId);
+    if (config.source) params.append('source', config.source);
+    const response = await axios.post('https://api.stripe.com/v1/charges', params.toString(), {
+      auth: { username: apiKey, password: '' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    return { success: true, charge: response.data, chargeId: response.data.id, status: response.data.status };
+  }
+});
+
+registry.register('stripe_customer', {
+  label: 'Stripe – Get Customer',
+  description: 'Retrieve a Stripe customer',
+  category: 'payments',
+  icon: '👤',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'customer', type: 'object' }],
+  configSchema: {
+    customerId: { type: 'text', label: 'Customer ID', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.secret_key || creds.api_key || config.apiKey || process.env.STRIPE_SECRET_KEY;
+    if (!apiKey) throw new Error('Stripe secret key required — set STRIPE_SECRET_KEY in .env');
+    const response = await axios.get(`https://api.stripe.com/v1/customers/${config.customerId}`, { auth: { username: apiKey, password: '' } });
+    return { success: true, customer: response.data };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// OPENAI DALL·E + WHISPER
+// ═══════════════════════════════════════════════════════
+
+registry.register('openai_image', {
+  label: 'OpenAI – DALL·E',
+  description: 'Generate images with DALL·E',
+  category: 'ai',
+  icon: '🎨',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'imageUrl', type: 'string' }, { name: 'images', type: 'array' }],
+  configSchema: {
+    prompt: { type: 'textarea', label: 'Image Prompt', required: true },
+    model: { type: 'select', options: ['dall-e-3', 'dall-e-2'], default: 'dall-e-3' },
+    size: { type: 'select', options: ['1024x1024', '1792x1024', '1024x1792', '512x512', '256x256'], default: '1024x1024' },
+    n: { type: 'number', label: 'Number of Images', default: 1 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.apiKey || creds.api_key || config.apiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API key required — set OPENAI_API_KEY in .env');
+    const OpenAI = require('openai');
+    const client = new OpenAI({ apiKey });
+    const response = await client.images.generate({ model: config.model || 'dall-e-3', prompt: config.prompt, n: config.n || 1, size: config.size || '1024x1024' });
+    const images = response.data.map(img => img.url);
+    return { success: true, imageUrl: images[0], images };
+  }
+});
+
+registry.register('whisper_transcribe', {
+  label: 'Whisper – Transcribe Audio',
+  description: 'Transcribe audio to text using OpenAI Whisper',
+  category: 'ai',
+  icon: '🎤',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'text', type: 'string' }],
+  configSchema: {
+    audioUrl: { type: 'text', label: 'Audio URL', required: true },
+    language: { type: 'text', label: 'Language', default: 'en' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.apiKey || creds.api_key || config.apiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API key required — set OPENAI_API_KEY in .env');
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const audioResponse = await axios.get(config.audioUrl, { responseType: 'arraybuffer' });
+    const ext = path.extname(config.audioUrl.split('?')[0]) || '.mp3';
+    const tmpFile = path.join(os.tmpdir(), `whisper_${Date.now()}${ext}`);
+    fs.writeFileSync(tmpFile, Buffer.from(audioResponse.data));
+    try {
+      const OpenAI = require('openai');
+      const client = new OpenAI({ apiKey });
+      const transcription = await client.audio.transcriptions.create({ file: fs.createReadStream(tmpFile), model: 'whisper-1', language: config.language || 'en' });
+      return { success: true, text: transcription.text };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch {}
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// HUGGING FACE
+// ═══════════════════════════════════════════════════════
+
+registry.register('huggingface_inference', {
+  label: 'Hugging Face – Inference',
+  description: 'Run ML models via Hugging Face Inference API',
+  category: 'ai',
+  icon: '🤗',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    model: { type: 'text', label: 'Model ID', required: true, default: 'facebook/bart-large-mnli' },
+    inputs: { type: 'textarea', label: 'Input', required: true },
+    parameters: { type: 'json', label: 'Parameters (JSON)', default: '{}' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.apiKey || creds.api_key || config.apiKey || process.env.HUGGINGFACE_API_KEY;
+    if (!apiKey) throw new Error('Hugging Face API key required — set HUGGINGFACE_API_KEY in .env');
+    let parameters = config.parameters;
+    if (typeof parameters === 'string') { try { parameters = JSON.parse(parameters); } catch { parameters = {}; } }
+    const response = await axios.post(
+      `https://api-inference.huggingface.co/models/${config.model}`,
+      { inputs: config.inputs, parameters },
+      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000 }
+    );
+    return { success: true, result: response.data };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// AIRTABLE
+// ═══════════════════════════════════════════════════════
+
+registry.register('airtable_list', {
+  label: 'Airtable – List Records',
+  description: 'List records from an Airtable base',
+  category: 'crm',
+  icon: '📋',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'records', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    baseId: { type: 'text', label: 'Base ID', required: true },
+    table: { type: 'text', label: 'Table Name', required: true },
+    view: { type: 'text', label: 'View', default: 'Grid view' },
+    maxRecords: { type: 'number', label: 'Max Records', default: 100 },
+    filterFormula: { type: 'text', label: 'Filter Formula', default: '' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || creds.apiKey || config.apiKey || process.env.AIRTABLE_API_KEY;
+    if (!apiKey) throw new Error('Airtable API key required — set AIRTABLE_API_KEY in .env');
+    const params = { view: config.view || 'Grid view', maxRecords: config.maxRecords || 100 };
+    if (config.filterFormula) params.filterByFormula = config.filterFormula;
+    const response = await axios.get(
+      `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.table)}`,
+      { headers: { Authorization: `Bearer ${apiKey}` }, params }
+    );
+    return { success: true, records: response.data.records, count: response.data.records.length };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// NOTION
+// ═══════════════════════════════════════════════════════
+
+registry.register('notion_query', {
+  label: 'Notion – Query Database',
+  description: 'Query pages from a Notion database',
+  category: 'crm',
+  icon: '📓',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'pages', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    databaseId: { type: 'text', label: 'Database ID', required: true },
+    filter: { type: 'json', label: 'Filter (JSON)', default: '{}' },
+    pageSize: { type: 'number', label: 'Page Size', default: 100 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || creds.token || config.apiKey || process.env.NOTION_API_KEY;
+    if (!apiKey) throw new Error('Notion API key required — set NOTION_API_KEY in .env');
+    let filter = config.filter;
+    if (typeof filter === 'string') { try { filter = JSON.parse(filter); } catch { filter = {}; } }
+    const body = { page_size: config.pageSize || 100, ...(Object.keys(filter || {}).length > 0 && { filter }) };
+    const response = await axios.post(
+      `https://api.notion.com/v1/databases/${config.databaseId}/query`,
+      body,
+      { headers: { Authorization: `Bearer ${apiKey}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' } }
+    );
+    return { success: true, pages: response.data.results, count: response.data.results.length, hasMore: response.data.has_more };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// MIXPANEL & SEGMENT
+// ═══════════════════════════════════════════════════════
+
+registry.register('mixpanel_track', {
+  label: 'Mixpanel – Track Event',
+  description: 'Send a tracking event to Mixpanel',
+  category: 'analytics',
+  icon: '📊',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    event: { type: 'text', label: 'Event Name', required: true },
+    distinctId: { type: 'text', label: 'Distinct ID', default: 'anonymous' },
+    properties: { type: 'json', label: 'Properties (JSON)', default: '{}' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const projectToken = creds.project_token || creds.token || config.projectToken || process.env.MIXPANEL_PROJECT_TOKEN;
+    if (!projectToken) throw new Error('Mixpanel project token required — set MIXPANEL_PROJECT_TOKEN in .env');
+    let properties = config.properties;
+    if (typeof properties === 'string') { try { properties = JSON.parse(properties); } catch { properties = {}; } }
+    const eventData = [{ event: config.event, properties: { token: projectToken, distinct_id: config.distinctId || 'anonymous', time: Math.floor(Date.now() / 1000), ...properties } }];
+    const response = await axios.post('https://api.mixpanel.com/track', `data=${Buffer.from(JSON.stringify(eventData)).toString('base64')}`, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    return { success: response.data === 1, status: response.data };
+  }
+});
+
+registry.register('segment_track', {
+  label: 'Segment – Track',
+  description: 'Send an event to Segment',
+  category: 'analytics',
+  icon: '📡',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    event: { type: 'text', label: 'Event Name', required: true },
+    userId: { type: 'text', label: 'User ID', default: '' },
+    anonymousId: { type: 'text', label: 'Anonymous ID', default: '' },
+    properties: { type: 'json', label: 'Properties (JSON)', default: '{}' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const writeKey = creds.write_key || creds.api_key || config.writeKey || process.env.SEGMENT_WRITE_KEY;
+    if (!writeKey) throw new Error('Segment write key required — set SEGMENT_WRITE_KEY in .env');
+    let properties = config.properties;
+    if (typeof properties === 'string') { try { properties = JSON.parse(properties); } catch { properties = {}; } }
+    const response = await axios.post('https://api.segment.io/v1/track', { event: config.event, userId: config.userId || undefined, anonymousId: config.anonymousId || undefined, properties, timestamp: new Date().toISOString() }, { auth: { username: writeKey, password: '' }, headers: { 'Content-Type': 'application/json' } });
+    return { success: true, statusCode: response.status };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// VERCEL DEPLOY
+// ═══════════════════════════════════════════════════════
+
+registry.register('vercel_deploy', {
+  label: 'Vercel – Trigger Deploy',
+  description: 'Trigger a Vercel deployment via deploy hook',
+  category: 'cloud',
+  icon: '▲',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    hookUrl: { type: 'text', label: 'Deploy Hook URL', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const hookUrl = creds.hook_url || config.hookUrl;
+    if (!hookUrl) throw new Error('Vercel deploy hook URL is required');
+    const response = await axios.post(hookUrl);
+    return { success: true, statusCode: response.status, job: response.data };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// FILE OPERATIONS
+// ═══════════════════════════════════════════════════════
+
+registry.register('file_read', {
+  label: 'Read File',
+  description: 'Read contents of a local file',
+  category: 'files',
+  icon: '📖',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'content', type: 'string' }, { name: 'size', type: 'number' }],
+  configSchema: {
+    path: { type: 'text', label: 'File Path', required: true },
+    encoding: { type: 'select', options: ['utf-8', 'base64', 'binary'], default: 'utf-8' }
+  },
+  execute: async ({ config }) => {
+    const fs = require('fs');
+    if (!config.path) throw new Error('File path is required');
+    const content = fs.readFileSync(config.path, config.encoding === 'binary' ? undefined : config.encoding || 'utf-8');
+    const stats = fs.statSync(config.path);
+    return { success: true, content: config.encoding === 'binary' ? Buffer.from(content).toString('base64') : content, size: stats.size, path: config.path };
+  }
+});
+
+registry.register('file_write', {
+  label: 'Write File',
+  description: 'Write contents to a file',
+  category: 'files',
+  icon: '✍️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    path: { type: 'text', label: 'File Path', required: true },
+    content: { type: 'textarea', label: 'Content', required: true },
+    mode: { type: 'select', options: ['overwrite', 'append'], default: 'overwrite' }
+  },
+  execute: async ({ config }) => {
+    const fs = require('fs');
+    if (!config.path) throw new Error('File path is required');
+    if (config.mode === 'append') fs.appendFileSync(config.path, config.content, 'utf-8');
+    else fs.writeFileSync(config.path, config.content, 'utf-8');
+    const stats = fs.statSync(config.path);
+    return { success: true, path: config.path, size: stats.size, mode: config.mode || 'overwrite' };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// REDIS COMMAND
+// ═══════════════════════════════════════════════════════
+
+registry.register('redis_command', {
+  label: 'Redis – Command',
+  description: 'Execute a Redis command',
+  category: 'databases',
+  icon: '⚡',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    url: { type: 'text', label: 'Redis URL', default: 'redis://localhost:6379' },
+    command: { type: 'text', label: 'Command (e.g. GET, SET, HGET)', required: true },
+    args: { type: 'text', label: 'Args (comma-separated)', default: '' }
+  },
+  execute: async ({ config }) => {
+    const Redis = require('ioredis');
+    const creds = config._credentials || {};
+    const url = creds.url || config.url || process.env.REDIS_URL || 'redis://localhost:6379';
+    const redis = new Redis(url, { lazyConnect: true, connectTimeout: 10000, enableOfflineQueue: false });
+    try {
+      await redis.connect();
+      const cmd = (config.command || '').toLowerCase().trim();
+      const args = config.args ? config.args.split(',').map(a => a.trim()).filter(Boolean) : [];
+      const result = await redis.call(cmd, ...args);
+      return { success: true, result };
+    } finally {
+      redis.disconnect();
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// GOOGLE APIs
+// ═══════════════════════════════════════════════════════
+
+registry.register('google_translate', {
+  label: 'Google Translate',
+  description: 'Translate text between languages',
+  category: 'google',
+  icon: '🌍',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'translatedText', type: 'string' }, { name: 'detectedLanguage', type: 'string' }],
+  configSchema: {
+    text: { type: 'textarea', label: 'Text', required: true },
+    target: { type: 'text', label: 'Target Language', default: 'en' },
+    source: { type: 'text', label: 'Source Language (blank = auto)', default: '' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || config.apiKey || process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) throw new Error('Google API key required — set GOOGLE_TRANSLATE_API_KEY in .env');
+    const response = await axios.post(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, { q: config.text, target: config.target || 'en', ...(config.source && { source: config.source }) });
+    const translation = response.data.data.translations[0];
+    return { success: true, translatedText: translation.translatedText, detectedLanguage: translation.detectedSourceLanguage || config.source };
+  }
+});
+
+registry.register('google_maps_geocode', {
+  label: 'Google Maps – Geocode',
+  description: 'Convert address to coordinates',
+  category: 'google',
+  icon: '📍',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'lat', type: 'number' }, { name: 'lng', type: 'number' }, { name: 'formattedAddress', type: 'string' }],
+  configSchema: {
+    address: { type: 'text', label: 'Address', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || config.apiKey || process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) throw new Error('Google Maps API key required — set GOOGLE_MAPS_API_KEY in .env');
+    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', { params: { address: config.address, key: apiKey } });
+    if (response.data.status !== 'OK') throw new Error(`Geocoding failed: ${response.data.status} — ${response.data.error_message || ''}`);
+    const result = response.data.results[0];
+    const { lat, lng } = result.geometry.location;
+    return { success: true, lat, lng, formattedAddress: result.formatted_address, placeId: result.place_id };
+  }
+});
+
+registry.register('youtube_search', {
+  label: 'YouTube – Search',
+  description: 'Search YouTube videos',
+  category: 'google',
+  icon: '▶️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'videos', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    query: { type: 'text', label: 'Search Query', required: true },
+    maxResults: { type: 'number', label: 'Max Results', default: 5 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || config.apiKey || process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) throw new Error('YouTube Data API key required — set YOUTUBE_API_KEY in .env');
+    const response = await axios.get('https://www.googleapis.com/youtube/v3/search', { params: { part: 'snippet', q: config.query, maxResults: config.maxResults || 5, type: 'video', key: apiKey } });
+    const videos = response.data.items.map(item => ({ videoId: item.id.videoId, title: item.snippet.title, description: item.snippet.description, channel: item.snippet.channelTitle, publishedAt: item.snippet.publishedAt, thumbnail: item.snippet.thumbnails?.default?.url, url: `https://www.youtube.com/watch?v=${item.id.videoId}` }));
+    return { success: true, videos, count: videos.length };
+  }
+});
+
+registry.register('google_vision', {
+  label: 'Google Vision AI',
+  description: 'Analyze images with Google Cloud Vision',
+  category: 'google',
+  icon: '👁️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'annotations', type: 'any' }],
+  configSchema: {
+    imageUrl: { type: 'text', label: 'Image URL', required: true },
+    features: { type: 'select', options: ['LABEL_DETECTION', 'TEXT_DETECTION', 'FACE_DETECTION', 'OBJECT_LOCALIZATION', 'SAFE_SEARCH_DETECTION'], default: 'LABEL_DETECTION' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || config.apiKey || process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) throw new Error('Google Cloud API key required — set GOOGLE_API_KEY in .env');
+    const response = await axios.post(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, { requests: [{ image: { source: { imageUri: config.imageUrl } }, features: [{ type: config.features || 'LABEL_DETECTION', maxResults: 10 }] }] });
+    return { success: true, annotations: response.data.responses[0], feature: config.features };
+  }
+});
+
+registry.register('google_sheets_read', {
+  label: 'Google Sheets – Read',
+  description: 'Read rows from a Google Spreadsheet',
+  category: 'google',
+  icon: '📊',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'rows', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    spreadsheetId: { type: 'text', label: 'Spreadsheet ID', required: true },
+    range: { type: 'text', label: 'Range', default: 'Sheet1!A1:Z100' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const apiKey = creds.api_key || config.apiKey || process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY;
+    const accessToken = creds.access_token || config.accessToken;
+    if (!apiKey && !accessToken) throw new Error('Google API key or OAuth access token required — set GOOGLE_SHEETS_API_KEY in .env');
+    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+    const params = apiKey ? { key: apiKey } : {};
+    const response = await axios.get(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${encodeURIComponent(config.range || 'Sheet1!A1:Z100')}`, { headers, params });
+    const values = response.data.values || [];
+    const [header, ...dataRows] = values;
+    const parsed = header ? dataRows.map(row => Object.fromEntries(header.map((h, i) => [h, row[i] ?? '']))) : values;
+    return { success: true, rows: parsed, rawValues: values, count: parsed.length };
+  }
+});
+
+registry.register('google_sheets_write', {
+  label: 'Google Sheets – Write',
+  description: 'Append or update rows in Google Sheets',
+  category: 'google',
+  icon: '📝',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    spreadsheetId: { type: 'text', label: 'Spreadsheet ID', required: true },
+    range: { type: 'text', label: 'Range', default: 'Sheet1!A1' },
+    mode: { type: 'select', options: ['append', 'update'], default: 'append' },
+    data: { type: 'json', label: 'Data (2D array or array of objects)', default: '[]' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken;
+    if (!accessToken) throw new Error('Google OAuth access token required for Sheets write — add a Google credential with access_token');
+    let data = config.data;
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch { data = []; } }
+    const values = Array.isArray(data[0]) ? data : data.map(row => Object.values(row));
+    const range = encodeURIComponent(config.range || 'Sheet1!A1');
+    const isAppend = config.mode !== 'update';
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${range}${isAppend ? ':append' : ''}?valueInputOption=USER_ENTERED`;
+    const response = await axios[isAppend ? 'post' : 'put'](url, { values }, { headers: { Authorization: `Bearer ${accessToken}` } });
+    return { success: true, updatedRange: response.data.updates?.updatedRange || response.data.updatedRange };
+  }
+});
+
+registry.register('google_gmail_send', {
+  label: 'Gmail – Send Email',
+  description: 'Send an email via Gmail API (OAuth)',
+  category: 'google',
+  icon: '✉️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    to: { type: 'text', label: 'To', required: true },
+    subject: { type: 'text', label: 'Subject', required: true },
+    body: { type: 'textarea', label: 'Body (HTML)', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GMAIL_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Gmail OAuth access token required — add a Google/Gmail credential with access_token');
+    const message = [`To: ${config.to}`, `Subject: ${config.subject}`, 'Content-Type: text/html; charset=utf-8', 'MIME-Version: 1.0', '', config.body].join('\r\n');
+    const encoded = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const response = await axios.post('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { raw: encoded }, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+    return { success: true, messageId: response.data.id, threadId: response.data.threadId };
+  }
+});
+
+registry.register('google_gmail_read', {
+  label: 'Gmail – Read Emails',
+  description: 'Read emails from Gmail inbox',
+  category: 'google',
+  icon: '📬',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'messages', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    query: { type: 'text', label: 'Search Query', default: 'is:unread' },
+    maxResults: { type: 'number', label: 'Max Results', default: 10 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GMAIL_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Gmail OAuth access token required');
+    const listResp = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/messages', { params: { q: config.query || 'is:unread', maxResults: config.maxResults || 10 }, headers: { Authorization: `Bearer ${accessToken}` } });
+    const messageIds = listResp.data.messages || [];
+    const messages = await Promise.all(messageIds.slice(0, 10).map(async ({ id }) => {
+      const msg = await axios.get(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject,From,Date`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const hdrs = msg.data.payload?.headers || [];
+      const get = name => hdrs.find(h => h.name === name)?.value || '';
+      return { id, subject: get('Subject'), from: get('From'), date: get('Date'), snippet: msg.data.snippet };
+    }));
+    return { success: true, messages, count: messages.length };
+  }
+});
+
+registry.register('google_calendar_create', {
+  label: 'Google Calendar – Create Event',
+  description: 'Create a new Google Calendar event',
+  category: 'google',
+  icon: '📅',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'event', type: 'object' }],
+  configSchema: {
+    summary: { type: 'text', label: 'Title', required: true },
+    startTime: { type: 'text', label: 'Start (ISO)', required: true },
+    endTime: { type: 'text', label: 'End (ISO)', required: true },
+    attendees: { type: 'text', label: 'Attendees (comma-sep emails)', default: '' },
+    calendarId: { type: 'text', label: 'Calendar ID', default: 'primary' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GOOGLE_CALENDAR_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Google OAuth access token required — add a Google Calendar credential');
+    const attendees = config.attendees ? config.attendees.split(',').map(e => ({ email: e.trim() })).filter(a => a.email) : [];
+    const event = { summary: config.summary, start: { dateTime: config.startTime, timeZone: 'UTC' }, end: { dateTime: config.endTime, timeZone: 'UTC' }, ...(attendees.length > 0 && { attendees }) };
+    const response = await axios.post(`https://www.googleapis.com/calendar/v3/calendars/${config.calendarId || 'primary'}/events`, event, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+    return { success: true, event: response.data, eventId: response.data.id, htmlLink: response.data.htmlLink };
+  }
+});
+
+registry.register('google_drive_upload', {
+  label: 'Google Drive – Upload',
+  description: 'Upload content to Google Drive',
+  category: 'google',
+  icon: '📤',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'file', type: 'object' }],
+  configSchema: {
+    fileName: { type: 'text', label: 'File Name', required: true, default: 'output.txt' },
+    content: { type: 'textarea', label: 'Content', required: true },
+    folderId: { type: 'text', label: 'Folder ID (blank = root)', default: '' },
+    mimeType: { type: 'text', label: 'MIME Type', default: 'text/plain' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Google OAuth access token required — add a Google Drive credential');
+    const metadata = { name: config.fileName, ...(config.folderId && { parents: [config.folderId] }) };
+    const boundary = 'flowa_boundary';
+    const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${config.mimeType || 'text/plain'}\r\n\r\n${config.content}\r\n--${boundary}--`;
+    const response = await axios.post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', body, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` } });
+    return { success: true, file: response.data, fileId: response.data.id, webViewLink: response.data.webViewLink };
+  }
+});
+
+registry.register('google_drive_list', {
+  label: 'Google Drive – List Files',
+  description: 'List files in a Google Drive folder',
+  category: 'google',
+  icon: '📂',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'files', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    folderId: { type: 'text', label: 'Folder ID', default: 'root' },
+    query: { type: 'text', label: 'Name Filter', default: '' },
+    maxResults: { type: 'number', label: 'Max Results', default: 50 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Google OAuth access token required');
+    let q = `'${config.folderId || 'root'}' in parents and trashed=false`;
+    if (config.query) q += ` and name contains '${config.query}'`;
+    const response = await axios.get('https://www.googleapis.com/drive/v3/files', { params: { q, pageSize: config.maxResults || 50, fields: 'files(id,name,mimeType,size,modifiedTime,webViewLink)' }, headers: { Authorization: `Bearer ${accessToken}` } });
+    return { success: true, files: response.data.files, count: response.data.files.length };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// TWITTER / X
+// ═══════════════════════════════════════════════════════
+
+registry.register('twitter_post', {
+  label: 'X (Twitter) – Post',
+  description: 'Post a tweet to X/Twitter',
+  category: 'social',
+  icon: '🐦',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'tweet', type: 'object' }],
+  configSchema: {
+    text: { type: 'textarea', label: 'Tweet Text', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const token = creds.access_token || config.accessToken || process.env.TWITTER_ACCESS_TOKEN;
+    if (!token) throw new Error('Twitter OAuth2 user access token required — set TWITTER_ACCESS_TOKEN in .env');
+    const response = await axios.post('https://api.twitter.com/2/tweets', { text: config.text }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+    return { success: true, tweet: response.data.data };
+  }
+});
+
+registry.register('twitter_search', {
+  label: 'X (Twitter) – Search',
+  description: 'Search recent tweets on X/Twitter',
+  category: 'social',
+  icon: '🔎',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'tweets', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    query: { type: 'text', label: 'Search Query', required: true },
+    count: { type: 'number', label: 'Max Results', default: 10 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const bearerToken = creds.bearer_token || config.bearerToken || process.env.TWITTER_BEARER_TOKEN;
+    if (!bearerToken) throw new Error('Twitter Bearer Token required — set TWITTER_BEARER_TOKEN in .env');
+    const response = await axios.get('https://api.twitter.com/2/tweets/search/recent', { params: { query: config.query, max_results: Math.min(Math.max(config.count || 10, 10), 100), 'tweet.fields': 'created_at,author_id,text' }, headers: { Authorization: `Bearer ${bearerToken}` } });
+    const tweets = response.data.data || [];
+    return { success: true, tweets, count: tweets.length };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// SOCIAL MEDIA
+// ═══════════════════════════════════════════════════════
+
+registry.register('instagram_post', {
+  label: 'Instagram – Post',
+  description: 'Publish a media post to Instagram via Meta Graph API',
+  category: 'social',
+  icon: '📸',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'post', type: 'object' }],
+  configSchema: {
+    imageUrl: { type: 'text', label: 'Image URL', required: true },
+    caption: { type: 'textarea', label: 'Caption', default: '' },
+    accountId: { type: 'text', label: 'Instagram Business Account ID', required: true }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.INSTAGRAM_ACCESS_TOKEN;
+    const accountId = creds.account_id || config.accountId || process.env.INSTAGRAM_ACCOUNT_ID;
+    if (!accessToken) throw new Error('Instagram access token required — set INSTAGRAM_ACCESS_TOKEN in .env');
+    if (!accountId) throw new Error('Instagram Business Account ID required');
+    const containerResp = await axios.post(`https://graph.facebook.com/v18.0/${accountId}/media`, null, { params: { image_url: config.imageUrl, caption: config.caption || '', access_token: accessToken } });
+    const publishResp = await axios.post(`https://graph.facebook.com/v18.0/${accountId}/media_publish`, null, { params: { creation_id: containerResp.data.id, access_token: accessToken } });
+    return { success: true, postId: publishResp.data.id };
+  }
+});
+
+registry.register('linkedin_post', {
+  label: 'LinkedIn – Post',
+  description: 'Share a post on LinkedIn',
+  category: 'social',
+  icon: '💼',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'post', type: 'object' }],
+  configSchema: {
+    text: { type: 'textarea', label: 'Post Text', required: true },
+    visibility: { type: 'select', options: ['PUBLIC', 'CONNECTIONS'], default: 'PUBLIC' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.LINKEDIN_ACCESS_TOKEN;
+    const personId = creds.person_id || config.personId || process.env.LINKEDIN_PERSON_ID;
+    if (!accessToken) throw new Error('LinkedIn access token required — set LINKEDIN_ACCESS_TOKEN in .env');
+    if (!personId) throw new Error('LinkedIn person URN required — set LINKEDIN_PERSON_ID in .env (e.g. urn:li:person:XXXX)');
+    const author = personId.startsWith('urn:') ? personId : `urn:li:person:${personId}`;
+    const response = await axios.post('https://api.linkedin.com/v2/ugcPosts', { author, lifecycleState: 'PUBLISHED', specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: config.text }, shareMediaCategory: 'NONE' } }, visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': config.visibility || 'PUBLIC' } }, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' } });
+    return { success: true, postId: response.data.id };
+  }
+});
+
+registry.register('reddit_post', {
+  label: 'Reddit – Submit Post',
+  description: 'Submit a post to a subreddit',
+  category: 'social',
+  icon: '🔴',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'post', type: 'object' }],
+  configSchema: {
+    subreddit: { type: 'text', label: 'Subreddit (without r/)', required: true },
+    title: { type: 'text', label: 'Title', required: true },
+    body: { type: 'textarea', label: 'Body', default: '' },
+    kind: { type: 'select', options: ['self', 'link'], default: 'self' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.REDDIT_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Reddit access token required — set REDDIT_ACCESS_TOKEN in .env (use OAuth2 flow)');
+    const response = await axios.post('https://oauth.reddit.com/api/submit', new URLSearchParams({ sr: config.subreddit, title: config.title, kind: config.kind || 'self', text: config.body || '', resubmit: 'true' }).toString(), { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Flowa-Automation/1.0' } });
+    return { success: true, post: response.data };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// PAYMENTS
+// ═══════════════════════════════════════════════════════
+
+registry.register('paypal_payment', {
+  label: 'PayPal – Create Order',
+  description: 'Create a payment order via PayPal REST API',
+  category: 'payments',
+  icon: '💰',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'order', type: 'object' }, { name: 'approvalUrl', type: 'string' }],
+  configSchema: {
+    amount: { type: 'number', label: 'Amount', required: true },
+    currency: { type: 'text', label: 'Currency', default: 'USD' },
+    description: { type: 'text', label: 'Description', default: '' },
+    sandbox: { type: 'select', options: ['true', 'false'], default: 'true' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const clientId = creds.client_id || config.clientId || process.env.PAYPAL_CLIENT_ID;
+    const secret = creds.client_secret || config.clientSecret || process.env.PAYPAL_CLIENT_SECRET;
+    if (!clientId || !secret) throw new Error('PayPal Client ID and Secret required — set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env');
+    const baseUrl = config.sandbox !== 'false' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+    const tokenResp = await axios.post(`${baseUrl}/v1/oauth2/token`, 'grant_type=client_credentials', { auth: { username: clientId, password: secret }, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    const orderResp = await axios.post(`${baseUrl}/v2/checkout/orders`, { intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: config.currency || 'USD', value: String(config.amount) }, description: config.description }] }, { headers: { Authorization: `Bearer ${tokenResp.data.access_token}`, 'Content-Type': 'application/json' } });
+    const order = orderResp.data;
+    return { success: true, order, orderId: order.id, approvalUrl: order.links?.find(l => l.rel === 'approve')?.href, status: order.status };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// CRM – SALESFORCE
+// ═══════════════════════════════════════════════════════
+
+registry.register('salesforce_query', {
+  label: 'Salesforce – SOQL Query',
+  description: 'Query Salesforce records with SOQL',
+  category: 'crm',
+  icon: '☁️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'records', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    query: { type: 'textarea', label: 'SOQL Query', required: true, default: 'SELECT Id, Name FROM Account LIMIT 10' },
+    instanceUrl: { type: 'text', label: 'Instance URL (e.g. https://org.my.salesforce.com)', default: '' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.SALESFORCE_ACCESS_TOKEN;
+    const instanceUrl = (creds.instance_url || config.instanceUrl || process.env.SALESFORCE_INSTANCE_URL || '').replace(/\/$/, '');
+    if (!accessToken) throw new Error('Salesforce access token required — set SALESFORCE_ACCESS_TOKEN in .env');
+    if (!instanceUrl) throw new Error('Salesforce instance URL required — set SALESFORCE_INSTANCE_URL in .env');
+    const response = await axios.get(`${instanceUrl}/services/data/v57.0/query`, { params: { q: config.query }, headers: { Authorization: `Bearer ${accessToken}` } });
+    return { success: true, records: response.data.records, count: response.data.totalSize, done: response.data.done };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// ANALYTICS – GOOGLE ANALYTICS
+// ═══════════════════════════════════════════════════════
+
+registry.register('google_analytics', {
+  label: 'Google Analytics – Report',
+  description: 'Fetch reports from Google Analytics GA4',
+  category: 'analytics',
+  icon: '📈',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'rows', type: 'array' }, { name: 'rowCount', type: 'number' }],
+  configSchema: {
+    propertyId: { type: 'text', label: 'GA4 Property ID', required: true },
+    startDate: { type: 'text', label: 'Start Date', default: '7daysAgo' },
+    endDate: { type: 'text', label: 'End Date', default: 'today' },
+    metrics: { type: 'text', label: 'Metrics (comma-sep)', default: 'sessions,screenPageViews' },
+    dimensions: { type: 'text', label: 'Dimensions (comma-sep)', default: 'date' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessToken = creds.access_token || config.accessToken || process.env.GOOGLE_ANALYTICS_ACCESS_TOKEN;
+    if (!accessToken) throw new Error('Google Analytics OAuth access token required — add a Google credential');
+    const metrics = (config.metrics || 'sessions').split(',').map(m => ({ name: m.trim() }));
+    const dimensions = config.dimensions ? config.dimensions.split(',').map(d => ({ name: d.trim() })) : [];
+    const response = await axios.post(`https://analyticsdata.googleapis.com/v1beta/properties/${config.propertyId}:runReport`, { dateRanges: [{ startDate: config.startDate || '7daysAgo', endDate: config.endDate || 'today' }], metrics, ...(dimensions.length > 0 && { dimensions }) }, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+    const rows = (response.data.rows || []).map(row => {
+      const obj = {};
+      (row.dimensionValues || []).forEach((v, i) => { obj[dimensions[i]?.name || `dim${i}`] = v.value; });
+      (row.metricValues || []).forEach((v, i) => { obj[metrics[i]?.name || `metric${i}`] = v.value; });
+      return obj;
+    });
+    return { success: true, rows, rowCount: response.data.rowCount || rows.length };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// DATABASES – SUPABASE, MONGODB, FIREBASE
+// ═══════════════════════════════════════════════════════
+
+registry.register('supabase_query', {
+  label: 'Supabase – Query',
+  description: 'Query data from Supabase via REST API',
+  category: 'databases',
+  icon: '⚡',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'rows', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    projectUrl: { type: 'text', label: 'Project URL', required: true },
+    table: { type: 'text', label: 'Table', required: true },
+    select: { type: 'text', label: 'Select Columns', default: '*' },
+    filter: { type: 'json', label: 'Filters (JSON: {"col": "val"})', default: '{}' },
+    limit: { type: 'number', label: 'Limit', default: 100 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const projectUrl = (creds.project_url || config.projectUrl || process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    const apiKey = creds.anon_key || creds.service_key || config.apiKey || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!projectUrl) throw new Error('Supabase project URL required — set SUPABASE_URL in .env');
+    if (!apiKey) throw new Error('Supabase API key required — set SUPABASE_ANON_KEY in .env');
+    let filter = config.filter;
+    if (typeof filter === 'string') { try { filter = JSON.parse(filter); } catch { filter = {}; } }
+    const params = new URLSearchParams({ select: config.select || '*', limit: String(config.limit || 100) });
+    Object.entries(filter || {}).forEach(([k, v]) => params.append(k, `eq.${v}`));
+    const response = await axios.get(`${projectUrl}/rest/v1/${config.table}?${params}`, { headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` } });
+    return { success: true, rows: response.data, count: response.data.length };
+  }
+});
+
+registry.register('mongodb_find', {
+  label: 'MongoDB – Find',
+  description: 'Query documents via MongoDB Atlas Data API',
+  category: 'databases',
+  icon: '🍃',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'documents', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    dataApiUrl: { type: 'text', label: 'Atlas Data API URL', required: true },
+    database: { type: 'text', label: 'Database', required: true },
+    collection: { type: 'text', label: 'Collection', required: true },
+    filter: { type: 'json', label: 'Filter (JSON)', default: '{}' },
+    limit: { type: 'number', label: 'Limit', default: 100 }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const dataApiUrl = (creds.data_api_url || config.dataApiUrl || process.env.MONGODB_DATA_API_URL || '').replace(/\/$/, '');
+    const dataApiKey = creds.data_api_key || config.dataApiKey || process.env.MONGODB_DATA_API_KEY;
+    if (!dataApiUrl) throw new Error('MongoDB Atlas Data API URL required — set MONGODB_DATA_API_URL in .env');
+    if (!dataApiKey) throw new Error('MongoDB Atlas Data API key required — set MONGODB_DATA_API_KEY in .env');
+    let filter = config.filter;
+    if (typeof filter === 'string') { try { filter = JSON.parse(filter); } catch { filter = {}; } }
+    const response = await axios.post(`${dataApiUrl}/action/find`, { dataSource: creds.cluster || config.cluster || 'Cluster0', database: config.database, collection: config.collection, filter, limit: config.limit || 100 }, { headers: { 'api-key': dataApiKey, 'Content-Type': 'application/json' } });
+    return { success: true, documents: response.data.documents, count: response.data.documents.length };
+  }
+});
+
+registry.register('firebase_read', {
+  label: 'Firebase – Read',
+  description: 'Read data from Firebase Realtime Database',
+  category: 'databases',
+  icon: '🔥',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'data', type: 'any' }],
+  configSchema: {
+    databaseUrl: { type: 'text', label: 'Database URL', required: true },
+    path: { type: 'text', label: 'Path', required: true, default: '/users' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const dbUrl = (creds.database_url || config.databaseUrl || process.env.FIREBASE_DATABASE_URL || '').replace(/\/$/, '');
+    const secret = creds.database_secret || config.databaseSecret || process.env.FIREBASE_DATABASE_SECRET;
+    if (!dbUrl) throw new Error('Firebase database URL required — set FIREBASE_DATABASE_URL in .env');
+    const url = `${dbUrl}${config.path}.json${secret ? `?auth=${secret}` : ''}`;
+    const response = await axios.get(url);
+    return { success: true, data: response.data, path: config.path };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// FILES – CSV/PDF
+// ═══════════════════════════════════════════════════════
+
+registry.register('csv_parse', {
+  label: 'CSV Parser',
+  description: 'Parse CSV text into JSON objects',
+  category: 'files',
+  icon: '📑',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'rows', type: 'array' }, { name: 'count', type: 'number' }],
+  configSchema: {
+    field: { type: 'text', label: 'Field containing CSV (blank = entire input)', default: '' },
+    delimiter: { type: 'text', label: 'Delimiter', default: ',' },
+    hasHeader: { type: 'select', options: ['true', 'false'], default: 'true' }
+  },
+  execute: async ({ config, input }) => {
+    const data = Object.values(input || {})[0] || {};
+    const raw = config.field ? (data[config.field] || '') : (typeof data === 'string' ? data : '');
+    if (!raw) return { rows: [], count: 0 };
+    const delimiter = config.delimiter || ',';
+    const lines = raw.trim().split(/\r?\n/);
+    const hasHeader = config.hasHeader !== 'false';
+    const parse = line => line.split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
+    if (hasHeader && lines.length > 1) {
+      const headers = parse(lines[0]);
+      const rows = lines.slice(1).map(line => Object.fromEntries(parse(line).map((v, i) => [headers[i] ?? i, v])));
+      return { success: true, rows, count: rows.length, headers };
+    }
+    const rows = lines.map(parse);
+    return { success: true, rows, count: rows.length };
+  }
+});
+
+registry.register('pdf_extract', {
+  label: 'PDF – Extract Text',
+  description: 'Extract text from a PDF via URL (requires pdftotext)',
+  category: 'files',
+  icon: '📄',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'text', type: 'string' }],
+  configSchema: {
+    fileUrl: { type: 'text', label: 'PDF URL', required: true }
+  },
+  execute: async ({ config }) => {
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+    const pdfResp = await axios.get(config.fileUrl, { responseType: 'arraybuffer', timeout: 30000 });
+    const tmpFile = path.join(os.tmpdir(), `flowa_pdf_${Date.now()}.pdf`);
+    fs.writeFileSync(tmpFile, Buffer.from(pdfResp.data));
+    try {
+      const { execSync } = require('child_process');
+      const text = execSync(`pdftotext "${tmpFile}" -`, { timeout: 30000, encoding: 'utf-8' });
+      return { success: true, text: text.trim() };
+    } catch {
+      return { success: false, text: '', note: 'pdftotext (poppler-utils) not installed on server — run: apt-get install poppler-utils' };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch {}
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// TRANSFORM – XML PARSE
+// ═══════════════════════════════════════════════════════
+
+registry.register('xml_parse', {
+  label: 'XML Parse',
+  description: 'Parse XML into JSON',
+  category: 'transform',
+  icon: '📰',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'parsed', type: 'any' }],
+  configSchema: {
+    field: { type: 'text', label: 'Field containing XML (blank = entire input)', default: '' }
+  },
+  execute: async ({ config, input }) => {
+    const data = Object.values(input || {})[0] || {};
+    const xmlString = config.field ? (data[config.field] || '') : (typeof data === 'string' ? data : JSON.stringify(data));
+    const parseXml = (xml) => {
+      const clean = xml.replace(/<\?[^>]+\?>/g, '').replace(/<!--[\s\S]*?-->/g, '').trim();
+      const parse = (str) => {
+        const result = {};
+        const tagRe = /<(\w[\w:.-]*)([^>]*)>([\s\S]*?)<\/\1>/g;
+        let m;
+        while ((m = tagRe.exec(str)) !== null) {
+          const [, tag, , content] = m;
+          const inner = content.trim();
+          const val = inner.includes('<') ? parse(inner) : inner;
+          if (result[tag]) { if (!Array.isArray(result[tag])) result[tag] = [result[tag]]; result[tag].push(val); } else result[tag] = val;
+        }
+        return Object.keys(result).length > 0 ? result : str.trim();
+      };
+      return parse(clean);
+    };
+    return { success: true, parsed: parseXml(xmlString) };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// AWS S3 + LAMBDA
+// ═══════════════════════════════════════════════════════
+
+registry.register('aws_s3_upload', {
+  label: 'AWS S3 – Upload',
+  description: 'Upload content to Amazon S3',
+  category: 'cloud',
+  icon: '☁️',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'url', type: 'string' }, { name: 'result', type: 'object' }],
+  configSchema: {
+    bucket: { type: 'text', label: 'Bucket Name', required: true },
+    key: { type: 'text', label: 'Object Key (file path)', required: true },
+    content: { type: 'textarea', label: 'Content', default: '' },
+    region: { type: 'text', label: 'Region', default: 'us-east-1' },
+    contentType: { type: 'text', label: 'Content Type', default: 'text/plain' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessKeyId = creds.access_key_id || creds.aws_access_key_id || config.accessKeyId || process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = creds.secret_access_key || config.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
+    if (!accessKeyId || !secretAccessKey) throw new Error('AWS credentials required — set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env');
+    const crypto = require('crypto');
+    const region = config.region || 'us-east-1';
+    const bucket = config.bucket;
+    const key = config.key;
+    const content = config.content || '';
+    const contentType = config.contentType || 'text/plain';
+    const now = new Date();
+    const date = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 8);
+    const datetime = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const sign = (k, msg) => crypto.createHmac('sha256', k).update(msg).digest();
+    const hash = msg => crypto.createHash('sha256').update(msg).digest('hex');
+    const bodyHash = hash(content);
+    const host = `${bucket}.s3.${region}.amazonaws.com`;
+    const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+    const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${bodyHash}\nx-amz-date:${datetime}\n`;
+    const canonicalRequest = `PUT\n/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${bodyHash}`;
+    const credScope = `${date}/${region}/s3/aws4_request`;
+    const stringToSign = `AWS4-HMAC-SHA256\n${datetime}\n${credScope}\n${hash(canonicalRequest)}`;
+    const signingKey = sign(sign(sign(sign(`AWS4${secretAccessKey}`, date), region), 's3'), 'aws4_request');
+    const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+    const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    await axios.put(`https://${host}/${key}`, content, { headers: { 'Content-Type': contentType, Authorization: authorization, 'x-amz-content-sha256': bodyHash, 'x-amz-date': datetime } });
+    return { success: true, url: `https://${host}/${key}`, bucket, key, region };
+  }
+});
+
+registry.register('aws_lambda_invoke', {
+  label: 'AWS Lambda – Invoke',
+  description: 'Invoke an AWS Lambda function',
+  category: 'cloud',
+  icon: 'λ',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    functionName: { type: 'text', label: 'Function Name or ARN', required: true },
+    payload: { type: 'json', label: 'Payload (JSON)', default: '{}' },
+    region: { type: 'text', label: 'Region', default: 'us-east-1' },
+    invocationType: { type: 'select', options: ['RequestResponse', 'Event', 'DryRun'], default: 'RequestResponse' }
+  },
+  execute: async ({ config }) => {
+    const creds = config._credentials || {};
+    const accessKeyId = creds.access_key_id || config.accessKeyId || process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = creds.secret_access_key || config.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
+    if (!accessKeyId || !secretAccessKey) throw new Error('AWS credentials required — set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env');
+    const crypto = require('crypto');
+    const region = config.region || 'us-east-1';
+    let payload = config.payload;
+    if (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch { payload = {}; } }
+    const body = JSON.stringify(payload || {});
+    const now = new Date();
+    const date = now.toISOString().replace(/[:-]|\.\d{3}/g, '').slice(0, 8);
+    const datetime = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const sign = (k, msg) => crypto.createHmac('sha256', k).update(msg).digest();
+    const hash = msg => crypto.createHash('sha256').update(msg).digest('hex');
+    const bodyHash = hash(body);
+    const host = `lambda.${region}.amazonaws.com`;
+    const path = `/2015-03-31/functions/${encodeURIComponent(config.functionName)}/invocations`;
+    const invocationType = config.invocationType || 'RequestResponse';
+    const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date;x-amz-invocation-type';
+    const canonicalHeaders = `content-type:application/json\nhost:${host}\nx-amz-content-sha256:${bodyHash}\nx-amz-date:${datetime}\nx-amz-invocation-type:${invocationType}\n`;
+    const canonicalRequest = `POST\n${path}\n\n${canonicalHeaders}\n${signedHeaders}\n${bodyHash}`;
+    const credScope = `${date}/${region}/lambda/aws4_request`;
+    const stringToSign = `AWS4-HMAC-SHA256\n${datetime}\n${credScope}\n${hash(canonicalRequest)}`;
+    const signingKey = sign(sign(sign(sign(`AWS4${secretAccessKey}`, date), region), 'lambda'), 'aws4_request');
+    const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+    const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    const response = await axios.post(`https://${host}${path}`, body, { headers: { 'Content-Type': 'application/json', Authorization: authorization, 'x-amz-date': datetime, 'x-amz-content-sha256': bodyHash, 'x-amz-invocation-type': invocationType } });
+    const result = typeof response.data === 'string' ? (() => { try { return JSON.parse(response.data); } catch { return response.data; } })() : response.data;
+    return { success: true, result, statusCode: response.status };
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// TRIGGER – EMAIL TRIGGER
+// ═══════════════════════════════════════════════════════
+
+registry.register('trigger_email', {
+  label: 'Email Trigger',
+  description: 'Trigger when a new email arrives (polls IMAP)',
+  category: 'triggers',
+  icon: '📩',
+  inputs: [],
+  outputs: [{ name: 'email', type: 'object' }],
+  configSchema: {
+    mailbox: { type: 'text', label: 'Mailbox', default: 'INBOX' },
+    filter: { type: 'text', label: 'Subject Filter', default: '' }
+  },
+  execute: async ({ config, context }) => {
+    // Email triggers are polled externally; this node passes through the trigger payload
+    const payload = context.triggerPayload || {};
+    return { subject: payload.subject || '', from: payload.from || '', body: payload.body || '', receivedAt: payload.receivedAt || new Date().toISOString(), mailbox: config.mailbox || 'INBOX' };
+  }
+});
+
 // Frontend and AI-generated workflows use snake_case node ids, while the
 // original runtime used camelCase ids. Register aliases so canvas/catalog nodes
 // execute instead of failing with "Unknown node type".
@@ -1570,5 +2855,55 @@ registerAlias('graphql_query', 'httpRequest', {
     headers: '{"Content-Type":"application/json"}',
   }))
 });
+
+// New node aliases
+registerAlias('discord_send', 'discord_message');
+registerAlias('telegram_message', 'telegram_send');
+registerAlias('github_issue', 'github_create_issue');
+registerAlias('github_list_prs', 'github_pr');
+registerAlias('stripe_create_charge', 'stripe_charge');
+registerAlias('stripe_get_customer', 'stripe_customer');
+registerAlias('dalle_image', 'openai_image');
+registerAlias('openai_dalle', 'openai_image');
+registerAlias('whisper', 'whisper_transcribe');
+registerAlias('huggingface', 'huggingface_inference');
+registerAlias('hf_inference', 'huggingface_inference');
+registerAlias('airtable', 'airtable_list');
+registerAlias('notion', 'notion_query');
+registerAlias('notion_database', 'notion_query');
+registerAlias('mixpanel', 'mixpanel_track');
+registerAlias('segment', 'segment_track');
+registerAlias('vercel', 'vercel_deploy');
+registerAlias('read_file', 'file_read');
+registerAlias('write_file', 'file_write');
+registerAlias('redis', 'redis_command');
+registerAlias('translate', 'google_translate');
+registerAlias('geocode', 'google_maps_geocode');
+registerAlias('youtube', 'youtube_search');
+registerAlias('vision_ai', 'google_vision');
+registerAlias('sheets_read', 'google_sheets_read');
+registerAlias('sheets_write', 'google_sheets_write');
+registerAlias('gmail_send', 'google_gmail_send');
+registerAlias('gmail_read', 'google_gmail_read');
+registerAlias('calendar_create', 'google_calendar_create');
+registerAlias('drive_list', 'google_drive_list');
+registerAlias('drive_upload', 'google_drive_upload');
+registerAlias('tweet', 'twitter_post');
+registerAlias('x_post', 'twitter_post');
+registerAlias('twitter', 'twitter_search');
+registerAlias('instagram', 'instagram_post');
+registerAlias('linkedin', 'linkedin_post');
+registerAlias('reddit', 'reddit_post');
+registerAlias('paypal', 'paypal_payment');
+registerAlias('salesforce', 'salesforce_query');
+registerAlias('ga4', 'google_analytics');
+registerAlias('supabase', 'supabase_query');
+registerAlias('mongodb', 'mongodb_find');
+registerAlias('firebase', 'firebase_read');
+registerAlias('xml', 'xml_parse');
+registerAlias('s3_upload', 'aws_s3_upload');
+registerAlias('lambda_invoke', 'aws_lambda_invoke');
+registerAlias('ftp_upload', 'file_write');
+registerAlias('soap_request', 'httpRequest');
 
 module.exports = registry;
