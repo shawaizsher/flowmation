@@ -27,8 +27,8 @@ function mkTheme(dark: boolean) {
     textDim:     dark ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.35)',
     border:      dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.09)',
     borderHover: dark ? 'rgba(246,48,73,0.25)'   : 'rgba(246,48,73,0.35)',
-    navBg:       dark ? 'rgba(0,0,0,0.85)'        : 'rgba(255,255,255,0.9)',
-    dotGrid:     dark ? 'rgba(255,255,255,0.04)'  : 'rgba(0,0,0,0.055)',
+    navBg:       dark ? 'rgba(0,0,0,0.88)'        : 'rgba(255,255,255,0.92)',
+    dotGrid:     dark ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)',
     faqBg:       (open: boolean) => open
       ? (dark ? 'rgba(246,48,73,0.04)' : 'rgba(246,48,73,0.03)')
       : (dark ? '#0a0a0a' : '#ffffff'),
@@ -113,6 +113,24 @@ const faqs = [
   { q: 'Can I connect external tools and custom APIs?',    a: 'Yes. Use the HTTP/API nodes and webhook triggers to integrate external services, then combine them with built-in nodes for orchestration.' },
 ];
 
+/* ── Tag colour rotation for use cases ── */
+const TAG_CLASSES = ['tag-brand', 'tag-cyan', 'tag-rose'];
+
+/* ── Highlight icon accent colours ── */
+const HIGHLIGHT_ACCENTS = [
+  { bg: 'rgba(246,48,73,0.08)',   border: 'rgba(246,48,73,0.15)',  color: '#F63049' },
+  { bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.15)',  color: '#06B6D4' },
+  { bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.15)',  color: '#06B6D4' },
+  { bg: 'rgba(246,48,73,0.08)',   border: 'rgba(246,48,73,0.15)',  color: '#F63049' },
+];
+
+/* ── Step number accent colours ── */
+const STEP_NUM_COLORS = [
+  'rgba(246,48,73,0.08)',
+  'rgba(6,182,212,0.07)',
+  'rgba(246,48,73,0.08)',
+];
+
 /* ── Hooks ── */
 function useTypewriter(words: string[], typingMs = 100, pauseMs = 2200, deletingMs = 60) {
   const [display, setDisplay]     = useState('');
@@ -174,8 +192,32 @@ function usePointerGlow() {
 
 /* ══════════════════════════════════════════════════════ */
 
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        setProgress(max > 0 ? Math.min(window.scrollY / max, 1) : 0);
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  return progress;
+}
+
 export default function LandingPage() {
   const pointerRef    = usePointerGlow();
+  const scrollProgress = useScrollProgress();
   const statsObs      = useInView(0.3);
   const radarObs      = useInView(0.2);
   const stepsObs      = useInView(0.2);
@@ -197,7 +239,7 @@ export default function LandingPage() {
 
   const t = mkTheme(isDark);
 
-  const typed    = useTypewriter(['Speed of Thought', 'Power of AI', 'Click of a Button', 'Scale You Need'], 90, 2000, 50);
+  const typed    = 'AI.';
   const count10x = useCountUp(10,  1500, statsObs.inView);
   const count100 = useCountUp(100, 1800, statsObs.inView);
 
@@ -210,12 +252,13 @@ export default function LandingPage() {
   return (
     <div
       ref={pointerRef}
-      className="pointer-glow-container min-h-screen overflow-hidden"
+      className="pointer-glow-container landing-shell min-h-screen overflow-hidden"
       style={{ background: t.bg, color: t.text, transition: 'background 0.4s ease, color 0.3s ease' }}
     >
-      {/* Top red line */}
-      <div className="fixed top-0 left-0 right-0 h-[2px] z-[100]"
-        style={{ background: 'linear-gradient(90deg, transparent, #F63049 30%, #F63049 70%, transparent)' }} />
+      <div
+        className="landing-scroll-progress fixed top-0 left-0 h-[3px] z-[120] origin-left"
+        style={{ transform: `scaleX(${scrollProgress})` }}
+      />
 
       {/* Pointer glow */}
       <div className="pointer-glow" aria-hidden="true" />
@@ -224,21 +267,18 @@ export default function LandingPage() {
       <div className="fixed inset-0 pointer-events-none" aria-hidden="true"
         style={{ backgroundImage: `radial-gradient(circle, ${t.dotGrid} 1px, transparent 1px)`, backgroundSize: '28px 28px', transition: 'background-image 0.4s ease' }} />
 
-      {/* Hero glow orb */}
-      <div className="fixed pointer-events-none" aria-hidden="true"
-        style={{ top: '-15%', left: '50%', transform: 'translateX(-50%)', width: '800px', height: '500px', borderRadius: '50%',
-          background: 'radial-gradient(ellipse, rgba(246,48,73,0.09) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+      <div className="landing-beams fixed inset-0 pointer-events-none" aria-hidden="true" />
+      <div className="landing-scanlines fixed inset-0 pointer-events-none" aria-hidden="true" />
 
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 border-b"
-        style={{ background: t.navBg, backdropFilter: 'blur(20px)', borderColor: t.border, transition: 'background 0.4s ease, border-color 0.4s ease' }}>
-        <div className="flex items-center justify-between px-8 py-4 max-w-7xl mx-auto animate-fade-in">
+        style={{ background: t.navBg, backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)', borderColor: t.border, transition: 'background 0.4s ease, border-color 0.4s ease' }}>
+        <div className="flex items-center justify-between px-4 sm:px-8 py-4 max-w-7xl mx-auto animate-fade-in">
           <div className="flex items-center gap-3 group cursor-default">
             <FlowaLogo size={32} className="group-hover:scale-110 transition-transform duration-300" />
             <span className="font-body text-lg font-bold tracking-tight" style={{ color: t.text }}>Flowa</span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Theme toggle */}
             <button
               onClick={() => setIsDark(d => !d)}
               className="flex items-center justify-center w-9 h-9 rounded-lg border transition-all duration-300"
@@ -249,15 +289,15 @@ export default function LandingPage() {
             </button>
             <Link
               to="/login"
-              className="text-xs px-4 py-2 rounded-lg font-medium uppercase tracking-widest transition-all duration-300"
+              className="hover-underline text-xs px-4 py-2 rounded-lg font-medium uppercase tracking-widest transition-all duration-300"
               style={{ color: t.textMuted }}
             >
               Sign In
             </Link>
             <Link
               to="/register"
-              className="btn-shimmer relative text-xs px-6 py-2.5 rounded-lg font-semibold uppercase tracking-widest transition-all duration-300 text-white border"
-              style={{ background: '#F63049', borderColor: 'rgba(246,48,73,0.5)', boxShadow: '0 4px 24px rgba(246,48,73,0.25)' }}
+              className="landing-nav-cta btn-shimmer relative text-xs px-6 py-2.5 rounded-lg font-semibold uppercase tracking-widest transition-all duration-300 text-white border"
+              style={{ background: '#F63049', borderColor: 'rgba(246,48,73,0.5)', boxShadow: '0 4px 24px rgba(246,48,73,0.28)' }}
             >
               Get Started
             </Link>
@@ -267,28 +307,29 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section
-        className="spotlight-container relative z-10 max-w-5xl mx-auto text-center pt-28 pb-20 px-6"
+        className="spotlight-container relative z-10 max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-20 px-5 sm:px-6"
         onMouseMove={handleMouseMove}
       >
         {/* Badge */}
-        <div className="relative inline-flex items-center gap-2.5 rounded-full px-5 py-2 mb-12 animate-scale-in cursor-default border"
-          style={{ borderColor: 'rgba(246,48,73,0.25)', background: 'rgba(246,48,73,0.06)', backdropFilter: 'blur(8px)' }}>
+        <div className="landing-chip relative inline-flex items-center gap-2.5 rounded-full px-5 py-2 mb-10 animate-scale-in cursor-default border"
+          style={{ borderColor: 'rgba(246,48,73,0.28)', background: 'rgba(246,48,73,0.07)', backdropFilter: 'blur(8px)' }}>
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F63049' }} />
             <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#F63049' }} />
           </span>
-          <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'rgba(246,48,73,0.9)' }}>
+          <span className="font-accent text-base" style={{ color: 'rgba(246,48,73,0.9)' }}>
             AI-Native Automation Platform
           </span>
         </div>
 
         {/* Headline */}
-        <h1 className="font-display font-bold leading-[1.1] mb-8" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)' }}>
+        <h1 className="landing-hero-title font-display font-bold leading-[1.03] mb-8" style={{ fontSize: 'clamp(2.45rem, 8.2vw, 7.25rem)' }}>
           <span className="block hero-text-reveal" style={{ color: t.text, animationDelay: '0.15s' }}>
-            Build Workflows.
+            <span className="block sm:inline">Flowa</span>{' '}
+            <span className="block sm:inline">automates work.</span>
           </span>
           <span className="block hero-text-reveal italic" style={{ color: t.text, animationDelay: '0.35s' }}>
-            At the{' '}
+            With{' '}
             <span className="not-italic" style={{ color: '#F63049' }}>
               {typed}<span className="typewriter-cursor">|</span>
             </span>
@@ -296,10 +337,10 @@ export default function LandingPage() {
         </h1>
 
         {/* Subline */}
-        <p className="text-lg md:text-xl max-w-2xl mx-auto mb-14 font-body leading-relaxed hero-text-reveal font-light"
+        <p className="landing-hero-copy text-lg md:text-xl max-w-2xl mx-auto mb-14 font-body leading-relaxed hero-text-reveal font-light"
           style={{ color: t.textMuted, animationDelay: '0.6s' }}>
           Flowa is a visual, AI-powered workflow automation platform.
-          Drag, connect, and let artificial intelligence debug your pipelines — all in real time.
+          Drag, connect, and let artificial intelligence debug your pipelines - all in real time.
         </p>
 
         {/* CTAs */}
@@ -307,7 +348,7 @@ export default function LandingPage() {
           <Link
             to="/register"
             className="cta-primary group relative inline-flex items-center gap-2 text-white px-8 py-4 rounded-xl text-sm font-bold transition-all duration-300"
-            style={{ background: '#F63049', boxShadow: '0 8px 32px rgba(246,48,73,0.35)' }}
+            style={{ background: '#F63049', boxShadow: '0 8px 36px rgba(246,48,73,0.38)' }}
           >
             <span className="relative z-10 flex items-center gap-2">
               Start Building Free <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
@@ -315,17 +356,19 @@ export default function LandingPage() {
           </Link>
           <Link
             to="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium rounded-xl px-8 py-4 border transition-all duration-300"
+            className="group inline-flex items-center gap-2 text-sm font-medium rounded-xl px-8 py-4 border transition-all duration-300"
             style={{ color: t.textMuted, borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(246,48,73,0.25)'; e.currentTarget.style.color = t.text; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textMuted; }}
           >
-            Sign In <ChevronRight size={14} />
+            Sign In <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform duration-200" />
           </Link>
         </div>
 
         {/* Terminal preview */}
-        <div className="mt-16 mx-auto max-w-lg hero-text-reveal" style={{ animationDelay: '1s' }}>
-          <div className="rounded-xl overflow-hidden border"
-            style={{ borderColor: t.border, background: t.cardBg, boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.6)' : '0 16px 48px rgba(0,0,0,0.08)', transition: 'background 0.4s ease' }}>
+        <div className="mt-16 mx-auto max-w-3xl hero-text-reveal" style={{ animationDelay: '1s' }}>
+          <div className="landing-terminal rounded-2xl overflow-hidden border"
+            style={{ borderColor: t.border, background: t.cardBg, boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(246,48,73,0.06)' : '0 16px 48px rgba(0,0,0,0.08)', transition: 'background 0.4s ease' }}>
             <div className="flex items-center gap-2 px-4 py-2.5 border-b"
               style={{ borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
               <div className="flex gap-1.5">
@@ -344,9 +387,10 @@ export default function LandingPage() {
                 <span style={{ color: t.text }}>"email-campaign"</span>
               </div>
               <div className="mt-2 flex items-center gap-2" style={{ color: '#4ade80' }}>
-                <Code2 size={12} /><span>✓ 12 nodes executed in 340ms</span>
+                <Code2 size={12} /><span>OK 12 nodes executed in 340ms</span>
               </div>
-              <div className="mt-1 ml-5" style={{ color: t.textDim }}>→ 3 branches run in parallel</div>
+              <div className="mt-1 ml-5" style={{ color: '#06B6D4' }}>-&gt; 3 branches run in parallel</div>
+              <div className="mt-1 ml-5" style={{ color: t.textDim }}>-&gt; 0 errors - 2 retries resolved</div>
             </div>
           </div>
         </div>
@@ -354,14 +398,18 @@ export default function LandingPage() {
         {/* Stats strip */}
         <div ref={statsObs.ref} className="mt-20 grid grid-cols-3 gap-8 max-w-lg mx-auto">
           {[
-            { value: `${count10x}x`, label: 'Faster Builds' },
-            { value: `${count100}%`, label: 'Self-Hosted' },
-            { value: '∞',            label: 'Workflows' },
+            { value: `${count10x}x`, label: 'Faster Builds',  accent: '#F63049' },
+            { value: `${count100}%`, label: 'Self-Hosted',     accent: '#06B6D4' },
+            { value: '24/7',          label: 'Workflows',       accent: '#F63049' },
           ].map((stat, i) => (
             <div key={stat.label}
-              className={`text-center transition-all duration-700 ${statsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+              className={`relative text-center transition-all duration-700 ${statsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
               style={{ transitionDelay: `${i * 150}ms` }}>
-              <div className="font-display text-3xl md:text-4xl font-extrabold mb-1" style={{ color: t.text }}>{stat.value}</div>
+              {i > 0 && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-10 w-px -translate-x-4"
+                  style={{ background: `linear-gradient(to bottom, transparent, ${t.border}, transparent)` }} />
+              )}
+              <div className="font-display text-3xl md:text-4xl font-extrabold mb-1" style={{ color: stat.accent }}>{stat.value}</div>
               <div className="text-xs font-medium uppercase tracking-widest" style={{ color: t.textDim }}>{stat.label}</div>
             </div>
           ))}
@@ -369,13 +417,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── Radar / Integrations showcase ── */}
-      <section ref={radarObs.ref} className="relative z-10 py-20 overflow-hidden">
+      <section ref={radarObs.ref} className="landing-section relative z-10 py-20 overflow-hidden">
         <div className="text-center mb-4">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest transition-all duration-700 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}>
-            INTEGRATIONS
+          <span className={`inline-block font-accent text-xl mb-1 transition-all duration-700 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}>
+            Integrations
           </span>
-          <h2 className={`font-display text-3xl md:text-4xl font-bold mt-2 transition-all duration-700 delay-100 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+          <h2 className={`font-display text-3xl md:text-4xl font-bold mt-1 transition-all duration-700 delay-100 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
             style={{ color: t.text }}>
             Connects with your ecosystem
           </h2>
@@ -388,17 +436,14 @@ export default function LandingPage() {
         {/* Radar canvas */}
         <div className={`relative mx-auto flex items-center justify-center transition-all duration-1000 ${radarObs.inView ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
           style={{ width: '480px', height: '380px', maxWidth: '100%' }}>
-          {/* Centered radar */}
           <Radar className="w-[380px] h-[380px]" />
 
-          {/* Floating icons */}
           {radarIcons.map((item, i) => (
             <div key={i} className={`absolute ${item.pos}`}>
               <IconContainer icon={item.icon} text={item.text} delay={item.delay} isDark={isDark} />
             </div>
           ))}
 
-          {/* Center Flowa logo */}
           <div className="absolute z-50 flex flex-col items-center gap-1">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl border"
               style={{ background: isDark ? 'rgba(246,48,73,0.12)' : 'rgba(246,48,73,0.08)', borderColor: 'rgba(246,48,73,0.3)' }}>
@@ -412,7 +457,7 @@ export default function LandingPage() {
       {/* ── Marquee ── */}
       <section className="relative z-10 py-10 overflow-hidden border-y"
         style={{ borderColor: t.border, transition: 'border-color 0.4s ease' }}>
-        <p className="text-center text-xs font-body font-light uppercase tracking-[0.2em] mb-8" style={{ color: t.textDim }}>
+        <p className="text-center font-accent text-base mb-7" style={{ color: t.textDim }}>
           Connects with your favorite tools
         </p>
         <div className="marquee-track">
@@ -434,10 +479,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── How It Works ── */}
-      <section ref={stepsObs.ref} className="relative z-10 max-w-5xl mx-auto px-6 py-28">
+      <section ref={stepsObs.ref} className="landing-section relative z-10 max-w-5xl mx-auto px-6 py-28">
         <div className="text-center mb-20">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}>HOW IT WORKS</span>
+          <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}>How it works</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Three steps to<br />
@@ -447,19 +492,19 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
           <div className={`hidden md:block absolute top-14 left-[16%] right-[16%] h-px transition-all duration-1000 delay-500 ${stepsObs.inView ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}`}>
-            <div className="h-full w-full animated-line" style={{ background: 'linear-gradient(90deg, rgba(246,48,73,0.4), rgba(246,48,73,0.15), rgba(246,48,73,0.05))' }} />
+            <div className="h-full w-full animated-line" style={{ background: 'linear-gradient(90deg, rgba(246,48,73,0.4), rgba(6,182,212,0.25), rgba(246,48,73,0.08))' }} />
           </div>
 
           {steps.map((s, i) => (
             <div key={s.num}
               className={`relative group transition-all duration-700 rounded-2xl p-8 border ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
               style={{ transitionDelay: `${400 + i * 200}ms`, background: t.cardBg, borderColor: t.border }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = t.borderHover; e.currentTarget.style.transform = 'translateY(-4px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; }}>
-              <span className="absolute top-4 right-5 text-5xl font-bold font-display leading-none select-none" style={{ color: 'rgba(246,48,73,0.06)' }}>{s.num}</span>
+              onMouseEnter={e => { e.currentTarget.style.borderColor = t.borderHover; e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = isDark ? '0 20px 50px rgba(0,0,0,0.5)' : '0 12px 32px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
+              <span className="absolute top-3 right-4 text-6xl font-bold font-display leading-none select-none" style={{ color: STEP_NUM_COLORS[i] }}>{s.num}</span>
               <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 border transition-all duration-300"
-                style={{ background: 'rgba(246,48,73,0.06)', borderColor: 'rgba(246,48,73,0.15)' }}>
-                <s.icon size={22} style={{ color: 'rgba(246,48,73,0.8)' }} />
+                style={{ background: i === 1 ? 'rgba(6,182,212,0.07)' : 'rgba(246,48,73,0.06)', borderColor: i === 1 ? 'rgba(6,182,212,0.15)' : 'rgba(246,48,73,0.15)' }}>
+                <s.icon size={22} style={{ color: i === 1 ? '#06B6D4' : 'rgba(246,48,73,0.8)' }} />
               </div>
               <h3 className="font-display text-xl font-bold mb-3" style={{ color: t.text }}>{s.title}</h3>
               <p className="text-sm font-body leading-relaxed font-light" style={{ color: t.textMuted }}>{s.desc}</p>
@@ -469,13 +514,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── Workflow Animation ── */}
-      <section ref={workflowObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-24">
+      <section ref={workflowObs.ref} className="landing-section relative z-10 max-w-4xl mx-auto px-6 pb-24">
         <div className="text-center mb-12">
           <span
-            className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}
+            className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}
           >
-            LIVE PREVIEW
+            Live Preview
           </span>
           <h2
             className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
@@ -496,7 +541,6 @@ export default function LandingPage() {
           className={`rounded-3xl border p-6 md:p-10 overflow-x-auto transition-all duration-700 delay-200 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
           style={{ background: t.cardBg, borderColor: t.border }}
         >
-          {/* Running badge */}
           <div className="flex items-center gap-2 mb-6">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#10b981' }} />
@@ -520,10 +564,10 @@ export default function LandingPage() {
       </div>
 
       {/* ── Features ── */}
-      <section ref={featObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 py-28">
+      <section ref={featObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 py-28">
         <div className="text-center mb-20">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}>CORE CAPABILITIES</span>
+          <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}>Core Capabilities</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Everything you need.<br />
@@ -538,7 +582,8 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
             <div key={f.title}
-              className={`feature-card group p-7 rounded-2xl border transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              className={`feature-card card-gradient-border group p-7 rounded-2xl border transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              onMouseMove={handleMouseMove}
               style={{ transitionDelay: `${300 + i * 100}ms`, background: t.cardBg, borderColor: t.border }}>
               <div className="feature-card-glow" />
               <div className="relative z-10">
@@ -563,30 +608,33 @@ export default function LandingPage() {
       </section>
 
       {/* ── Platform Highlights ── */}
-      <section ref={highlightsObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+      <section ref={highlightsObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 pb-28">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {platformHighlights.map((item, i) => (
-            <div key={item.title}
-              className={`rounded-2xl p-6 border transition-all duration-700 ${highlightsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-              style={{ transitionDelay: `${i * 120}ms`, background: t.cardBg, borderColor: t.border }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = t.borderHover; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; }}>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 border"
-                style={{ background: 'rgba(246,48,73,0.08)', borderColor: 'rgba(246,48,73,0.15)' }}>
-                <item.icon size={20} style={{ color: '#F63049' }} />
+          {platformHighlights.map((item, i) => {
+            const accent = HIGHLIGHT_ACCENTS[i];
+            return (
+              <div key={item.title}
+                className={`rounded-2xl p-6 border transition-all duration-700 ${highlightsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+                style={{ transitionDelay: `${i * 120}ms`, background: t.cardBg, borderColor: t.border }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = t.borderHover; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; }}>
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 border"
+                  style={{ background: accent.bg, borderColor: accent.border }}>
+                  <item.icon size={20} style={{ color: accent.color }} />
+                </div>
+                <h3 className="font-display text-lg font-bold mb-2" style={{ color: t.text }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: t.textMuted }}>{item.desc}</p>
               </div>
-              <h3 className="font-display text-lg font-bold mb-2" style={{ color: t.text }}>{item.title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: t.textMuted }}>{item.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
       {/* ── Use Cases ── */}
-      <section ref={useCasesObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+      <section ref={useCasesObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 pb-28">
         <div className="text-center mb-14">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}>USE CASES</span>
+          <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}>Use Cases</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Built for real work.<br />
@@ -612,9 +660,10 @@ export default function LandingPage() {
               <h3 className="font-display text-lg font-bold mb-2" style={{ color: t.text }}>{item.title}</h3>
               <p className="text-sm leading-relaxed mb-4" style={{ color: t.textMuted }}>{item.desc}</p>
               <div className="flex flex-wrap gap-2">
-                {item.tags.map(tag => (
-                  <span key={tag} className="text-xs font-medium px-2.5 py-1 rounded-full border"
-                    style={{ borderColor: t.tagBorder, color: t.tagColor, background: t.tagBg }}>{tag}</span>
+                {item.tags.map((tag, ti) => (
+                  <span key={tag} className={`text-xs font-medium px-2.5 py-1 rounded-full border ${TAG_CLASSES[ti % TAG_CLASSES.length]}`}>
+                    {tag}
+                  </span>
                 ))}
               </div>
             </div>
@@ -623,13 +672,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── Day One Value ── */}
-      <section ref={valueObs.ref} className="relative z-10 max-w-6xl mx-auto px-6 pb-28">
+      <section ref={valueObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 pb-28">
         <div className={`rounded-3xl p-8 md:p-10 border transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
           style={{ background: t.cardBg, borderColor: t.border }}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
             <div>
-              <span className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-                style={{ color: 'rgba(246,48,73,0.7)' }}>WHAT YOU GET</span>
+              <span className={`inline-block font-accent text-xl mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+                style={{ color: 'rgba(246,48,73,0.75)' }}>What You Get</span>
               <h2 className={`font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-4 transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ color: t.text }}>
                 Everything you need.<br />
@@ -645,9 +694,9 @@ export default function LandingPage() {
                 <div key={item}
                   className={`flex items-start gap-3 rounded-xl px-4 py-3.5 border transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
                   style={{ transitionDelay: `${220 + i * 90}ms`, borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(246,48,73,0.18)')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = i % 2 === 0 ? 'rgba(246,48,73,0.18)' : 'rgba(6,182,212,0.18)')}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = t.border)}>
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0" style={{ color: 'rgba(246,48,73,0.75)' }} />
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0" style={{ color: i % 2 === 0 ? 'rgba(246,48,73,0.75)' : 'rgba(6,182,212,0.75)' }} />
                   <span className="text-sm leading-relaxed font-light" style={{ color: t.textMuted }}>{item}</span>
                 </div>
               ))}
@@ -657,10 +706,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQ ── */}
-      <section ref={faqObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28">
+      <section ref={faqObs.ref} className="landing-section relative z-10 max-w-4xl mx-auto px-6 pb-28">
         <div className="text-center mb-12">
-          <span className={`inline-block text-xs font-semibold uppercase tracking-widest mb-4 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.7)' }}>FAQ</span>
+          <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            style={{ color: 'rgba(246,48,73,0.75)' }}>FAQ</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Questions teams ask before{' '}
@@ -689,11 +738,11 @@ export default function LandingPage() {
       </section>
 
       {/* ── Manifesto ── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-20">
+      <section className="landing-section relative z-10 max-w-5xl mx-auto px-6 pb-20">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center rounded-3xl p-10 md:p-14 border"
           style={{ background: t.cardBg, borderColor: t.border }}>
           <div>
-            <span className="inline-block text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: 'rgba(246,48,73,0.7)' }}>Our Belief</span>
+            <span className="inline-block font-accent text-xl mb-6" style={{ color: 'rgba(246,48,73,0.75)' }}>Our Belief</span>
             <h2 className="font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-6" style={{ color: t.text }}>
               We used to build things.<br />
               <span className="italic" style={{ color: '#F63049' }}>Then we automated them.</span>
@@ -714,31 +763,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section ref={ctaObs.ref} className="relative z-10 max-w-4xl mx-auto px-6 pb-28 text-center">
-        <div className={`rounded-3xl p-14 relative overflow-hidden border transition-all duration-1000 ${ctaObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-          style={{ background: t.cardBg, borderColor: t.border }}>
-          <div className="absolute inset-0 pointer-events-none rounded-3xl"
-            style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(246,48,73,0.1) 0%, transparent 60%)' }} />
-          <div className="relative z-10">
-            <h2 className="font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-5" style={{ color: t.text }}>
+      {/* ── CTA — full-bleed dark section ── */}
+      <section ref={ctaObs.ref} className="relative z-10 overflow-hidden">
+        <div className="cta-full-section relative">
+          {/* Radial mesh top glow */}
+          <div className="cta-radial-mesh" aria-hidden="true" />
+
+          {/* Decorative rings */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden" aria-hidden="true">
+            <div style={{ width: 700, height: 700, borderRadius: '50%', border: '1px solid rgba(246,48,73,0.06)', position: 'absolute' }} />
+            <div style={{ width: 950, height: 950, borderRadius: '50%', border: '1px solid rgba(6,182,212,0.04)', position: 'absolute' }} />
+            <div style={{ width: 1200, height: 1200, borderRadius: '50%', border: '1px solid rgba(246,48,73,0.03)', position: 'absolute' }} />
+          </div>
+
+          <div className={`max-w-4xl mx-auto px-6 py-32 md:py-44 text-center relative z-10 transition-all duration-1000 ${ctaObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-8 border"
+              style={{ borderColor: 'rgba(246,48,73,0.3)', background: 'rgba(246,48,73,0.08)' }}>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F63049' }} />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#F63049' }} />
+              </span>
+              <span className="font-accent text-base" style={{ color: 'rgba(246,48,73,0.9)' }}>Free to start · Self-hosted</span>
+            </div>
+
+            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] mb-6 text-white">
               Ready to automate?<br />
               <span className="italic" style={{ color: '#F63049' }}>Let's build.</span>
             </h2>
-            <p className="mb-10 max-w-md mx-auto font-body text-base font-light" style={{ color: t.textMuted }}>
+            <p className="mb-10 max-w-md mx-auto font-body text-base font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
               Create your free account and start building intelligent workflows in seconds.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/register"
                 className="cta-primary group relative inline-flex items-center gap-2 text-white px-10 py-4 rounded-xl text-sm font-bold transition-all duration-300"
-                style={{ background: '#F63049', boxShadow: '0 8px 32px rgba(246,48,73,0.35)' }}>
+                style={{ background: '#F63049', boxShadow: '0 8px 40px rgba(246,48,73,0.45)' }}>
                 <span className="relative z-10 flex items-center gap-2">
                   Get Started Free <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
                 </span>
               </Link>
               <a href="https://github.com" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-sm font-medium transition-colors duration-200"
-                style={{ color: t.textMuted }}>
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}>
                 <Sparkles size={14} /> Star on GitHub
               </a>
             </div>
@@ -748,16 +815,28 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <footer ref={footerObs.ref} className="relative z-10 py-12 border-t" style={{ borderColor: t.border }}>
-        <div className={`max-w-7xl mx-auto px-8 flex items-center justify-between transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-          <div className="flex items-center gap-3">
-            <FlowaLogo size={22} />
-            <span className="font-body text-sm font-medium" style={{ color: t.textDim }}>
-              Flowa &copy; {new Date().getFullYear()}
+        <div className={`max-w-7xl mx-auto px-8 transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <FlowaLogo size={22} />
+              <span className="font-body text-sm font-medium" style={{ color: t.textDim }}>
+                Flowa &copy; {new Date().getFullYear()}
+              </span>
+            </div>
+            <div className="flex items-center gap-6">
+              {['Features', 'Integrations', 'Docs', 'GitHub'].map(label => (
+                <span key={label} className="text-xs font-body font-light cursor-default transition-colors duration-200"
+                  style={{ color: t.textDim }}
+                  onMouseEnter={e => (e.currentTarget.style.color = t.textMuted)}
+                  onMouseLeave={e => (e.currentTarget.style.color = t.textDim)}>
+                  {label}
+                </span>
+              ))}
+            </div>
+            <span className="text-xs font-body font-light uppercase tracking-widest" style={{ color: t.textDim }}>
+              AI-Native Workflow Automation
             </span>
           </div>
-          <span className="text-xs font-body font-light uppercase tracking-widest" style={{ color: t.textDim }}>
-            AI-Native Workflow Automation
-          </span>
         </div>
       </footer>
     </div>
