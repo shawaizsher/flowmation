@@ -1462,11 +1462,24 @@ button, a {
     linear-gradient(160deg, #06010a 0%, #020109 35%, #01060a 65%, #060103 100%);
 }
 
+.light .cta-full-section,
+:root:not(.dark) .cta-full-section {
+  background:
+    radial-gradient(ellipse at 20% 60%, rgba(246,48,73,0.09) 0%, transparent 48%),
+    radial-gradient(ellipse at 80% 40%, rgba(6,182,212,0.08) 0%, transparent 50%),
+    linear-gradient(160deg, #fff7f8 0%, #ffffff 38%, #f0fbff 72%, #ffffff 100%);
+}
+
 .cta-radial-mesh {
   position: absolute;
   inset: 0;
   background: radial-gradient(ellipse at 50% -20%, rgba(246,48,73,0.22) 0%, transparent 52%);
   pointer-events: none;
+}
+
+.light .cta-radial-mesh,
+:root:not(.dark) .cta-radial-mesh {
+  background: radial-gradient(ellipse at 50% -20%, rgba(246,48,73,0.12) 0%, transparent 54%);
 }
 
 /* ── Colored tag pills for use cases ── */

@@ -763,7 +763,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA — full-bleed dark section ── */}
+      {/* ── CTA ── */}
       <section ref={ctaObs.ref} className="relative z-10 overflow-hidden">
         <div className="cta-full-section relative">
           {/* Radial mesh top glow */}
@@ -786,11 +786,14 @@ export default function LandingPage() {
               <span className="font-accent text-base" style={{ color: 'rgba(246,48,73,0.9)' }}>Free to start · Self-hosted</span>
             </div>
 
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] mb-6 text-white">
+            <h2
+              className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] mb-6"
+              style={{ color: t.text }}
+            >
               Ready to automate?<br />
               <span className="italic" style={{ color: '#F63049' }}>Let's build.</span>
             </h2>
-            <p className="mb-10 max-w-md mx-auto font-body text-base font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <p className="mb-10 max-w-md mx-auto font-body text-base font-light" style={{ color: t.textMuted }}>
               Create your free account and start building intelligent workflows in seconds.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -803,9 +806,9 @@ export default function LandingPage() {
               </Link>
               <a href="https://github.com" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-sm font-medium transition-colors duration-200"
-                style={{ color: 'rgba(255,255,255,0.5)' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}>
+                style={{ color: t.textMuted }}
+                onMouseEnter={e => (e.currentTarget.style.color = t.text)}
+                onMouseLeave={e => (e.currentTarget.style.color = t.textMuted)}>
                 <Sparkles size={14} /> Star on GitHub
               </a>
             </div>
