@@ -242,14 +242,150 @@ function buildKnowledgeBase() {
 
 function buildPatternDocs() {
   const patterns = [
-    ['webhook_sms', 'Receive webhook then send SMS. Use trigger_webhook -> twilio_sms. Map trigger.body.phone to "to" and trigger.body.message to "message".', ['webhook', 'twilio', 'sms']],
-    ['webhook_email', 'Receive webhook then send email. Use trigger_webhook -> email_send. Map trigger.body fields to to, subject, body.', ['webhook', 'email']],
-    ['schedule_api', 'Run on a schedule and call an API. Use trigger_cron with a cron expression -> http_request.', ['cron', 'api']],
-    ['ai_classify_route', 'Classify incoming text with AI and route it. Use trigger_webhook -> ai_text_classifier -> logic_if, then connect true and false branches.', ['ai', 'routing']],
-    ['hubspot_lead', 'CRM lead capture. Use trigger_webhook -> hubspot_contact -> slack_message to notify the team.', ['crm', 'hubspot', 'slack']],
-    ['monitor_site', 'Website monitoring. Use trigger_cron -> http_request -> logic_if statusCode not_equals 200 -> slack_message.', ['monitoring', 'slack']],
-    ['gpt_webhook', 'AI chatbot webhook. Use trigger_webhook -> openai_chat or anthropic_chat -> respond_webhook.', ['ai', 'webhook']],
-    ['error_handler', 'Error handling. Add error_handler or retry-oriented logic around risky HTTP/API/database nodes.', ['errors', 'retry']],
+    // ── Messaging ──────────────────────────────────────────────────────────
+    ['webhook_sms',
+      'Receive a webhook and send an SMS. Nodes: trigger_webhook → twilio_sms. ' +
+      'Config: set twilio_sms.to={{trigger.body.phone}}, message={{trigger.body.message}}. ' +
+      'Requires Twilio credentials (accountSid, authToken, fromNumber).',
+      ['webhook', 'twilio', 'sms', 'text', 'message']],
+
+    ['webhook_email',
+      'Receive a webhook and send an email. Nodes: trigger_webhook → email_send. ' +
+      'Config: to={{trigger.body.email}}, subject={{trigger.body.subject}}, body={{trigger.body.message}}. ' +
+      'Use sendEmail or google_gmail_send node.',
+      ['webhook', 'email', 'send', 'gmail', 'smtp']],
+
+    ['webhook_slack',
+      'Post a Slack notification when a webhook fires. Nodes: trigger_webhook → slack_send. ' +
+      'Config: channel="#alerts", text="New event: {{trigger.body.message}}". ' +
+      'Requires Slack Bot Token credential.',
+      ['webhook', 'slack', 'notify', 'channel', 'alert']],
+
+    ['webhook_discord',
+      'Post a Discord message when a webhook fires. Nodes: trigger_webhook → discord_send. ' +
+      'Config: webhookUrl from Discord server settings, content={{trigger.body.message}}.',
+      ['webhook', 'discord', 'notify', 'message']],
+
+    ['webhook_telegram',
+      'Send a Telegram message when a webhook fires. Nodes: trigger_webhook → telegram_send. ' +
+      'Config: chatId={{trigger.body.chatId}}, text={{trigger.body.message}}. Requires BOT_TOKEN.',
+      ['webhook', 'telegram', 'notify', 'message']],
+
+    // ── Scheduling ─────────────────────────────────────────────────────────
+    ['schedule_api',
+      'Call an external API on a schedule. Nodes: trigger_cron → http_request. ' +
+      'Config: cron="0 9 * * *" for daily at 9am. Set http_request.url and method.',
+      ['cron', 'schedule', 'api', 'http', 'interval']],
+
+    ['schedule_email_report',
+      'Send a daily email report. Nodes: trigger_cron → http_request (fetch data) → email_send. ' +
+      'Config: cron="0 8 * * 1-5" for weekdays 8am. Format the body with {{http_request.body}}.',
+      ['cron', 'schedule', 'email', 'report', 'daily']],
+
+    ['schedule_db_export',
+      'Export database records on a schedule. Nodes: trigger_cron → postgres_query → email_send or file_write. ' +
+      'Config: query="SELECT * FROM orders WHERE created_at > NOW() - INTERVAL \'1 day\'".',
+      ['cron', 'schedule', 'database', 'postgres', 'export']],
+
+    // ── AI / LLM ───────────────────────────────────────────────────────────
+    ['ai_classify_route',
+      'Classify text with AI and branch on the result. Nodes: trigger_webhook → ai_text_classifier → logic_if. ' +
+      'Connect the true branch to one action and false to another. ' +
+      'Config: ai_text_classifier.categories=["urgent","normal"], logic_if checks {{ai_text_classifier.label}}.',
+      ['ai', 'classify', 'route', 'branch', 'logic', 'conditional']],
+
+    ['gpt_webhook',
+      'AI chatbot that responds to webhook requests. Nodes: trigger_webhook → openai_chat → respond_webhook. ' +
+      'Config: openai_chat.prompt={{trigger.body.message}}, model="gpt-4o". ' +
+      'Use anthropic_chat for Claude instead.',
+      ['ai', 'openai', 'chatbot', 'webhook', 'response', 'gpt']],
+
+    ['ai_summarize_email',
+      'Summarize content with AI then email the result. Nodes: trigger_webhook → ai_summarize → email_send. ' +
+      'Config: ai_summarize.text={{trigger.body.content}}, email body={{ai_summarize.summary}}.',
+      ['ai', 'summarize', 'email', 'summary']],
+
+    ['ai_image_generate',
+      'Generate an image with DALL-E from a prompt. Nodes: trigger_webhook → openai_dalle → respond_webhook. ' +
+      'Config: openai_dalle.prompt={{trigger.body.prompt}}, size="1024x1024". ' +
+      'Returns imageUrl in the response.',
+      ['ai', 'dalle', 'image', 'generate', 'openai']],
+
+    ['ai_translate',
+      'Translate text using Google Translate. Nodes: trigger_webhook → google_translate → respond_webhook. ' +
+      'Config: text={{trigger.body.text}}, target="es" for Spanish.',
+      ['translate', 'google', 'language', 'ai']],
+
+    // ── CRM / Sales ────────────────────────────────────────────────────────
+    ['hubspot_lead',
+      'Capture a CRM lead then notify Slack. Nodes: trigger_webhook → hubspot_contact → slack_send. ' +
+      'Config: hubspot_contact.email={{trigger.body.email}}, firstname={{trigger.body.name}}. ' +
+      'Slack message: "New lead: {{trigger.body.name}}".',
+      ['crm', 'hubspot', 'lead', 'slack', 'sales']],
+
+    ['stripe_hubspot_slack',
+      'On new Stripe payment, create HubSpot deal and notify Slack. ' +
+      'Nodes: trigger_webhook → stripe_charge (verify) → hubspot_create_deal → slack_send. ' +
+      'Map trigger.body.amount and customer email from Stripe payload.',
+      ['stripe', 'payment', 'hubspot', 'deal', 'slack', 'crm']],
+
+    // ── Monitoring ─────────────────────────────────────────────────────────
+    ['monitor_site',
+      'Monitor a website and alert on downtime. Nodes: trigger_cron → http_request → logic_if → slack_send. ' +
+      'Config: cron="*/5 * * * *", logic_if condition: {{http_request.statusCode}} != 200, ' +
+      'slack channel="#ops-alerts".',
+      ['monitoring', 'uptime', 'http', 'slack', 'alert', 'cron']],
+
+    ['monitor_db_threshold',
+      'Alert when a database metric exceeds a threshold. Nodes: trigger_cron → postgres_query → logic_if → slack_send. ' +
+      'Config: query counts records; logic_if checks {{postgres_query.rows[0].count}} > 1000.',
+      ['monitoring', 'database', 'postgres', 'threshold', 'alert', 'slack']],
+
+    // ── Data Processing ────────────────────────────────────────────────────
+    ['loop_email_list',
+      'Loop over a list and send personalised emails. Nodes: trigger_webhook → loop_for_each → email_send. ' +
+      'Config: loop_for_each.items={{trigger.body.contacts}}, email to={{$json.email}}, body="Hi {{$json.name}}".',
+      ['loop', 'email', 'list', 'personalise', 'batch']],
+
+    ['sheets_to_slack',
+      'Read a Google Sheet and post a summary to Slack. Nodes: trigger_cron → google_sheets_read → ai_summarize → slack_send. ' +
+      'Config: sheets_read.spreadsheetId and range="Sheet1!A1:Z100".',
+      ['sheets', 'google', 'slack', 'report', 'summarize']],
+
+    ['csv_parse_email',
+      'Parse a CSV payload and process each row. Nodes: trigger_webhook → csv_parse → loop_for_each → email_send. ' +
+      'Config: csv_parse.data={{trigger.body.csv}}, loop items={{csv_parse.rows}}.',
+      ['csv', 'parse', 'loop', 'email', 'rows']],
+
+    // ── Dev / Cloud ────────────────────────────────────────────────────────
+    ['github_issue_slack',
+      'Create a GitHub issue and notify Slack. Nodes: trigger_webhook → github_issue → slack_send. ' +
+      'Config: github_issue.title={{trigger.body.title}}, repo="owner/repo". ' +
+      'Slack: "Issue created: {{github_issue.html_url}}".',
+      ['github', 'issue', 'slack', 'devops']],
+
+    ['s3_upload_notify',
+      'Upload a file to S3 and notify via Slack. Nodes: trigger_webhook → aws_s3_upload → slack_send. ' +
+      'Config: s3.bucket, s3.key={{trigger.body.filename}}, s3.body={{trigger.body.content}}.',
+      ['s3', 'aws', 'upload', 'file', 'slack', 'storage']],
+
+    ['vercel_deploy',
+      'Trigger a Vercel deployment on webhook. Nodes: trigger_webhook → vercel_deploy → slack_send. ' +
+      'Config: vercel_deploy.projectId, teamId. Notify Slack on completion.',
+      ['vercel', 'deploy', 'ci', 'webhook', 'slack']],
+
+    // ── Error Handling ─────────────────────────────────────────────────────
+    ['error_handler',
+      'Catch errors and alert the team. Add an error_handler node connected from any risky node. ' +
+      'Config: error_handler.onError → slack_send with message="Workflow failed: {{error.message}}". ' +
+      'Also use logic_retry for transient HTTP failures.',
+      ['errors', 'retry', 'error_handler', 'alert', 'resilience']],
+
+    ['conditional_branch',
+      'Branch workflow based on a condition. Nodes: trigger_webhook → logic_if → (true branch) action1 / (false branch) action2. ' +
+      'Config: logic_if.condition="{{trigger.body.status}} === \'active\'". ' +
+      'Use logic_switch for more than two branches.',
+      ['condition', 'branch', 'if', 'logic', 'route', 'switch']],
   ];
 
   return patterns.map(([id, text, tags]) => ({
@@ -264,28 +400,90 @@ function buildPlatformDocs() {
   return [
     {
       id: 'syntax:variables',
-      title: 'Variable syntax',
-      text: 'Use {{trigger.body.fieldName}} for webhook data, {{$json.field}} for current input, and {{$node["Node Label"].json.field}} or {{NodeLabel.outputField}} for previous node output.',
-      metadata: { type: 'syntax', tags: ['variables', 'mapping', 'expressions'] }
+      title: 'Variable syntax and data mapping',
+      text:
+        'Variable expressions use double curly braces: {{expression}}.\n' +
+        '- Webhook input: {{trigger.body.fieldName}} or {{trigger.headers.Authorization}}\n' +
+        '- Current node input: {{$json.field}} or {{$json.nested.field}}\n' +
+        '- Previous node output: {{NodeLabel.outputField}} or {{$node["Node Label"].json.field}}\n' +
+        '- Loop item: {{$json.email}} inside a loop_for_each\n' +
+        '- Query params: {{trigger.query.page}}\n' +
+        '- Environment: use stored credentials, not raw secrets in config.',
+      metadata: { type: 'syntax', tags: ['variables', 'mapping', 'expressions', 'template'] }
     },
     {
       id: 'syntax:workflow_json',
       title: 'Workflow JSON contract',
-      text: 'Generated workflows must contain nodes and edges. Each node needs id, type, label, config, and optional position. Each edge source and target must reference existing node ids.',
-      metadata: { type: 'syntax', tags: ['json', 'workflow', 'validation'] }
+      text:
+        'Every generated workflow must be a JSON object with two arrays: nodes and edges.\n' +
+        'Node shape: {"id":"n1","type":"trigger_webhook","label":"Webhook Trigger","config":{}}\n' +
+        'Edge shape: {"id":"e1","source":"n1","target":"n2"}\n' +
+        'Rules:\n' +
+        '- Node ids must be unique strings (n1, n2, …).\n' +
+        '- Every edge source and target must reference an existing node id.\n' +
+        '- Workflows must start with a trigger node (trigger_webhook, trigger_cron, trigger_manual).\n' +
+        '- Config values should use {{variable}} syntax for dynamic fields.\n' +
+        '- Position is optional: {x: 250, y: 100} for React Flow layout.',
+      metadata: { type: 'syntax', tags: ['json', 'workflow', 'contract', 'validation', 'nodes', 'edges'] }
+    },
+    {
+      id: 'syntax:config_fields',
+      title: 'Common node config fields',
+      text:
+        'Common config patterns across node types:\n' +
+        '- HTTP nodes: url, method (GET/POST/PUT/DELETE), headers, body\n' +
+        '- Email nodes: to, subject, body (html or text), from\n' +
+        '- Slack nodes: channel ("#general"), text, attachments\n' +
+        '- Database nodes: query (SQL string), params (array of values)\n' +
+        '- Loop node: items (array expression like {{trigger.body.list}})\n' +
+        '- AI nodes: prompt or messages, model, temperature, maxTokens\n' +
+        '- Cron node: cron expression like "0 9 * * 1-5" = weekdays 9am\n' +
+        '- Condition node: condition (JS-style expression), operator (equals, contains, gt, lt)',
+      metadata: { type: 'syntax', tags: ['config', 'fields', 'http', 'email', 'database', 'cron'] }
     },
     {
       id: 'platform:credentials',
-      title: 'Credentials',
-      text: 'Credentials are managed in the Credentials Manager. Nodes may use stored service credentials for OpenAI, Anthropic, Slack, HubSpot, Twilio, Stripe, GitHub, AWS, Google, and more.',
-      metadata: { type: 'platform', tags: ['credentials', 'secrets'] }
+      title: 'Credentials and secrets management',
+      text:
+        'Credentials are stored in the Credentials Manager (never hardcode secrets in config).\n' +
+        'Supported credential types: OpenAI, Anthropic, Groq, Slack, HubSpot, Twilio, Stripe, ' +
+        'GitHub, AWS (S3, Lambda), Google (Gmail, Sheets, Drive, Calendar, Translate, Maps), ' +
+        'Telegram, Discord, Twitter/X, LinkedIn, Airtable, Notion, Salesforce, Supabase, MongoDB.\n' +
+        'In node config, reference credentials by name using the credential selector field.',
+      metadata: { type: 'platform', tags: ['credentials', 'secrets', 'api_key', 'oauth'] }
     },
     {
       id: 'platform:triggers',
-      title: 'Triggers',
-      text: 'Common trigger nodes are trigger_webhook, trigger_cron, and trigger_manual. Workflows should normally start with one trigger or a root node with no incoming edges.',
-      metadata: { type: 'platform', tags: ['triggers', 'webhook', 'cron'] }
-    }
+      title: 'Trigger nodes',
+      text:
+        'Every workflow must start with a trigger node. Available triggers:\n' +
+        '- trigger_webhook: fires when an HTTP POST/GET request hits the workflow URL. Payload in {{trigger.body}}, headers in {{trigger.headers}}.\n' +
+        '- trigger_cron: fires on a schedule. Config: cron="0 9 * * *" (daily 9am), timezone="UTC".\n' +
+        '- trigger_manual: fires when the user clicks "Run" in the UI. Useful for testing.\n' +
+        '- trigger_email: fires when an email arrives (IMAP polling). Config: folder="INBOX", filter by subject.\n' +
+        'Only one trigger per workflow is typical; use logic_if to branch on payload fields.',
+      metadata: { type: 'platform', tags: ['triggers', 'webhook', 'cron', 'schedule', 'manual', 'email'] }
+    },
+    {
+      id: 'platform:node_categories',
+      title: 'Node categories overview',
+      text:
+        'Flowa nodes are grouped by category:\n' +
+        '- Triggers: trigger_webhook, trigger_cron, trigger_manual, trigger_email\n' +
+        '- HTTP/API: http_request, rest_get, rest_post, respond_webhook, graphql_query\n' +
+        '- Messaging: email_send, slack_send, discord_send, telegram_send, twilio_sms, whatsapp_send\n' +
+        '- AI/ML: openai_chat, anthropic_chat, ai_classify, ai_summarize, openai_dalle, whisper, google_translate, google_vision, huggingface\n' +
+        '- Data transform: transform_set, json_parse, csv_parse, transform_split, transform_merge, transform_filter, transform_map\n' +
+        '- Logic/Control: logic_if, logic_switch, loop_for_each, logic_delay, logic_retry, logic_parallel\n' +
+        '- Database: postgres_query, mysql_query, supabase_query, mongodb_find, redis_command, firebase_read\n' +
+        '- Cloud/Storage: aws_s3_upload, aws_lambda_invoke, google_drive_upload, file_read, file_write\n' +
+        '- CRM/Productivity: hubspot_contact, hubspot_create_deal, airtable, notion, salesforce_query\n' +
+        '- Social/Marketing: twitter_post, instagram_post, linkedin_post, reddit_post, mixpanel_track, segment_track\n' +
+        '- Finance: stripe_charge, stripe_customer, paypal_payment\n' +
+        '- Dev/CI: github_issue, github_pr, vercel_deploy\n' +
+        '- Utility: code_execute, math_operation, date_time, wait_approval, console_log, error_handler',
+      metadata: { type: 'platform', tags: ['categories', 'nodes', 'overview', 'all'] }
+    },
   ];
 }
 
