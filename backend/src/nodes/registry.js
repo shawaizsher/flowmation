@@ -2771,7 +2771,61 @@ registerAlias('respond_webhook', 'respondWebhook');
 registerAlias('code_execute', 'codeBlock');
 registerAlias('transform_set', 'setVariable');
 registerAlias('json_parse', 'jsonParse');
-registerAlias('csv_parse', 'jsonParse');
+registry.register('csv_parse', {
+  label: 'CSV Parse',
+  description: 'Parse CSV text into an array of objects',
+  category: 'transform',
+  icon: '📊',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'rows', type: 'array' }],
+  configSchema: {
+    field: { type: 'text', label: 'Input field containing CSV text', default: 'body' },
+    delimiter: { type: 'text', label: 'Delimiter', default: ',' },
+    hasHeader: { type: 'boolean', label: 'First row is header', default: true }
+  },
+  execute: async ({ config, input }) => {
+    const data = Object.values(input)[0];
+    const raw = data?.[config.field || 'body'] ?? data;
+    const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+    const delim = config.delimiter || ',';
+    const hasHeader = config.hasHeader !== false;
+
+    function parseRow(line) {
+      const fields = [];
+      let cur = '', inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuote) {
+          if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (ch === '"') { inQuote = false; }
+          else { cur += ch; }
+        } else if (ch === '"') {
+          inQuote = true;
+        } else if (ch === delim) {
+          fields.push(cur); cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      fields.push(cur);
+      return fields;
+    }
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return { rows: [], count: 0 };
+
+    if (!hasHeader) {
+      return { rows: lines.map(parseRow), count: lines.length };
+    }
+
+    const headers = parseRow(lines[0]);
+    const rows = lines.slice(1).map(line => {
+      const vals = parseRow(line);
+      return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
+    });
+    return { rows, count: rows.length, headers };
+  }
+});
 registerAlias('transform_split', 'splitArray');
 registerAlias('transform_merge', 'mergeData');
 registerAlias('transform_filter', 'filterData');
