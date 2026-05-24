@@ -1370,14 +1370,87 @@ registry.register('waitForApproval', {
     message: { type: 'textarea', label: 'Approval Message', default: 'Please approve to continue' },
     timeout: { type: 'number', label: 'Timeout (minutes)', default: 60 }
   },
-  execute: async ({ config, input }) => {
-    // In a real implementation, this would pause and wait
-    return {
-      approved: true,
-      message: config.message,
-      approvedAt: new Date().toISOString(),
-      note: 'Auto-approved in development mode'
-    };
+  execute: async ({ config, input, context }) => {
+    const { query } = require('../db');
+    const crypto = require('crypto');
+
+    // Lazy-create the approvals table
+    await query(`CREATE TABLE IF NOT EXISTS workflow_approvals (
+      id          SERIAL PRIMARY KEY,
+      token       TEXT UNIQUE NOT NULL,
+      execution_id TEXT,
+      workflow_id  TEXT,
+      message     TEXT,
+      status      TEXT DEFAULT 'pending',
+      approver    TEXT,
+      comment     TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      resolved_at TIMESTAMPTZ
+    )`);
+
+    const token = crypto.randomBytes(24).toString('hex');
+    const message = config.message || 'Please approve to continue';
+    const approver = config.approverEmail || config.to;
+    const timeoutMs = Math.min(Number(config.timeout || 60), 1440) * 60 * 1000;
+    const pollMs = 8000;
+
+    await query(
+      `INSERT INTO workflow_approvals (token, execution_id, workflow_id, message, approver)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [token, context?.executionId || null, context?.workflowId || null, message, approver || null]
+    );
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const approveUrl = `${frontendUrl}/approve/${token}?action=approve`;
+    const rejectUrl  = `${frontendUrl}/approve/${token}?action=reject`;
+
+    // Send notification email if approver configured
+    if (approver) {
+      try {
+        const nodemailer = require('nodemailer');
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
+        if (user && pass) {
+          const t = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: false,
+            auth: { user, pass }
+          });
+          await t.sendMail({
+            from: process.env.SMTP_FROM || user,
+            to: approver,
+            subject: `[Flowa] Approval required: ${message.slice(0, 60)}`,
+            html: `<p>${message}</p>
+<p>
+  <a href="${approveUrl}" style="background:#22c55e;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-right:10px">✅ Approve</a>
+  <a href="${rejectUrl}"  style="background:#ef4444;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">❌ Reject</a>
+</p>
+<p style="color:#888;font-size:12px">Token: ${token}</p>`
+          });
+        }
+      } catch (e) {
+        logger.warn('[waitForApproval] Email send failed:', e.message);
+      }
+    }
+
+    logger.info(`[waitForApproval] Waiting for approval token=${token}`);
+
+    // Poll DB until approved/rejected or timeout
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, pollMs));
+      const res = await query('SELECT status, approver, comment, resolved_at FROM workflow_approvals WHERE token=$1', [token]);
+      const row = res.rows[0];
+      if (row?.status === 'approved') {
+        return { approved: true, token, approver: row.approver, comment: row.comment, resolvedAt: row.resolved_at };
+      }
+      if (row?.status === 'rejected') {
+        throw new Error(`Approval rejected. Comment: ${row.comment || 'none'}`);
+      }
+    }
+
+    throw new Error(`Approval timed out after ${config.timeout || 60} minutes (token: ${token})`);
   }
 });
 

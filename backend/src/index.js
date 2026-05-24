@@ -5,7 +5,7 @@ const http = require('http');
 
 const logger = require('./utils/logger');
 const { initDb } = require('./db');
-const { initRedis } = require('./db/redis');
+const { initRedis, isRedisAvailable } = require('./db/redis');
 const { initWebSocket } = require('./services/websocket');
 const { initEmail } = require('./services/email');
 
@@ -18,6 +18,7 @@ const nodeRoutes = require('./routes/nodes');
 const collaborationRoutes = require('./routes/collaboration');
 const adminRoutes = require('./routes/admin');
 const ragRoutes = require('./routes/rag');
+const approvalRoutes = require('./routes/approvals');
 
 const app = express();
 const server = http.createServer(app);
@@ -91,6 +92,7 @@ app.use('/api/workspaces/:wid/collaboration', collaborationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/rag', ragRoutes);
+app.use('/api/approve', approvalRoutes);
 
 // ── Webhook endpoint ──
 app.all('/webhook/:path', async (req, res) => {
@@ -149,7 +151,9 @@ async function start() {
     await initRedis();
     await initEmail();
     const wsManager = initWebSocket(server);
-    wsManager.initRedisSubscriber();
+    if (isRedisAvailable()) {
+      wsManager.initRedisSubscriber();
+    }
 
     server.listen(PORT, () => {
       logger.info(`🚀 Flowa backend running on port ${PORT}`);
