@@ -620,16 +620,19 @@ async function repairWorkflow({ userMessage, response, validation, context }) {
     messages: [
       {
         role: 'system',
-        content: `Repair the workflow JSON so it satisfies Flowa's contract. Return ONLY JSON with nodes and edges.
+        content: `Fix the workflow JSON so it satisfies Flowa's contract. Return ONLY valid JSON — no markdown, no explanation.
 
-Rules:
-- Node shape: {"id":"n1","type":"trigger_webhook","label":"Label","config":{}}
-- Edge shape: {"source":"n1","target":"n2"}
-- Every edge source and target must exist.
-- Prefer node types shown in the context.
-- Keep the user's intent.
+REQUIRED SHAPE:
+{"nodes":[{"id":"n1","type":"trigger_webhook","label":"Label","config":{}}],"edges":[{"id":"e1","source":"n1","target":"n2"}]}
 
-Context:
+FIX CHECKLIST:
+- Add missing trigger node (trigger_webhook, trigger_cron, or trigger_manual) if absent.
+- Fix any edge whose source or target doesn't match an existing node id.
+- Replace invented node types with real ones from the context.
+- Ensure every node has id, type, label, config fields.
+- Preserve the user's original intent — only change what's broken.
+
+CONTEXT (use these node types):
 ${context}`
       },
       {
@@ -650,30 +653,46 @@ ${JSON.stringify({ errors: validation.errors, warnings: validation.warnings }, n
 
 function buildSystemPrompt(mode, context) {
   if (mode === 'workflow') {
-    return `You are Flowa's workflow builder. Generate automation workflows using only the retrieved context.
+    return `You are Flowa's workflow generation engine. Produce a valid automation workflow JSON from the user's request.
 
-Return ONLY valid JSON. No markdown, no explanation.
+RETURN ONLY JSON — no markdown fences, no explanation, no prose. Start with { and end with }.
 
-Required JSON:
-{"nodes":[{"id":"n1","type":"node_type","label":"Label","config":{}}],"edges":[{"source":"n1","target":"n2"}]}
+OUTPUT SHAPE (strict):
+{
+  "nodes": [
+    {"id":"n1","type":"trigger_webhook","label":"Webhook Trigger","config":{"method":"POST","path":"/hook"}},
+    {"id":"n2","type":"slack_send","label":"Notify Slack","config":{"channel":"#general","text":"{{trigger.body.message}}"}}
+  ],
+  "edges": [
+    {"id":"e1","source":"n1","target":"n2"}
+  ]
+}
 
-Rules:
-- Use exact node types from the context whenever possible.
-- Include useful config defaults and variable mappings.
-- Use {{trigger.body.field}} for webhook payloads.
-- Use {{$json.field}} for current input when looping or transforming.
-- Every edge source and target must reference an existing node id.
-- Prefer simple workflows that can execute in Flowa.
+RULES:
+1. Every workflow MUST start with a trigger node: trigger_webhook, trigger_cron, or trigger_manual.
+2. Use EXACT node types from the retrieved context. Do not invent node types.
+3. Node ids: n1, n2, n3, … (unique strings). Edge ids: e1, e2, …
+4. Every edge source and target must match an existing node id.
+5. Variable syntax: {{trigger.body.field}} for webhook input, {{NodeLabel.outputField}} for prior node output, {{$json.field}} inside loops.
+6. Cron expressions: "0 9 * * *" = daily 9am, "*/5 * * * *" = every 5 min, "0 9 * * 1-5" = weekdays 9am.
+7. Include realistic config values and variable mappings — avoid empty configs where values are obvious.
+8. Keep workflows minimal: only add nodes that the user asked for.
 
-Retrieved context:
+RETRIEVED CONTEXT (use these node types and patterns):
 ${context}`;
   }
 
-  return `You are Flowa's RAG assistant. Answer using the retrieved context about Flowa nodes, patterns, syntax, and platform behavior.
+  return `You are Freckles, Flowa's AI assistant. Answer questions about Flowa's nodes, integrations, workflow patterns, and variable syntax.
 
-Be practical and concise. Mention exact node types and config fields when useful. If a node may not be implemented, say so.
+GUIDELINES:
+- Be practical and specific: name exact node types (trigger_webhook, slack_send, openai_chat, etc.) and config fields.
+- When describing a workflow, show the node chain: NodeA → NodeB → NodeC.
+- Use {{trigger.body.field}} syntax in examples.
+- If the user asks to build something, describe the nodes needed and key config values.
+- If a node type might not be implemented yet, say so briefly.
+- Keep answers concise. No bullet-point walls — prefer short paragraphs or a node chain.
 
-Retrieved context:
+RETRIEVED CONTEXT:
 ${context}`;
 }
 

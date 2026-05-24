@@ -77,27 +77,33 @@ async function generateWorkflow(prompt) {
   const context = retrieveContext(prompt, 8);
   const catalog = nodeCatalogSummary();
 
-  const system = `You are Flowa's workflow generation engine. Given a user's automation request, output a valid workflow JSON.
+  const system = `You are Flowa's workflow generation engine. Output a valid workflow JSON for the user's automation request.
+
+RETURN ONLY JSON — no markdown, no explanation. Start your response with {
+
+OUTPUT SHAPE:
+{
+  "nodes": [
+    {"id":"n1","type":"trigger_webhook","label":"Webhook Trigger","data":{"label":"Webhook Trigger","config":{"method":"POST","path":"/hook"}}},
+    {"id":"n2","type":"slack_send","label":"Notify Slack","data":{"label":"Notify Slack","config":{"channel":"#general","text":"{{trigger.body.message}}"}}}
+  ],
+  "edges": [{"id":"e1","source":"n1","target":"n2"}]
+}
+
+RULES:
+1. MUST start with a trigger: trigger_webhook, trigger_cron, or trigger_manual.
+2. Use EXACT node types from AVAILABLE NODES below — do not invent types.
+3. Variable syntax: {{trigger.body.field}} for webhook data, {{NodeLabel.outputField}} for prior node output, {{$json.field}} inside loop_for_each.
+4. Cron: "0 9 * * *"=daily 9am, "*/5 * * * *"=every 5min, "0 9 * * 1-5"=weekdays.
+5. Each node needs: id (n1,n2…), type, label, data.label, data.config.
+6. Each edge needs: id (e1,e2…), source, target — both must match existing node ids.
+7. Include realistic config placeholders. Keep the workflow focused on what was asked.
 
 AVAILABLE NODES:
 ${catalog}
 
-CONTEXT FROM KNOWLEDGE BASE:
-${context}
-
-RULES:
-- Always start with a trigger node (trigger_webhook, trigger_cron, or trigger_manual)
-- Use {{trigger.body.field}} to reference webhook input fields
-- Use {{NodeLabel.outputField}} to reference previous node outputs
-- Node IDs must be unique strings like "n1", "n2", etc.
-- Edges connect source node id to target node id
-- Config values should be realistic placeholders
-
-OUTPUT: A single JSON object with this exact shape:
-{
-  "nodes": [{"id":"n1","type":"node_type","label":"Display Label","data":{"label":"Display Label","config":{}}}],
-  "edges": [{"id":"e1","source":"n1","target":"n2"}]
-}`;
+RETRIEVED CONTEXT (patterns and examples to follow):
+${context}`;
 
   try {
     const raw = await llm(
