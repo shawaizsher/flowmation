@@ -909,15 +909,18 @@ registry.register('sendEmail', {
     from: { type: 'text', label: 'From Email', default: 'noreply@flowa.dev' }
   },
   execute: async ({ config }) => {
-    // Placeholder - would integrate with SMTP/SendGrid/etc.
-    logger.info(`Email would be sent to ${config.to}: ${config.subject}`);
-    return {
-      success: true,
-      to: config.to,
-      subject: config.subject,
-      sentAt: new Date().toISOString(),
-      note: 'Email sending placeholder - configure SMTP provider'
-    };
+    const nodemailer = require('nodemailer');
+    const creds = config._credentials || {};
+    const host = creds.host || config.host || process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = Number(creds.port || config.port || process.env.SMTP_PORT || 587);
+    const user = creds.user || creds.username || config.user || process.env.SMTP_USER;
+    const pass = creds.pass || creds.password || config.password || process.env.SMTP_PASS;
+    const from = config.from || creds.from || process.env.SMTP_FROM || user;
+    if (!user || !pass) throw new Error('SMTP credentials missing (set SMTP_USER and SMTP_PASS)');
+    const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+    const info = await transporter.sendMail({ from, to: config.to, subject: config.subject, html: config.body || config.html || config.text });
+    logger.info(`[sendEmail] Sent to ${config.to}: ${info.messageId}`);
+    return { success: true, messageId: info.messageId, to: config.to, subject: config.subject, sentAt: new Date().toISOString() };
   }
 });
 
@@ -2797,7 +2800,6 @@ registerAlias('ai_text_classifier', 'aiClassify');
 registerAlias('ai_summarize', 'aiSummarize');
 registerAlias('ai_summarizer', 'aiSummarize');
 
-registerAlias('email_send', 'sendEmail');
 registerAlias('slack_send', 'slackMessage', {
   configSchema: {
     webhookUrl: { type: 'text', label: 'Slack Webhook URL' },
