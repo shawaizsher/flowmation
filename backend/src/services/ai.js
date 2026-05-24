@@ -2,7 +2,7 @@
 
 const Groq = require('groq-sdk');
 const logger = require('../utils/logger');
-const { loadStore } = require('./rag');
+const { loadStore, retrieve } = require('./rag');
 
 // ── Single Groq client ───────────────────────────────────────────────────────
 
@@ -12,45 +12,13 @@ function getGroq() {
   return new Groq({ apiKey: key });
 }
 
-// ── TF-IDF retrieval (same as rag.js, no external deps) ─────────────────────
-
-function tokenize(text) {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
-}
+// ── Context retrieval using rag.js hybrid BM25+lexical+intent scoring ────────
 
 function retrieveContext(queryText, topK = 6) {
   const store = loadStore();
   if (!store.length) return '';
-
-  const allTexts = [...store.map(d => d.text), queryText];
-  const N = allTexts.length;
-  const df = {};
-  allTexts.forEach(t => { new Set(tokenize(t)).forEach(w => { df[w] = (df[w] || 0) + 1; }); });
-
-  const vectorise = (text) => {
-    const tokens = tokenize(text);
-    const tf = {};
-    tokens.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
-    const vec = {};
-    Object.entries(tf).forEach(([t, c]) => {
-      vec[t] = (c / tokens.length) * (Math.log((N + 1) / ((df[t] || 0) + 1)) + 1);
-    });
-    const norm = Math.sqrt(Object.values(vec).reduce((s, v) => s + v * v, 0)) || 1;
-    Object.keys(vec).forEach(t => { vec[t] /= norm; });
-    return vec;
-  };
-
-  const qVec = vectorise(queryText);
-  return store
-    .map(doc => {
-      const dVec = vectorise(doc.text);
-      let dot = 0;
-      for (const [t, v] of Object.entries(qVec)) { if (dVec[t]) dot += v * dVec[t]; }
-      return { text: doc.text, score: dot };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map(d => d.text)
+  return retrieve(queryText, store, topK)
+    .map((doc) => `[${doc.id} | score ${doc.score}]\n${doc.text}`)
     .join('\n\n---\n\n');
 }
 
