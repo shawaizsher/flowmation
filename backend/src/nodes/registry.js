@@ -2896,10 +2896,158 @@ registerAlias('util_date_format', 'dateTime');
 registerAlias('math_operation', 'mathOperation');
 registerAlias('logic_delay', 'delay');
 registerAlias('logic_loop', 'loop');
-registerAlias('logic_retry', 'errorHandler');
-registerAlias('logic_parallel', 'mergeData');
-registerAlias('transform_map', 'setVariable');
-registerAlias('transform_aggregate', 'mergeData');
+registry.register('logic_retry', {
+  label: 'Retry',
+  description: 'Retry a sub-operation up to N times with exponential back-off',
+  category: 'logic',
+  icon: '🔁',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    maxAttempts: { type: 'number', label: 'Max attempts', default: 3 },
+    delayMs:     { type: 'number', label: 'Initial delay (ms)', default: 1000 },
+    backoffMult: { type: 'number', label: 'Back-off multiplier', default: 2 },
+    nodeIdToRetry: { type: 'text', label: 'Node id to retry (leave blank = pass-through)' }
+  },
+  execute: async ({ config, input, context }) => {
+    const maxAttempts = Math.max(1, Number(config.maxAttempts) || 3);
+    const initialDelay = Number(config.delayMs) || 1000;
+    const mult = Number(config.backoffMult) || 2;
+
+    const targetNodeId = config.nodeIdToRetry;
+    if (!targetNodeId || !context?.runNode) {
+      return { ...Object.values(input)[0], _retried: false, attempts: 0 };
+    }
+
+    let lastError;
+    let delay = initialDelay;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await context.runNode(targetNodeId, input);
+        return { ...result, _retried: attempt > 1, attempts: attempt };
+      } catch (err) {
+        lastError = err;
+        logger.warn(`[logic_retry] attempt ${attempt}/${maxAttempts} failed: ${err.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, delay));
+          delay *= mult;
+        }
+      }
+    }
+    throw new Error(`All ${maxAttempts} retry attempts failed. Last error: ${lastError?.message}`);
+  }
+});
+
+registry.register('logic_parallel', {
+  label: 'Parallel',
+  description: 'Fan out data to multiple downstream branches simultaneously',
+  category: 'logic',
+  icon: '⑂',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    branches: { type: 'number', label: 'Number of parallel branches', default: 2 }
+  },
+  execute: async ({ config, input, context }) => {
+    const data = Object.values(input)[0];
+    const branchNodeIds = config.branchNodeIds || [];
+    if (!branchNodeIds.length || !context?.runNode) {
+      return { data, _parallel: true, branches: config.branches || 2 };
+    }
+    const results = await Promise.allSettled(
+      branchNodeIds.map(id => context.runNode(id, input))
+    );
+    const outputs = results.map((r, i) =>
+      r.status === 'fulfilled' ? r.value : { error: r.reason?.message, branch: i }
+    );
+    return { results: outputs, succeeded: results.filter(r => r.status === 'fulfilled').length, total: results.length };
+  }
+});
+
+registry.register('transform_map', {
+  label: 'Map Array',
+  description: 'Transform each item in an array using field mappings or a JS expression',
+  category: 'transform',
+  icon: '🗺️',
+  inputs: [{ name: 'array', type: 'array' }],
+  outputs: [{ name: 'result', type: 'array' }],
+  configSchema: {
+    inputField:  { type: 'text', label: 'Input field containing the array', default: 'items' },
+    outputField: { type: 'text', label: 'Output key for each item', default: '' },
+    mappings: { type: 'json', label: 'Field mappings ({"newKey": "oldKey"})', default: '{}' },
+    expression: { type: 'text', label: 'JS expression per item (use `item`)', default: '' }
+  },
+  execute: async ({ config, input }) => {
+    const data = Object.values(input)[0];
+    const arr = data?.[config.inputField || 'items'] ?? (Array.isArray(data) ? data : [data]);
+    if (!Array.isArray(arr)) throw new Error(`transform_map: expected an array, got ${typeof arr}`);
+
+    let mappings = config.mappings || {};
+    if (typeof mappings === 'string') { try { mappings = JSON.parse(mappings); } catch { mappings = {}; } }
+    const hasMapping = Object.keys(mappings).length > 0;
+    const expr = (config.expression || '').trim();
+
+    const mapped = arr.map((item) => {
+      let result = item;
+      if (hasMapping) {
+        result = {};
+        for (const [newKey, oldKey] of Object.entries(mappings)) {
+          result[newKey] = typeof oldKey === 'string' ? item[oldKey] : oldKey;
+        }
+      }
+      if (expr) {
+        try {
+          // eslint-disable-next-line no-new-func
+          result = new Function('item', `return (${expr})`)(result);
+        } catch (e) {
+          result = { ...result, _expressionError: e.message };
+        }
+      }
+      return result;
+    });
+
+    const outputField = config.outputField;
+    return outputField ? { [outputField]: mapped, count: mapped.length } : { items: mapped, count: mapped.length };
+  }
+});
+
+registry.register('transform_aggregate', {
+  label: 'Aggregate',
+  description: 'Collect loop outputs and compute sum/avg/min/max/count/array',
+  category: 'transform',
+  icon: '∑',
+  inputs: [{ name: 'data', type: 'any' }],
+  outputs: [{ name: 'result', type: 'any' }],
+  configSchema: {
+    inputField:  { type: 'text', label: 'Field to aggregate', default: 'value' },
+    operation:   { type: 'select', label: 'Operation', options: ['sum','avg','min','max','count','array','concat'], default: 'array' },
+    outputField: { type: 'text', label: 'Output field name', default: 'result' }
+  },
+  execute: async ({ config, input }) => {
+    const data = Object.values(input)[0];
+    const field = config.inputField || 'value';
+    const op = config.operation || 'array';
+    const outputField = config.outputField || 'result';
+
+    const items = Array.isArray(data) ? data : (data?.items ?? [data]);
+    const values = items.map(item => (typeof item === 'object' && item !== null ? item[field] : item));
+    const nums = values.map(Number).filter(v => !isNaN(v));
+
+    let agg;
+    switch (op) {
+      case 'sum':    agg = nums.reduce((a, b) => a + b, 0); break;
+      case 'avg':    agg = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0; break;
+      case 'min':    agg = nums.length ? Math.min(...nums) : null; break;
+      case 'max':    agg = nums.length ? Math.max(...nums) : null; break;
+      case 'count':  agg = items.length; break;
+      case 'concat': agg = values.join(config.separator || ''); break;
+      case 'array':
+      default:       agg = values;
+    }
+
+    return { [outputField]: agg, count: items.length, operation: op };
+  }
+});
 registerAlias('util_set_variable', 'setVariable');
 registerAlias('webhook_response', 'respondWebhook');
 registerAlias('rest_api_poll', 'httpRequest');
