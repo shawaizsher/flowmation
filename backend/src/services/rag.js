@@ -7,21 +7,51 @@ const VECTOR_STORE_PATH = path.join(__dirname, '../../rag_store.json');
 const TRAINING_WORKFLOWS_PATH = path.join(__dirname, '../../../training/data/workflows/seed_workflows.jsonl');
 const DEFAULT_MODEL = process.env.RAG_MODEL || 'llama-3.1-8b-instant';
 const STOP_WORDS = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'how', 'i',
-  'in', 'into', 'is', 'it', 'me', 'my', 'of', 'on', 'or', 'send', 'that', 'the',
-  'then', 'this', 'to', 'use', 'via', 'when', 'with', 'you', 'your'
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+  'i', 'in', 'into', 'is', 'it', 'me', 'my', 'of', 'on', 'or',
+  'that', 'the', 'then', 'this', 'to', 'with', 'you', 'your'
 ]);
+
+// Synonyms for query expansion — maps query term → additional terms to inject
+const SYNONYMS = {
+  email:    ['gmail', 'smtp', 'sendgrid', 'email_send', 'send_email', 'google_gmail'],
+  sms:      ['twilio', 'text', 'message', 'twilio_sms'],
+  slack:    ['notify', 'channel', 'slack_send', 'slack_message'],
+  webhook:  ['http', 'endpoint', 'trigger_webhook', 'rest'],
+  schedule: ['cron', 'timer', 'trigger_cron', 'interval', 'daily', 'hourly', 'scheduled'],
+  database: ['postgres', 'mysql', 'supabase', 'mongodb', 'db', 'query'],
+  ai:       ['openai', 'claude', 'gpt', 'llm', 'anthropic', 'groq', 'openai_chat', 'anthropic_chat'],
+  translate:['google_translate', 'language', 'translation'],
+  image:    ['dalle', 'vision', 'openai_image', 'openai_dalle'],
+  notify:   ['slack', 'email', 'sms', 'discord', 'telegram'],
+  file:     ['s3', 'drive', 'upload', 'google_drive', 'aws_s3'],
+  sheets:   ['google_sheets', 'spreadsheet', 'csv'],
+  twitter:  ['tweet', 'x_post', 'social'],
+  discord:  ['discord_send', 'discord_message', 'chat'],
+  http:     ['rest', 'api', 'request', 'http_request', 'rest_get', 'rest_post'],
+};
 
 function tokenize(text) {
   return String(text || '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')  // split camelCase: webhookTrigger → webhook Trigger
     .toLowerCase()
-    .replace(/[^a-z0-9_\s-]/g, ' ')
+    .replace(/[_\-]/g, ' ')               // split snake_case and kebab-case
+    .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter(Boolean);
+    .filter((t) => t.length > 1);
+}
+
+function expandQuery(terms) {
+  const expanded = new Set(terms);
+  for (const term of terms) {
+    if (SYNONYMS[term]) SYNONYMS[term].forEach((s) => expanded.add(s));
+  }
+  return [...expanded];
 }
 
 function importantTerms(text) {
-  return tokenize(text).filter((term) => term.length > 2 && !STOP_WORDS.has(term));
+  const base = tokenize(text).filter((term) => term.length > 2 && !STOP_WORDS.has(term));
+  return expandQuery(base);
 }
 
 function buildTfidf(texts) {
