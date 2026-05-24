@@ -54,43 +54,47 @@ function importantTerms(text) {
   return expandQuery(base);
 }
 
-function buildTfidf(texts) {
-  const df = {};
+// BM25 parameters
+const BM25_K1 = 1.5;
+const BM25_B  = 0.75;
+
+function buildBm25Index(texts) {
   const tokenized = texts.map((text) => tokenize(text));
-  const totalDocs = tokenized.length || 1;
+  const N = tokenized.length || 1;
 
+  // document frequency and average doc length
+  const df = {};
+  let totalLen = 0;
   tokenized.forEach((tokens) => {
-    new Set(tokens).forEach((term) => {
-      df[term] = (df[term] || 0) + 1;
-    });
+    totalLen += tokens.length;
+    new Set(tokens).forEach((term) => { df[term] = (df[term] || 0) + 1; });
   });
+  const avgdl = totalLen / N || 1;
 
-  return tokenized.map((tokens) => {
+  // pre-compute BM25 score vectors (one sparse map per doc)
+  const vecs = tokenized.map((tokens) => {
     const tf = {};
-    tokens.forEach((term) => {
-      tf[term] = (tf[term] || 0) + 1;
-    });
-
+    tokens.forEach((term) => { tf[term] = (tf[term] || 0) + 1; });
+    const dl = tokens.length;
     const vec = {};
-    Object.entries(tf).forEach(([term, count]) => {
-      const idf = Math.log((totalDocs + 1) / ((df[term] || 0) + 1)) + 1;
-      vec[term] = (count / Math.max(tokens.length, 1)) * idf;
-    });
-
-    const norm = Math.sqrt(Object.values(vec).reduce((sum, value) => sum + value * value, 0)) || 1;
-    Object.keys(vec).forEach((term) => {
-      vec[term] /= norm;
+    Object.entries(tf).forEach(([term, freq]) => {
+      const idf = Math.log((N - (df[term] || 0) + 0.5) / ((df[term] || 0) + 0.5) + 1);
+      const numerator = freq * (BM25_K1 + 1);
+      const denominator = freq + BM25_K1 * (1 - BM25_B + BM25_B * dl / avgdl);
+      vec[term] = idf * (numerator / denominator);
     });
     return vec;
   });
+
+  return { vecs, df, N, avgdl };
 }
 
-function sparseCosine(a, b) {
-  let dot = 0;
-  for (const [term, value] of Object.entries(a)) {
-    if (b[term]) dot += value * b[term];
+function bm25Score(queryTerms, docVec) {
+  let score = 0;
+  for (const term of queryTerms) {
+    if (docVec[term]) score += docVec[term];
   }
-  return dot;
+  return score;
 }
 
 function getDocSearchText(doc) {
@@ -144,17 +148,26 @@ function saveStore(docs) {
 }
 
 function retrieve(queryText, docs, topK = 8) {
+  if (!docs.length) return [];
   const queryTerms = importantTerms(queryText);
-  const allTexts = [...docs.map(getDocSearchText), queryText];
-  const vecs = buildTfidf(allTexts);
-  const queryVec = vecs[vecs.length - 1];
+  const allTexts = docs.map(getDocSearchText);
+  const { vecs } = buildBm25Index(allTexts);
+
+  const rawScores = docs.map((doc, index) => {
+    const bm25 = bm25Score(queryTerms, vecs[index]);
+    const lexical = lexicalScore(queryTerms, doc);
+    const boost = intentBoost(queryText, doc);
+    return { bm25, lexical, boost };
+  });
+
+  // Normalize BM25 scores to [0,1] before combining
+  const maxBm25 = Math.max(...rawScores.map((s) => s.bm25), 1);
 
   return docs
     .map((doc, index) => {
-      const semantic = sparseCosine(vecs[index], queryVec);
-      const lexical = lexicalScore(queryTerms, doc);
-      const boost = intentBoost(queryText, doc);
-      const score = (semantic * 0.62) + (lexical * 0.28) + boost;
+      const { bm25, lexical, boost } = rawScores[index];
+      const semantic = bm25 / maxBm25;
+      const score = (semantic * 0.60) + (lexical * 0.25) + boost;
       return { ...doc, score: Number(score.toFixed(5)), scores: { semantic, lexical, boost } };
     })
     .sort((a, b) => b.score - a.score)
