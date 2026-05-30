@@ -1724,41 +1724,41 @@ function EditorCanvas() {
               </div>
             </div>
 
-            {/* ── ML Suggested nodes panel ── */}
-            {!nodeSearch && (nodeSuggestions.length > 0 || suggestionsLoading) && (
-              <div className="border-b border-surface-border px-2 py-2">
-                <div className="flex items-center gap-1.5 px-1 mb-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">✦ Suggested for you</span>
-                  {suggestionsLoading && (
-                    <div className="h-2.5 w-2.5 animate-spin rounded-full border border-brand-400/40 border-t-brand-400" />
-                  )}
-                </div>
-                <div className="space-y-0.5">
-                  {nodeSuggestions.map((s) => {
-                    const def = allNodes.find((n) => n.type === s.type);
-                    if (!def) return null;
-                    return (
-                      <button
-                        key={s.type}
-                        onClick={() => { handleAddNode(def, paletteSourceId); setPaletteSourceId(null); }}
-                        title={s.reason}
-                        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-brand-500/10 group/sug border border-transparent hover:border-brand-500/20"
-                      >
-                        <NodeIcon nodeType={def.type} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-foreground truncate">{def.label}</div>
-                          <div className="text-[10px] text-foreground-muted truncate">{s.reason}</div>
-                        </div>
-                        <Plus size={14} className="shrink-0 text-brand-400 opacity-0 group-hover/sug:opacity-100 transition-opacity" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Scrollable category list */}
             <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+              {/* ── ML Suggested nodes panel ── */}
+              {!nodeSearch && (nodeSuggestions.length > 0 || suggestionsLoading) && (
+                <div className="mb-2 rounded-xl border border-brand-500/15 bg-brand-500/[0.03] px-2 py-2">
+                  <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">✦ Suggested for you</span>
+                    {suggestionsLoading && (
+                      <div className="h-2.5 w-2.5 animate-spin rounded-full border border-brand-400/40 border-t-brand-400" />
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    {nodeSuggestions.map((s) => {
+                      const def = allNodes.find((n) => n.type === s.type);
+                      if (!def) return null;
+                      return (
+                        <button
+                          key={s.type}
+                          onClick={() => { handleAddNode(def, paletteSourceId); setPaletteSourceId(null); }}
+                          title={s.reason}
+                          className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 text-left transition hover:border-brand-500/20 hover:bg-brand-500/10 group/sug"
+                        >
+                          <NodeIcon nodeType={def.type} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-foreground">{def.label}</div>
+                            <div className="truncate text-[10px] text-foreground-muted">{s.reason}</div>
+                          </div>
+                          <Plus size={14} className="shrink-0 text-brand-400 opacity-0 transition-opacity group-hover/sug:opacity-100" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {Object.entries(filteredCatalog).map(([category, defs]) => {
                 const meta = categoryMeta[category] || { label: category, icon: '📦', color: 'text-foreground-muted' };
                 const isCollapsed = collapsedCategories.has(category);
