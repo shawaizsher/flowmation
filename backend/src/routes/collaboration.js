@@ -452,6 +452,35 @@ router.post('/inbox/threads', async (req, res) => {
   }
 });
 
+router.delete('/inbox/threads/:threadId', async (req, res) => {
+  try {
+    const thread = await loadThread(req.workspaceId, req.params.threadId, req.user.id);
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    await transaction(async (client) => {
+      await client.query(
+        'DELETE FROM inbox_thread_members WHERE thread_id = $1 AND user_id = $2',
+        [thread.id, req.user.id]
+      );
+
+      const remainingMembers = await client.query(
+        'SELECT COUNT(*)::int AS count FROM inbox_thread_members WHERE thread_id = $1',
+        [thread.id]
+      );
+
+      if (Number(remainingMembers.rows[0]?.count || 0) === 0) {
+        await client.query('DELETE FROM inbox_messages WHERE thread_id = $1', [thread.id]);
+        await client.query('DELETE FROM inbox_threads WHERE id = $1', [thread.id]);
+      }
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('Delete inbox thread error:', err);
+    res.status(500).json({ error: 'Failed to remove conversation' });
+  }
+});
+
 router.get('/inbox/threads/:threadId/messages', async (req, res) => {
   try {
     const thread = await loadThread(req.workspaceId, req.params.threadId, req.user.id);

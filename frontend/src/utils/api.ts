@@ -237,6 +237,9 @@ export const collaborationApi = {
 
   sendInboxMessage: (workspaceId: string, threadId: string, body: string) =>
     api.post(`/workspaces/${workspaceId}/collaboration/inbox/threads/${threadId}/messages`, { body }),
+
+  deleteInboxThread: (workspaceId: string, threadId: string) =>
+    api.delete(`/workspaces/${workspaceId}/collaboration/inbox/threads/${threadId}`),
 };
 
 /* ------------------------------------------------------------------ */
