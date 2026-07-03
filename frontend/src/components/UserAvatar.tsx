@@ -145,7 +145,7 @@ export function UserAvatar({
     return withPresence(
       hasAnimatedBorder ? (
         <div
-          className="flowa-avatar-animated-ring rounded-full p-[2px]"
+          className="fluxion-avatar-animated-ring rounded-full p-[2px]"
           style={{ width: size, height: size, backgroundImage: `conic-gradient(from 0deg, ${avatarColors.from}, ${avatarColors.to}, rgba(255,255,255,0.2), ${avatarColors.from})` }}
         >
           {emojiCore}
@@ -167,7 +167,7 @@ export function UserAvatar({
   return withPresence(
     hasAnimatedBorder ? (
       <div
-        className="flowa-avatar-animated-ring rounded-full p-[2px]"
+        className="fluxion-avatar-animated-ring rounded-full p-[2px]"
         style={{ width: size, height: size, backgroundImage: `conic-gradient(from 0deg, rgba(255,255,255,0.10), ${avatarColors.from}, ${avatarColors.to}, rgba(255,255,255,0.18), ${avatarColors.from})` }}
       >
         {gradientCore}

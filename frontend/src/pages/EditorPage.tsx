@@ -119,8 +119,8 @@ function EditorCanvas() {
       // Defer focus until after layout so the input is mounted/visible
       setTimeout(() => paletteSearchRef.current?.focus(), 50);
     };
-    window.addEventListener('flowa:focus-palette', handler);
-    return () => window.removeEventListener('flowa:focus-palette', handler);
+    window.addEventListener('fluxion:focus-palette', handler);
+    return () => window.removeEventListener('fluxion:focus-palette', handler);
   }, []);
 
   // Execution
@@ -982,7 +982,7 @@ function EditorCanvas() {
    */
   const makeTokenDropHandler = (key: string, current: string) => ({
     onDragOver: (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      if (e.dataTransfer.types.includes('application/flowa-token') || e.dataTransfer.types.includes('text/plain')) {
+      if (e.dataTransfer.types.includes('application/fluxion-token') || e.dataTransfer.types.includes('text/plain')) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
         e.currentTarget.classList.add('ring-2', 'ring-brand-500/40');
@@ -994,7 +994,7 @@ function EditorCanvas() {
     onDrop: (e: React.DragEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       e.preventDefault();
       e.currentTarget.classList.remove('ring-2', 'ring-brand-500/40');
-      const token = e.dataTransfer.getData('application/flowa-token') || e.dataTransfer.getData('text/plain');
+      const token = e.dataTransfer.getData('application/fluxion-token') || e.dataTransfer.getData('text/plain');
       if (!token) return;
       const target = e.currentTarget;
       const start = target.selectionStart ?? current.length;

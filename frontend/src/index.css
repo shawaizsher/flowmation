@@ -31,22 +31,22 @@ html {
   animation: pageEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.flowa-avatar-animated-ring {
+.fluxion-avatar-animated-ring {
   /* rotation removed — static gradient border only */
 }
 
 /* ── Theme CSS Variables ── */
 :root {
-  --brand-50-rgb: 255 241 242;
-  --brand-100-rgb: 255 228 230;
-  --brand-200-rgb: 254 205 211;
-  --brand-300-rgb: 253 164 175;
-  --brand-400-rgb: 251 113 133;
-  --brand-500-rgb: 246 48 73;
-  --brand-600-rgb: 225 29 72;
-  --brand-700-rgb: 190 18 60;
-  --brand-800-rgb: 159 18 57;
-  --brand-900-rgb: 136 19 55;
+  --brand-50-rgb: 245 243 255;
+  --brand-100-rgb: 237 233 254;
+  --brand-200-rgb: 221 214 254;
+  --brand-300-rgb: 196 181 253;
+  --brand-400-rgb: 167 139 250;
+  --brand-500-rgb: 139 92 246;
+  --brand-600-rgb: 124 58 237;
+  --brand-700-rgb: 109 40 217;
+  --brand-800-rgb: 91 33 182;
+  --brand-900-rgb: 76 29 149;
 
   --accent-400-rgb: 34 211 238;
   --accent-500-rgb: 6 182 212;
@@ -70,7 +70,7 @@ html {
 
   /* Glass */
   --glass-bg:     rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(246, 48, 73, 0.15);
+  --glass-border: rgba(139, 92, 246, 0.15);
 
   /* Card gradient border bg */
   --card-gradient-bg: #FFFFFF;
@@ -689,7 +689,7 @@ body {
 }
 
 .animate-border-rotate {
-  background: linear-gradient(90deg, #F63049, #06B6D4, #EC4899, #F63049);
+  background: linear-gradient(90deg, #8B5CF6, #06B6D4, #D946EF, #8B5CF6);
   background-size: 200% auto;
   animation: borderRotate 3s linear infinite;
 }
@@ -741,7 +741,7 @@ body {
 
 /* ── Gradient text with modern feel ── */
 .gradient-text-vivid {
-  background: linear-gradient(135deg, #F63049 0%, #06B6D4 50%, #EC4899 100%);
+  background: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 50%, #D946EF 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -752,14 +752,14 @@ body {
 /* ── Glowing card on hover ── */
 .card-glow:hover {
   box-shadow:
-    0 0 20px rgba(246, 48, 73, 0.15),
-    0 0 60px rgba(246, 48, 73, 0.05),
+    0 0 20px rgba(139, 92, 246, 0.15),
+    0 0 60px rgba(139, 92, 246, 0.05),
     0 8px 32px rgba(0, 0, 0, 0.12);
 }
 .dark .card-glow:hover {
   box-shadow:
-    0 0 30px rgba(246, 48, 73, 0.15),
-    0 0 60px rgba(246, 48, 73, 0.05),
+    0 0 30px rgba(139, 92, 246, 0.15),
+    0 0 60px rgba(139, 92, 246, 0.05),
     0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -773,7 +773,7 @@ body {
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(246, 48, 73, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
   left: var(--mouse-x, 50%);
   top: var(--mouse-y, 50%);
   transform: translate(-50%, -50%);
@@ -790,7 +790,7 @@ body {
   position: absolute;
   width: 3px;
   height: 3px;
-  background: rgba(246, 48, 73, 0.25);
+  background: rgba(139, 92, 246, 0.25);
   border-radius: 50%;
   animation: particleDrift var(--duration, 8s) linear infinite;
   animation-delay: var(--delay, 0s);
@@ -832,7 +832,7 @@ body {
   left: 0;
   width: 0%;
   height: 2px;
-  background: linear-gradient(90deg, #F63049, #06B6D4);
+  background: linear-gradient(90deg, #8B5CF6, #06B6D4);
   transition: width 0.3s ease;
 }
 .hover-underline:hover::after {
@@ -877,7 +877,7 @@ body {
 }
 
 .card-gradient-border:hover::before {
-  background: linear-gradient(135deg, rgba(246, 48, 73, 0.4), rgba(6, 182, 212, 0.3), rgba(246, 48, 73, 0.15));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.15));
 }
 
 /* CTA shimmer button */
@@ -920,8 +920,8 @@ body {
   pointer-events: none;
   background: radial-gradient(
     600px circle at var(--px, -999px) var(--py, -999px),
-    rgba(246, 48, 73, 0.07),
-    rgba(246, 48, 73, 0.02) 40%,
+    rgba(139, 92, 246, 0.07),
+    rgba(139, 92, 246, 0.02) 40%,
     transparent 70%
   );
   transition: opacity 0.3s ease;
@@ -930,7 +930,7 @@ body {
 /* ── Typewriter cursor ── */
 .typewriter-cursor {
   display: inline-block;
-  color: #F63049;
+  color: #8B5CF6;
   font-weight: 300;
   animation: blink 0.8s step-end infinite;
   margin-left: 2px;
@@ -948,7 +948,7 @@ body {
 
 /* ── Hero gradient text (typing target) ── */
 .hero-gradient-text {
-  background: linear-gradient(135deg, #F63049 0%, #FB7185 30%, #06B6D4 60%, #22D3EE 100%);
+  background: linear-gradient(135deg, #8B5CF6 0%, #FB7185 30%, #06B6D4 60%, #22D3EE 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -969,7 +969,7 @@ body {
   transition: opacity 0.4s ease;
   background: radial-gradient(
     400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-    rgba(246, 48, 73, 0.06),
+    rgba(139, 92, 246, 0.06),
     transparent 60%
   );
   pointer-events: none;
@@ -978,9 +978,9 @@ body {
   opacity: 1;
 }
 .feature-card:hover {
-  border-color: rgba(246, 48, 73, 0.25) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
   box-shadow:
-    0 0 30px rgba(246, 48, 73, 0.1),
+    0 0 30px rgba(139, 92, 246, 0.1),
     0 8px 32px rgba(0, 0, 0, 0.5);
   transform: translateY(-4px);
 }
@@ -1035,7 +1035,7 @@ body {
   left: -30%;
   width: 30%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(246, 48, 73, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
   animation: lineShimmer 3s ease-in-out infinite;
 }
 @keyframes lineShimmer {
@@ -1104,7 +1104,7 @@ body {
 
 /* ── Glow text effect ── */
 .glow-text {
-  text-shadow: 0 0 20px rgba(246, 48, 73, 0.5), 0 0 40px rgba(246, 48, 73, 0.3);
+  text-shadow: 0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.3);
 }
 
 /* ── Smooth transitions for all interactive elements ── */
@@ -1129,7 +1129,7 @@ button, a {
   left: 0;
   width: 0;
   height: 2px;
-  background: linear-gradient(90deg, rgba(246, 48, 73, 0.8), transparent);
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.8), transparent);
   animation: elegantUnderline 0.8s ease-out forwards;
 }
 
@@ -1170,7 +1170,7 @@ button, a {
   100% { background-position: 100% 50%; }
 }
 .gradient-border-animated {
-  background: linear-gradient(90deg, rgba(246, 48, 73, 0.3), rgba(6, 182, 212, 0.2), rgba(246, 48, 73, 0.1));
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.3), rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.1));
   background-size: 200% 100%;
   animation: gradientBorderFlow 4s ease infinite;
 }
@@ -1219,12 +1219,12 @@ button, a {
 /* ── Refined glow on focus/hover ── */
 @keyframes glowBorderPulse {
   0%, 100% {
-    border-color: rgba(246, 48, 73, 0.15);
-    box-shadow: 0 0 0 0 rgba(246, 48, 73, 0.05);
+    border-color: rgba(139, 92, 246, 0.15);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.05);
   }
   50% {
-    border-color: rgba(246, 48, 73, 0.35);
-    box-shadow: 0 0 12px 0 rgba(246, 48, 73, 0.1);
+    border-color: rgba(139, 92, 246, 0.35);
+    box-shadow: 0 0 12px 0 rgba(139, 92, 246, 0.1);
   }
 }
 .glow-border-pulse {
@@ -1256,7 +1256,7 @@ button, a {
   top: 0;
   width: 100%;
   height: 100%;
-  background: #F63049;
+  background: #8B5CF6;
 }
 
 .banter-loader__box:nth-child(3n) {
@@ -1457,7 +1457,7 @@ button, a {
 /* ── Full-bleed CTA section ── */
 .cta-full-section {
   background:
-    radial-gradient(ellipse at 20% 60%, rgba(246,48,73,0.16) 0%, transparent 48%),
+    radial-gradient(ellipse at 20% 60%, rgba(139,92,246,0.16) 0%, transparent 48%),
     radial-gradient(ellipse at 80% 40%, rgba(6,182,212,0.11) 0%, transparent 48%),
     linear-gradient(160deg, #06010a 0%, #020109 35%, #01060a 65%, #060103 100%);
 }
@@ -1465,7 +1465,7 @@ button, a {
 .light .cta-full-section,
 :root:not(.dark) .cta-full-section {
   background:
-    radial-gradient(ellipse at 20% 60%, rgba(246,48,73,0.09) 0%, transparent 48%),
+    radial-gradient(ellipse at 20% 60%, rgba(139,92,246,0.09) 0%, transparent 48%),
     radial-gradient(ellipse at 80% 40%, rgba(6,182,212,0.08) 0%, transparent 50%),
     linear-gradient(160deg, #fff7f8 0%, #ffffff 38%, #f0fbff 72%, #ffffff 100%);
 }
@@ -1473,20 +1473,20 @@ button, a {
 .cta-radial-mesh {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% -20%, rgba(246,48,73,0.22) 0%, transparent 52%);
+  background: radial-gradient(ellipse at 50% -20%, rgba(139,92,246,0.22) 0%, transparent 52%);
   pointer-events: none;
 }
 
 .light .cta-radial-mesh,
 :root:not(.dark) .cta-radial-mesh {
-  background: radial-gradient(ellipse at 50% -20%, rgba(246,48,73,0.12) 0%, transparent 54%);
+  background: radial-gradient(ellipse at 50% -20%, rgba(139,92,246,0.12) 0%, transparent 54%);
 }
 
 /* ── Colored tag pills for use cases ── */
 .tag-brand {
-  background: rgba(246,48,73,0.08) !important;
-  border-color: rgba(246,48,73,0.22) !important;
-  color: rgba(246,48,73,0.9) !important;
+  background: rgba(139,92,246,0.08) !important;
+  border-color: rgba(139,92,246,0.22) !important;
+  color: rgba(139,92,246,0.9) !important;
 }
 .tag-cyan {
   background: rgba(6,182,212,0.08) !important;
@@ -1498,7 +1498,7 @@ button, a {
   border-color: rgba(251,113,133,0.22) !important;
   color: rgba(251,113,133,0.9) !important;
 }
-.dark .tag-brand { background: rgba(246,48,73,0.1)  !important; }
+.dark .tag-brand { background: rgba(139,92,246,0.1)  !important; }
 .dark .tag-cyan  { background: rgba(6,182,212,0.1)  !important; }
 .dark .tag-rose  { background: rgba(251,113,133,0.1) !important; }
 
@@ -1511,8 +1511,8 @@ button, a {
 
 .landing-scroll-progress {
   width: 100%;
-  background: linear-gradient(90deg, #f63049 0%, #06b6d4 54%, #f97316 100%);
-  box-shadow: 0 0 22px rgba(246, 48, 73, 0.42);
+  background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 54%, #3b82f6 100%);
+  box-shadow: 0 0 22px rgba(139, 92, 246, 0.42);
   transition: transform 0.08s linear;
 }
 
@@ -1520,9 +1520,9 @@ button, a {
   z-index: 0;
   opacity: 0.9;
   background:
-    linear-gradient(112deg, transparent 0 38%, rgba(246, 48, 73, 0.1) 39%, transparent 45% 100%),
+    linear-gradient(112deg, transparent 0 38%, rgba(139, 92, 246, 0.1) 39%, transparent 45% 100%),
     linear-gradient(68deg, transparent 0 54%, rgba(6, 182, 212, 0.08) 55%, transparent 62% 100%),
-    linear-gradient(180deg, rgba(246, 48, 73, 0.08), transparent 22%, transparent 78%, rgba(6, 182, 212, 0.05));
+    linear-gradient(180deg, rgba(139, 92, 246, 0.08), transparent 22%, transparent 78%, rgba(6, 182, 212, 0.05));
   background-size: 160% 160%, 180% 180%, 100% 100%;
   animation: landingBeamSweep 18s ease-in-out infinite alternate;
 }
@@ -1532,7 +1532,7 @@ button, a {
   opacity: 0.42;
   background:
     linear-gradient(to bottom, transparent 0, transparent 8px, rgba(255, 255, 255, 0.028) 9px, transparent 10px),
-    linear-gradient(90deg, transparent, rgba(246, 48, 73, 0.04), transparent);
+    linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.04), transparent);
   background-size: 100% 10px, 220% 100%;
   animation: landingScanDrift 12s linear infinite;
   mix-blend-mode: screen;
@@ -1544,7 +1544,7 @@ button, a {
 }
 
 .landing-chip {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 44px rgba(246, 48, 73, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 44px rgba(139, 92, 246, 0.12);
 }
 
 .landing-hero-title {
@@ -1564,7 +1564,7 @@ button, a {
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(90deg, rgba(246, 48, 73, 0), rgba(246, 48, 73, 0.62), rgba(6, 182, 212, 0.35), rgba(246, 48, 73, 0));
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0), rgba(139, 92, 246, 0.62), rgba(6, 182, 212, 0.35), rgba(139, 92, 246, 0));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -1594,7 +1594,7 @@ button, a {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(246, 48, 73, 0.12), transparent 22%, transparent 78%, rgba(6, 182, 212, 0.1)),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.12), transparent 22%, transparent 78%, rgba(6, 182, 212, 0.1)),
     linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.035));
   opacity: 0.65;
 }

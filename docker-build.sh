@@ -14,12 +14,12 @@ if [ "$DOCKER_USERNAME" = "yourdockerusername" ]; then
   exit 1
 fi
 
-echo -e "${YELLOW}Building Flowa images...${NC}"
-docker build -t $DOCKER_USERNAME/flowa-backend:$VERSION -t $DOCKER_USERNAME/flowa-backend:latest -f backend/Dockerfile ./backend
+echo -e "${YELLOW}Building Fluxion images...${NC}"
+docker build -t $DOCKER_USERNAME/fluxion-backend:$VERSION -t $DOCKER_USERNAME/fluxion-backend:latest -f backend/Dockerfile ./backend
 echo -e "${GREEN}Backend built${NC}"
 
-docker build -t $DOCKER_USERNAME/flowa-frontend:$VERSION -t $DOCKER_USERNAME/flowa-frontend:latest -f frontend/Dockerfile ./frontend
+docker build -t $DOCKER_USERNAME/fluxion-frontend:$VERSION -t $DOCKER_USERNAME/fluxion-frontend:latest -f frontend/Dockerfile ./frontend
 echo -e "${GREEN}Frontend built${NC}"
 
 echo -e "${GREEN}Done! Images ready${NC}"
-docker images | grep flowa-
+docker images | grep fluxion-

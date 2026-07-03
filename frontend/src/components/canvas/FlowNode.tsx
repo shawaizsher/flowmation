@@ -298,7 +298,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
   const handleRunNode = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      window.dispatchEvent(new CustomEvent('flowa:node-run', { detail: { nodeId: id } }));
+      window.dispatchEvent(new CustomEvent('fluxion:node-run', { detail: { nodeId: id } }));
     },
     [id]
   );
@@ -475,7 +475,7 @@ function FlowNode({ data, selected, id, isConnectable, dragging }: NodeProps) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              window.dispatchEvent(new CustomEvent('flowa:focus-palette', { detail: { sourceNodeId: id } }));
+              window.dispatchEvent(new CustomEvent('fluxion:focus-palette', { detail: { sourceNodeId: id } }));
             }}
             className="absolute z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-lg backdrop-blur-sm transition-colors"
             style={{

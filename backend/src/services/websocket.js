@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
-const { getRedis, getRedisSub } = require('../db/redis');
+const { getRedis, getRedisSub, isRedisAvailable } = require('../db/redis');
 const logger = require('../utils/logger');
 
 const WS_EVENTS_CHANNEL = 'ws:execution-events';
@@ -508,11 +508,13 @@ class WebSocketManager {
   broadcastToWorkspace(workspaceId, message) {
     // If running in worker process (no WebSocket server), relay via Redis pub/sub
     if (!this.wss) {
-      try {
-        const redis = getRedis();
-        redis.publish(WS_EVENTS_CHANNEL, JSON.stringify({ workspaceId, message }));
-      } catch (err) {
-        logger.error('Failed to publish execution event to Redis:', err.message);
+      if (isRedisAvailable()) {
+        try {
+          const redis = getRedis();
+          redis.publish(WS_EVENTS_CHANNEL, JSON.stringify({ workspaceId, message }));
+        } catch (err) {
+          logger.error('Failed to publish execution event to Redis:', err.message);
+        }
       }
       return;
     }

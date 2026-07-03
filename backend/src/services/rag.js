@@ -468,7 +468,7 @@ function buildPlatformDocs() {
       id: 'platform:node_categories',
       title: 'Node categories overview',
       text:
-        'Flowa nodes are grouped by category:\n' +
+        'Fluxion nodes are grouped by category:\n' +
         '- Triggers: trigger_webhook, trigger_cron, trigger_manual, trigger_email\n' +
         '- HTTP/API: http_request, rest_get, rest_post, respond_webhook, graphql_query\n' +
         '- Messaging: email_send, slack_send, discord_send, telegram_send, twilio_sms, whatsapp_send\n' +
@@ -620,7 +620,7 @@ async function repairWorkflow({ userMessage, response, validation, context }) {
     messages: [
       {
         role: 'system',
-        content: `Fix the workflow JSON so it satisfies Flowa's contract. Return ONLY valid JSON — no markdown, no explanation.
+        content: `Fix the workflow JSON so it satisfies Fluxion's contract. Return ONLY valid JSON — no markdown, no explanation.
 
 REQUIRED SHAPE:
 {"nodes":[{"id":"n1","type":"trigger_webhook","label":"Label","config":{}}],"edges":[{"id":"e1","source":"n1","target":"n2"}]}
@@ -653,7 +653,7 @@ ${JSON.stringify({ errors: validation.errors, warnings: validation.warnings }, n
 
 function buildSystemPrompt(mode, context) {
   if (mode === 'workflow') {
-    return `You are Flowa's workflow generation engine. Produce a valid automation workflow JSON from the user's request.
+    return `You are Fluxion's workflow generation engine. Produce a valid automation workflow JSON from the user's request.
 
 RETURN ONLY JSON — no markdown fences, no explanation, no prose. Start with { and end with }.
 
@@ -682,7 +682,7 @@ RETRIEVED CONTEXT (use these node types and patterns):
 ${context}`;
   }
 
-  return `You are Freckles, Flowa's AI assistant. Answer questions about Flowa's nodes, integrations, workflow patterns, and variable syntax.
+  return `You are Freckles, Fluxion's AI assistant. Answer questions about Fluxion's nodes, integrations, workflow patterns, and variable syntax.
 
 GUIDELINES:
 - Be practical and specific: name exact node types (trigger_webhook, slack_send, openai_chat, etc.) and config fields.

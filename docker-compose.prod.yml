@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database (Production)
   postgres:
     image: postgres:15-alpine
-    container_name: flowa-postgres-prod
+    container_name: fluxion-postgres-prod
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - flowa-prod-network
+      - fluxion-prod-network
     restart: always
     resources:
       limits:
@@ -32,7 +32,7 @@ services:
   # Redis Cache (Production)
   redis:
     image: redis:7-alpine
-    container_name: flowa-redis-prod
+    container_name: fluxion-redis-prod
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
@@ -44,7 +44,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - flowa-prod-network
+      - fluxion-prod-network
     restart: always
     resources:
       limits:
@@ -59,8 +59,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: ${DOCKER_USERNAME}/flowa-backend:${VERSION:-latest}
-    container_name: flowa-backend-prod
+    image: ${DOCKER_USERNAME}/fluxion-backend:${VERSION:-latest}
+    container_name: fluxion-backend-prod
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
@@ -77,7 +77,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - flowa-prod-network
+      - fluxion-prod-network
     restart: always
     resources:
       limits:
@@ -97,8 +97,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: ${DOCKER_USERNAME}/flowa-frontend:${VERSION:-latest}
-    container_name: flowa-frontend-prod
+    image: ${DOCKER_USERNAME}/fluxion-frontend:${VERSION:-latest}
+    container_name: fluxion-frontend-prod
     environment:
       VITE_API_URL: ${API_URL}
       VITE_WS_URL: ${WS_URL}
@@ -107,7 +107,7 @@ services:
     depends_on:
       - backend
     networks:
-      - flowa-prod-network
+      - fluxion-prod-network
     restart: always
     resources:
       limits:
@@ -125,7 +125,7 @@ services:
   # NGINX Reverse Proxy (Optional)
   nginx:
     image: nginx:alpine
-    container_name: flowa-nginx
+    container_name: fluxion-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -136,7 +136,7 @@ services:
       - frontend
       - backend
     networks:
-      - flowa-prod-network
+      - fluxion-prod-network
     restart: always
 
 volumes:
@@ -144,5 +144,5 @@ volumes:
   redis_data_prod:
 
 networks:
-  flowa-prod-network:
+  fluxion-prod-network:
     driver: bridge

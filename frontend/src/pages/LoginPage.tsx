@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import FlowaLogo from '../components/FlowaLogo';
+import FluxionLogo from '../components/FluxionLogo';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -77,8 +77,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <FlowaLogo size={36} />
-          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Flowa</span>
+          <FluxionLogo size={36} />
+          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Fluxion</span>
         </div>
 
         {/* Card */}
@@ -96,7 +96,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 className={`input-field w-full ${showEmailError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                placeholder="admin@flowa.dev"
+                placeholder="admin@fluxion.dev"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}

@@ -1,8 +1,8 @@
 {
-  "name": "flowa-frontend",
+  "name": "fluxion-frontend",
   "private": true,
   "version": "1.0.0",
-  "description": "Flowa – AI-native workflow automation platform (frontend)",
+  "description": "Fluxion – AI-native workflow automation platform (frontend)",
   "type": "module",
   "scripts": {
     "dev": "vite",

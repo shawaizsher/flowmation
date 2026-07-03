@@ -326,7 +326,7 @@ router.post('/verify-otp', async (req, res) => {
     logger.info(`Email verified via OTP: ${user.email}`);
 
     res.json({
-      message: 'Email verified! Welcome to Flowa.',
+      message: 'Email verified! Welcome to Fluxion.',
       token: jwtToken,
       user,
       workspace: workspaces.rows[0] || null,

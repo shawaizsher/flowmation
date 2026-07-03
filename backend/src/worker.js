@@ -13,7 +13,7 @@ async function start() {
     await initDb();
     await initRedis();
 
-    logger.info('🔧 Starting Flowa worker...');
+    logger.info('🔧 Starting Fluxion worker...');
 
     const worker = createWorker(async (job) => {
       const { executionId, workflowId, triggerPayload, credentials } = job.data;
@@ -25,7 +25,7 @@ async function start() {
       return result;
     });
 
-    logger.info('✅ Flowa worker running and waiting for jobs');
+    logger.info('✅ Fluxion worker running and waiting for jobs');
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {

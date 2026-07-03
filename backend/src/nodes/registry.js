@@ -461,7 +461,7 @@ registry.register('code_python', {
       'print(json.dumps({"result": final_result}, default=str))'
     ].join('\n');
 
-    const tmpFile = path.join(os.tmpdir(), `flowa_py_${Date.now()}.py`);
+    const tmpFile = path.join(os.tmpdir(), `fluxion_py_${Date.now()}.py`);
     try {
       fs.writeFileSync(tmpFile, wrapper, 'utf-8');
       const inputJson = JSON.stringify(input || {});
@@ -906,7 +906,7 @@ registry.register('sendEmail', {
     to: { type: 'text', label: 'To Email', required: true },
     subject: { type: 'text', label: 'Subject', required: true },
     body: { type: 'textarea', label: 'Email Body (HTML)', required: true },
-    from: { type: 'text', label: 'From Email', default: 'noreply@flowa.dev' }
+    from: { type: 'text', label: 'From Email', default: 'noreply@fluxion.dev' }
   },
   execute: async ({ config }) => {
     const nodemailer = require('nodemailer');
@@ -1420,7 +1420,7 @@ registry.register('waitForApproval', {
           await t.sendMail({
             from: process.env.SMTP_FROM || user,
             to: approver,
-            subject: `[Flowa] Approval required: ${message.slice(0, 60)}`,
+            subject: `[Fluxion] Approval required: ${message.slice(0, 60)}`,
             html: `<p>${message}</p>
 <p>
   <a href="${approveUrl}" style="background:#22c55e;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;margin-right:10px">✅ Approve</a>
@@ -1566,13 +1566,13 @@ registry.register('discord_message', {
   configSchema: {
     webhookUrl: { type: 'text', label: 'Webhook URL', required: true },
     content: { type: 'textarea', label: 'Message', required: true },
-    username: { type: 'text', label: 'Username Override', default: 'Flowa Bot' }
+    username: { type: 'text', label: 'Username Override', default: 'Fluxion Bot' }
   },
   execute: async ({ config }) => {
     const creds = config._credentials || {};
     const webhookUrl = creds.webhook_url || creds.webhookUrl || config.webhookUrl;
     if (!webhookUrl) throw new Error('Discord webhook URL is required');
-    const response = await axios.post(webhookUrl, { content: config.content, username: config.username || 'Flowa Bot' });
+    const response = await axios.post(webhookUrl, { content: config.content, username: config.username || 'Fluxion Bot' });
     return { success: true, statusCode: response.status };
   }
 });
@@ -1635,7 +1635,7 @@ registry.register('github_create_issue', {
     const response = await axios.post(
       `https://api.github.com/repos/${config.owner}/${config.repo}/issues`,
       { title: config.title, body: config.body || '', labels },
-      { headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'Flowa-Automation' } }
+      { headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'Fluxion-Automation' } }
     );
     return { success: true, issue: response.data, number: response.data.number, url: response.data.html_url };
   }
@@ -1660,7 +1660,7 @@ registry.register('github_pr', {
     if (!token) throw new Error('GitHub token required — set GITHUB_TOKEN in .env');
     const response = await axios.get(
       `https://api.github.com/repos/${config.owner}/${config.repo}/pulls`,
-      { params: { state: config.state || 'open', per_page: Math.min(config.limit || 30, 100) }, headers: { Authorization: `token ${token}`, 'User-Agent': 'Flowa-Automation' } }
+      { params: { state: config.state || 'open', per_page: Math.min(config.limit || 30, 100) }, headers: { Authorization: `token ${token}`, 'User-Agent': 'Fluxion-Automation' } }
     );
     return { success: true, pullRequests: response.data, count: response.data.length };
   }
@@ -2266,7 +2266,7 @@ registry.register('google_drive_upload', {
     const accessToken = creds.access_token || config.accessToken || process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
     if (!accessToken) throw new Error('Google OAuth access token required — add a Google Drive credential');
     const metadata = { name: config.fileName, ...(config.folderId && { parents: [config.folderId] }) };
-    const boundary = 'flowa_boundary';
+    const boundary = 'fluxion_boundary';
     const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${config.mimeType || 'text/plain'}\r\n\r\n${config.content}\r\n--${boundary}--`;
     const response = await axios.post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', body, { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` } });
     return { success: true, file: response.data, fileId: response.data.id, webViewLink: response.data.webViewLink };
@@ -2408,7 +2408,7 @@ registry.register('reddit_post', {
     const creds = config._credentials || {};
     const accessToken = creds.access_token || config.accessToken || process.env.REDDIT_ACCESS_TOKEN;
     if (!accessToken) throw new Error('Reddit access token required — set REDDIT_ACCESS_TOKEN in .env (use OAuth2 flow)');
-    const response = await axios.post('https://oauth.reddit.com/api/submit', new URLSearchParams({ sr: config.subreddit, title: config.title, kind: config.kind || 'self', text: config.body || '', resubmit: 'true' }).toString(), { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Flowa-Automation/1.0' } });
+    const response = await axios.post('https://oauth.reddit.com/api/submit', new URLSearchParams({ sr: config.subreddit, title: config.title, kind: config.kind || 'self', text: config.body || '', resubmit: 'true' }).toString(), { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Fluxion-Automation/1.0' } });
     return { success: true, post: response.data };
   }
 });
@@ -2635,7 +2635,7 @@ registry.register('pdf_extract', {
     const path = require('path');
     const fs = require('fs');
     const pdfResp = await axios.get(config.fileUrl, { responseType: 'arraybuffer', timeout: 30000 });
-    const tmpFile = path.join(os.tmpdir(), `flowa_pdf_${Date.now()}.pdf`);
+    const tmpFile = path.join(os.tmpdir(), `fluxion_pdf_${Date.now()}.pdf`);
     fs.writeFileSync(tmpFile, Buffer.from(pdfResp.data));
     try {
       const { execSync } = require('child_process');

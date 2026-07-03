@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════
--- Flowa – Database Schema & Seed Data (PostgreSQL)
+-- Fluxion – Database Schema & Seed Data (PostgreSQL)
 -- ═══════════════════════════════════════════════════════
 
 -- Enable UUID generation
@@ -217,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_templates_published_by ON marketplace
 INSERT INTO users (id, email, password_hash, name, role, email_verified)
 VALUES (
   'a0000000-0000-0000-0000-000000000001',
-  'admin@flowa.dev',
+  'admin@fluxion.dev',
   '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
   'Admin', 'admin', TRUE
 ) ON CONFLICT (email) DO NOTHING;
@@ -225,7 +225,7 @@ VALUES (
 INSERT INTO users (id, email, password_hash, name, role, email_verified)
 VALUES (
   'a0000000-0000-0000-0000-000000000002',
-  'sarah@flowa.dev',
+  'sarah@fluxion.dev',
   '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
   'Sarah Khan', 'user', TRUE
 ) ON CONFLICT (email) DO NOTHING;
@@ -233,7 +233,7 @@ VALUES (
 INSERT INTO users (id, email, password_hash, name, role, email_verified)
 VALUES (
   'a0000000-0000-0000-0000-000000000003',
-  'bilal@flowa.dev',
+  'bilal@fluxion.dev',
   '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
   'Bilal Ahmed', 'user', TRUE
 ) ON CONFLICT (email) DO NOTHING;
@@ -241,18 +241,18 @@ VALUES (
 INSERT INTO users (id, email, password_hash, name, role, email_verified)
 VALUES (
   'a0000000-0000-0000-0000-000000000004',
-  'aisha@flowa.dev',
+  'aisha@fluxion.dev',
   '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
   'Aisha Noor', 'user', TRUE
 ) ON CONFLICT (email) DO NOTHING;
 
 -- Team users (password for all: admin123)
-IF NOT EXISTS (SELECT * FROM users WHERE email = 'sarah@flowa.dev')
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'sarah@fluxion.dev')
 BEGIN
   INSERT INTO users (id, email, password_hash, name, role, email_verified)
   VALUES (
     'a0000000-0000-0000-0000-000000000002',
-    'sarah@flowa.dev',
+    'sarah@fluxion.dev',
     '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
     'Sarah Khan',
     'user',
@@ -261,12 +261,12 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT * FROM users WHERE email = 'bilal@flowa.dev')
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'bilal@fluxion.dev')
 BEGIN
   INSERT INTO users (id, email, password_hash, name, role, email_verified)
   VALUES (
     'a0000000-0000-0000-0000-000000000003',
-    'bilal@flowa.dev',
+    'bilal@fluxion.dev',
     '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
     'Bilal Ahmed',
     'user',
@@ -275,12 +275,12 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT * FROM users WHERE email = 'aisha@flowa.dev')
+IF NOT EXISTS (SELECT * FROM users WHERE email = 'aisha@fluxion.dev')
 BEGIN
   INSERT INTO users (id, email, password_hash, name, role, email_verified)
   VALUES (
     'a0000000-0000-0000-0000-000000000004',
-    'aisha@flowa.dev',
+    'aisha@fluxion.dev',
     '$2a$10$nI2jxfgDn9xR8z0UQExt0u01oQsL5kAHVGKxKg.s1LL63v/Q2wwYy',
     'Aisha Noor',
     'user',
@@ -355,7 +355,7 @@ VALUES (
   'b0000000-0000-0000-0000-000000000001',
   'Welcome Workflow',
   'A sample workflow to get you started',
-  '{"nodes":[{"id":"trigger-1","type":"manualTrigger","position":{"x":100,"y":200},"data":{"label":"Manual Trigger","type":"manualTrigger","config":{}}},{"id":"log-1","type":"consoleLog","position":{"x":400,"y":200},"data":{"label":"Log Output","type":"consoleLog","config":{"message":"Hello from Flowa!"}}}],"edges":[{"id":"e-trigger-1-log-1","source":"trigger-1","target":"log-1"}]}',
+  '{"nodes":[{"id":"trigger-1","type":"manualTrigger","position":{"x":100,"y":200},"data":{"label":"Manual Trigger","type":"manualTrigger","config":{}}},{"id":"log-1","type":"consoleLog","position":{"x":400,"y":200},"data":{"label":"Log Output","type":"consoleLog","config":{"message":"Hello from Fluxion!"}}}],"edges":[{"id":"e-trigger-1-log-1","source":"trigger-1","target":"log-1"}]}',
   'active',
   'a0000000-0000-0000-0000-000000000001'
 ) ON CONFLICT (id) DO NOTHING;

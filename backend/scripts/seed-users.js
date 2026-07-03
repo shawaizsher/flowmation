@@ -4,7 +4,7 @@ const sql = require('mssql');
 async function main() {
   const config = {
     server: process.env.DB_SERVER || 'localhost',
-    database: process.env.DB_DATABASE || 'flowa',
+    database: process.env.DB_DATABASE || 'fluxion',
     user: process.env.DB_USER || 'sa',
     password: process.env.DB_PASSWORD || '',
     options: {
@@ -29,19 +29,19 @@ async function main() {
   const users = [
     {
       id: 'a0000000-0000-0000-0000-000000000002',
-      email: 'sarah@flowa.dev',
+      email: 'sarah@fluxion.dev',
       name: 'Sarah Khan',
       role: 'user',
     },
     {
       id: 'a0000000-0000-0000-0000-000000000003',
-      email: 'bilal@flowa.dev',
+      email: 'bilal@fluxion.dev',
       name: 'Bilal Ahmed',
       role: 'user',
     },
     {
       id: 'a0000000-0000-0000-0000-000000000004',
-      email: 'aisha@flowa.dev',
+      email: 'aisha@fluxion.dev',
       name: 'Aisha Noor',
       role: 'user',
     },
@@ -92,7 +92,7 @@ async function main() {
     const result = await pool.request().query(
       `SELECT email, name, role, email_verified
        FROM users
-       WHERE email IN ('admin@flowa.dev', 'sarah@flowa.dev', 'bilal@flowa.dev', 'aisha@flowa.dev')
+       WHERE email IN ('admin@fluxion.dev', 'sarah@fluxion.dev', 'bilal@fluxion.dev', 'aisha@fluxion.dev')
        ORDER BY email`
     );
 

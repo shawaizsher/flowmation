@@ -178,7 +178,7 @@ export const useStore = create<AppState>()(
       setShowTutorial: (show) => set({ showTutorial: show }),
     }),
     {
-      name: 'flowa-storage',
+      name: 'fluxion-storage',
       partialize: (state) => ({
         token: state.token,
         user: state.user,

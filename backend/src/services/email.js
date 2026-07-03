@@ -67,21 +67,21 @@ async function sendVerificationEmail(toEmail, userName, token) {
     'background:#f4f4f5;border-radius:8px;margin:0 4px;';
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
+    from: process.env.SMTP_FROM || '"Fluxion" <noreply@fluxion.dev>',
     to: toEmail,
-    subject: `${token} is your Flowa verification code`,
+    subject: `${token} is your Fluxion verification code`,
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#fff;">
         <!-- Logo -->
         <div style="text-align:center;margin-bottom:32px;">
           <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
-          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Fluxion</h1>
         </div>
 
         <!-- Heading -->
         <h2 style="font-size:20px;color:#111;margin:0 0 8px;font-weight:700;">Your verification code</h2>
         <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px;">
-          Hi ${userName}, enter the code below on the Flowa registration page to verify your email address.
+          Hi ${userName}, enter the code below on the Fluxion registration page to verify your email address.
         </p>
 
         <!-- OTP digits -->
@@ -93,14 +93,14 @@ async function sendVerificationEmail(toEmail, userName, token) {
           This code expires in <strong>15 minutes</strong>.
         </p>
         <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 28px;">
-          If you didn't create a Flowa account, you can safely ignore this email.
+          If you didn't create a Fluxion account, you can safely ignore this email.
         </p>
 
         <hr style="border:none;border-top:1px solid #eee;margin:0 0 20px;" />
-        <p style="color:#bbb;font-size:12px;margin:0;">Flowa — AI-Native Workflow Automation</p>
+        <p style="color:#bbb;font-size:12px;margin:0;">Fluxion — AI-Native Workflow Automation</p>
       </div>
     `,
-    text: `Hi ${userName},\n\nYour Flowa verification code is: ${token}\n\nThis code expires in 15 minutes.`,
+    text: `Hi ${userName},\n\nYour Fluxion verification code is: ${token}\n\nThis code expires in 15 minutes.`,
   };
 
   const info = await transporter.sendMail(mailOptions);
@@ -122,18 +122,18 @@ async function sendPasswordResetEmail(toEmail, userName, token) {
     'background:#f4f4f5;border-radius:8px;margin:0 4px;';
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
+    from: process.env.SMTP_FROM || '"Fluxion" <noreply@fluxion.dev>',
     to: toEmail,
-    subject: `${token} is your Flowa password reset code`,
+    subject: `${token} is your Fluxion password reset code`,
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#fff;">
         <div style="text-align:center;margin-bottom:32px;">
           <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
-          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Fluxion</h1>
         </div>
         <h2 style="font-size:20px;color:#111;margin:0 0 8px;font-weight:700;">Reset your password</h2>
         <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px;">
-          Hi ${userName}, enter the code below to reset your Flowa password.
+          Hi ${userName}, enter the code below to reset your Fluxion password.
         </p>
         <div style="text-align:center;margin:0 0 32px;">
           ${digits.map(d => `<span style="${digitBoxStyle}">${d}</span>`).join('')}
@@ -145,10 +145,10 @@ async function sendPasswordResetEmail(toEmail, userName, token) {
           If you didn't request a password reset, you can safely ignore this email.
         </p>
         <hr style="border:none;border-top:1px solid #eee;margin:0 0 20px;" />
-        <p style="color:#bbb;font-size:12px;margin:0;">Flowa — AI-Native Workflow Automation</p>
+        <p style="color:#bbb;font-size:12px;margin:0;">Fluxion — AI-Native Workflow Automation</p>
       </div>
     `,
-    text: `Hi ${userName},\n\nYour Flowa password reset code is: ${token}\n\nThis code expires in 15 minutes.`,
+    text: `Hi ${userName},\n\nYour Fluxion password reset code is: ${token}\n\nThis code expires in 15 minutes.`,
   };
 
   const info = await transporter.sendMail(mailOptions);
@@ -158,14 +158,14 @@ async function sendPasswordResetEmail(toEmail, userName, token) {
 
 async function sendWorkspaceInviteEmail({ toEmail, inviterName, workspaceName, role, message, inviteToken }) {
   const mailOptions = {
-    from: process.env.SMTP_FROM || '"Flowa" <noreply@flowa.dev>',
+    from: process.env.SMTP_FROM || '"Fluxion" <noreply@fluxion.dev>',
     to: toEmail,
-    subject: `${inviterName} invited you to ${workspaceName} on Flowa`,
+    subject: `${inviterName} invited you to ${workspaceName} on Fluxion`,
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#fff;">
         <div style="text-align:center;margin-bottom:28px;">
           <div style="display:inline-block;background:linear-gradient(135deg,#F63049,#E11D48);width:48px;height:48px;border-radius:12px;line-height:48px;font-size:24px;color:white;">⚡</div>
-          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Flowa</h1>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#111;font-weight:700;">Fluxion</h1>
         </div>
         <h2 style="font-size:20px;color:#111;margin:0 0 10px;font-weight:700;">You're invited to collaborate</h2>
         <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 18px;">
@@ -173,12 +173,12 @@ async function sendWorkspaceInviteEmail({ toEmail, inviterName, workspaceName, r
         </p>
         ${message ? `<div style="border:1px solid #f1d3d9;background:#fff5f7;border-radius:12px;padding:14px 16px;color:#6b2133;font-size:14px;line-height:1.6;margin-bottom:18px;">${message}</div>` : ''}
         <div style="border:1px solid #eee;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
-          <p style="margin:0;color:#444;font-size:14px;line-height:1.6;">Sign in to Flowa with <strong>${toEmail}</strong> to accept or reject the invitation from your notifications center.</p>
+          <p style="margin:0;color:#444;font-size:14px;line-height:1.6;">Sign in to Fluxion with <strong>${toEmail}</strong> to accept or reject the invitation from your notifications center.</p>
         </div>
         <p style="color:#999;font-size:12px;line-height:1.6;margin:0;">Invite token: ${inviteToken}</p>
       </div>
     `,
-    text: `${inviterName} invited you to join ${workspaceName} on Flowa as ${role}.${message ? ` Message: ${message}` : ''}`,
+    text: `${inviterName} invited you to join ${workspaceName} on Fluxion as ${role}.${message ? ` Message: ${message}` : ''}`,
   };
 
   const info = await transporter.sendMail(mailOptions);

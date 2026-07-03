@@ -1,6 +1,6 @@
-# Flowa Docker Quickstart
+# Fluxion Docker Quickstart
 
-Get Flowa running in 5 minutes!
+Get Fluxion running in 5 minutes!
 
 ## Prerequisites
 
@@ -12,8 +12,8 @@ Get Flowa running in 5 minutes!
 ### 1. Clone & Setup (2 minutes)
 
 ```bash
-git clone https://github.com/yourusername/flowa-automation-platform.git
-cd flowa-automation-platform
+git clone https://github.com/yourusername/fluxion-automation-platform.git
+cd fluxion-automation-platform
 cp .env.example .env
 ```
 
@@ -69,4 +69,4 @@ docker-compose down -v && docker-compose up -d
 docker-compose ps
 ```
 
-For more help, see DOCKER.md or contact us at github.com/yourusername/flowa
+For more help, see DOCKER.md or contact us at github.com/yourusername/fluxion

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="frontend/public/favicon.svg" alt="Flowa Logo" width="80" height="80" />
+  <img src="frontend/public/favicon.svg" alt="Fluxion Logo" width="80" height="80" />
 </p>
 
-<h1 align="center">Flowa</h1>
+<h1 align="center">Fluxion</h1>
 
 <p align="center">
   <strong>AI-Native Workflow Automation Platform</strong>
@@ -28,7 +28,7 @@
 
 ## Overview
 
-**Flowa** is a full-stack, AI-native workflow automation platform that lets you visually design, connect, and execute workflows using a drag-and-drop canvas editor. With **173+ integration nodes** across **23 categories**, Flowa connects your entire tech stack — from AI/ML models and databases to cloud services, social media, e-commerce, and more.
+**Fluxion** is a full-stack, AI-native workflow automation platform that lets you visually design, connect, and execute workflows using a drag-and-drop canvas editor. With **173+ integration nodes** across **23 categories**, Fluxion connects your entire tech stack — from AI/ML models and databases to cloud services, social media, e-commerce, and more.
 
 Think **n8n** meets **AI-first design** — with a sleek dark UI, real-time execution, and a credentials vault built in.
 
@@ -120,10 +120,10 @@ Think **n8n** meets **AI-first design** — with a sleek dark UI, real-time exec
 ## 📂 Project Structure
 
 ```
-Flowa-Automation-Platform/
+Fluxion-Automation-Platform/
 ├── frontend/                       # React + TypeScript + Vite
 │   ├── public/
-│   │   └── favicon.svg             # Flowa logo
+│   │   └── favicon.svg             # Fluxion logo
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── AppShell.tsx        # Layout wrapper with sidebar
@@ -199,8 +199,8 @@ Flowa-Automation-Platform/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/Flowa-Automation-Platform.git
-cd Flowa-Automation-Platform
+git clone https://github.com/your-username/Fluxion-Automation-Platform.git
+cd Fluxion-Automation-Platform
 ```
 
 ### 2. Configure Environment
@@ -330,9 +330,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `POSTGRES_USER` | `flowa` | Database user |
-| `POSTGRES_PASSWORD` | `flowa_secret_2026` | Database password |
-| `POSTGRES_DB` | `flowa` | Database name |
+| `POSTGRES_USER` | `fluxion` | Database user |
+| `POSTGRES_PASSWORD` | `fluxion_secret_2026` | Database password |
+| `POSTGRES_DB` | `fluxion` | Database name |
 | `DATABASE_URL` | `postgresql://...` | Full connection string |
 | `REDIS_URL` | `redis://redis:6379` | Redis connection |
 | `PORT` | `4000` | Backend port |
@@ -458,7 +458,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 ---
 
 <p align="center">
-  <img src="frontend/public/favicon.svg" alt="Flowa" width="24" height="24" />
+  <img src="frontend/public/favicon.svg" alt="Fluxion" width="24" height="24" />
   <br />
-  <sub>Built with ❤️ by the Flowa team</sub>
+  <sub>Built with ❤️ by the Fluxion team</sub>
 </p>

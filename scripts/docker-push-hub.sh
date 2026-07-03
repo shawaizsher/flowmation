@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Script to push Flowa Docker image to Docker Hub
+# Script to push Fluxion Docker image to Docker Hub
 # Usage: ./scripts/docker-push-hub.sh yourusername 1.0.0
 
 DOCKER_USERNAME=${1:-yourusername}
 VERSION=${2:-latest}
 
 echo "════════════════════════════════════════════════════════════"
-echo "🚀 Pushing Flowa Docker Image to Docker Hub"
+echo "🚀 Pushing Fluxion Docker Image to Docker Hub"
 echo "════════════════════════════════════════════════════════════"
 echo "Username: $DOCKER_USERNAME"
 echo "Version: $VERSION"
@@ -32,8 +32,8 @@ echo ""
 
 # Verify image exists locally
 echo "Checking if image exists locally..."
-if ! docker images | grep -q "${DOCKER_USERNAME}/flowa"; then
-    echo "❌ Image not found: ${DOCKER_USERNAME}/flowa"
+if ! docker images | grep -q "${DOCKER_USERNAME}/fluxion"; then
+    echo "❌ Image not found: ${DOCKER_USERNAME}/fluxion"
     echo "   Run first: ./scripts/docker-build-hub.sh ${DOCKER_USERNAME} ${VERSION}"
     exit 1
 fi
@@ -46,12 +46,12 @@ echo "────────────────────────�
 echo "📤 Pushing Image to Docker Hub"
 echo "────────────────────────────────────────────────────────────"
 
-echo "Pushing ${DOCKER_USERNAME}/flowa:${VERSION}..."
-docker push ${DOCKER_USERNAME}/flowa:${VERSION}
+echo "Pushing ${DOCKER_USERNAME}/fluxion:${VERSION}..."
+docker push ${DOCKER_USERNAME}/fluxion:${VERSION}
 
 echo ""
-echo "Pushing ${DOCKER_USERNAME}/flowa:latest..."
-docker push ${DOCKER_USERNAME}/flowa:latest
+echo "Pushing ${DOCKER_USERNAME}/fluxion:latest..."
+docker push ${DOCKER_USERNAME}/fluxion:latest
 
 echo "✅ Image pushed"
 echo ""
@@ -61,7 +61,7 @@ echo "✅ Push Complete!"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 echo "Image now available at Docker Hub:"
-echo "  https://hub.docker.com/r/${DOCKER_USERNAME}/flowa"
+echo "  https://hub.docker.com/r/${DOCKER_USERNAME}/fluxion"
 echo ""
 echo "For others to use this image:"
 echo "  DOCKER_USERNAME=${DOCKER_USERNAME} VERSION=${VERSION} docker-compose -f docker-compose.pull.yml up -d"

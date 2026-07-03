@@ -1,7 +1,7 @@
 import { useState, FormEvent, useRef, KeyboardEvent, ClipboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowLeft, Mail, RefreshCw, CheckCircle2, Zap, Sparkles } from 'lucide-react';
-import FlowaLogo from '../components/FlowaLogo';
+import FluxionLogo from '../components/FluxionLogo';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
@@ -215,8 +215,8 @@ export default function RegisterPage() {
 
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <FlowaLogo size={36} />
-          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Flowa</span>
+          <FluxionLogo size={36} />
+          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Fluxion</span>
         </div>
 
         <div className="card p-8">

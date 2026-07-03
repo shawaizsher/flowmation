@@ -18,10 +18,10 @@ echo -e "${YELLOW}Login to Docker Hub...${NC}"
 docker login
 
 echo -e "${YELLOW}Pushing images...${NC}"
-docker push $DOCKER_USERNAME/flowa-backend:$VERSION
-docker push $DOCKER_USERNAME/flowa-backend:latest
-docker push $DOCKER_USERNAME/flowa-frontend:$VERSION
-docker push $DOCKER_USERNAME/flowa-frontend:latest
+docker push $DOCKER_USERNAME/fluxion-backend:$VERSION
+docker push $DOCKER_USERNAME/fluxion-backend:latest
+docker push $DOCKER_USERNAME/fluxion-frontend:$VERSION
+docker push $DOCKER_USERNAME/fluxion-frontend:latest
 
 echo -e "${GREEN}Images pushed!${NC}"
 echo "Visit: https://hub.docker.com/r/$DOCKER_USERNAME"

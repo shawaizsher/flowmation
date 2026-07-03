@@ -5,6 +5,7 @@ let redis = null;
 let redisSub = null;
 let selectedRedisUrl = null;
 let selectedRedisVersion = null;
+let redisAvailable = false;
 
 const REDIS_OPTIONS = {
   maxRetriesPerRequest: null,
@@ -153,7 +154,12 @@ async function initRedis() {
     }
 
     if (!selectedRedisUrl) {
-      throw new Error(`Unable to connect to Redis. Tried: ${candidates.map(sanitizeRedisUrl).join(', ')}`);
+      logger.warn(
+        `Redis unavailable. Tried: ${candidates.map(sanitizeRedisUrl).join(', ')}. ` +
+        'Workflow executions will run inline; real-time cross-instance events disabled.'
+      );
+      redisAvailable = false;
+      return null;
     }
 
     logger.info(`Redis URL selected: ${sanitizeRedisUrl(selectedRedisUrl)}${selectedRedisVersion ? ` (${selectedRedisVersion})` : ''}`);
@@ -161,12 +167,17 @@ async function initRedis() {
 
   const client = getRedis();
   await client.ping();
+  redisAvailable = true;
   logger.info('Redis ping successful');
   return client;
+}
+
+function isRedisAvailable() {
+  return redisAvailable;
 }
 
 function getRedisServerVersion() {
   return selectedRedisVersion;
 }
 
-module.exports = { getRedis, getRedisSub, initRedis, getRedisServerVersion, isRedisVersionAtLeast };
+module.exports = { getRedis, getRedisSub, initRedis, isRedisAvailable, getRedisServerVersion, isRedisVersionAtLeast };

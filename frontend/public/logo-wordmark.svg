@@ -1,0 +1,41 @@
+<svg width="320" height="90" viewBox="0 0 320 90" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fx-bg" x1="4" y1="2" x2="76" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="55%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#4C1D95"/>
+    </linearGradient>
+    <linearGradient id="fx-mark" x1="17" y1="59" x2="63" y2="31" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#E0E7FF"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="fx-sheen" x1="0" y1="5" x2="80" y2="85" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fx-text" x1="100" y1="0" x2="320" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="55%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#0891B2"/>
+    </linearGradient>
+    <filter id="fx-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;display=swap');
+    </style>
+  </defs>
+  <rect x="0" y="5" width="80" height="80" rx="20" fill="url(#fx-bg)"/>
+  <rect x="0" y="5" width="80" height="80" rx="20" fill="url(#fx-sheen)"/>
+  <g filter="url(#fx-glow)" transform="translate(0,25)">
+    <path d="M18 20 C18 6 34 6 40 20 C46 34 62 34 62 20" stroke="url(#fx-mark)" stroke-width="6.5" fill="none" stroke-linecap="round"/>
+  </g>
+  <circle cx="18" cy="45" r="5" fill="#ffffff"/>
+  <circle cx="62" cy="45" r="5" fill="#22D3EE"/>
+  <text x="98" y="63" font-family="'Caveat', cursive" font-size="58" font-weight="700" fill="url(#fx-text)">Fluxion</text>
+</svg>

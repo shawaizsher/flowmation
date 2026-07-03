@@ -58,8 +58,8 @@ if [ "$IS_EXTERNAL" = "1" ] && [ -n "$DATABASE_URL" ]; then
     echo "Note: Schema may already be initialized (this is usually safe to ignore)."
   }
 else
-  export PGPASSWORD=${DB_PASSWORD:-flowa_password}
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "${DB_USER:-flowa_user}" -d "${DB_NAME:-flowa_db}" -f /app/src/db/init.sql 2>&1 || {
+  export PGPASSWORD=${DB_PASSWORD:-fluxion_password}
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "${DB_USER:-fluxion_user}" -d "${DB_NAME:-fluxion_db}" -f /app/src/db/init.sql 2>&1 || {
     echo "Note: Schema may already be initialized (this is usually safe to ignore)."
   }
   unset PGPASSWORD

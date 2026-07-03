@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
-import FlowaLogo from '../components/FlowaLogo';
+import FluxionLogo from '../components/FluxionLogo';
 import BanterLoader from '../components/BanterLoader';
 import toast from 'react-hot-toast';
 import { authApi } from '../utils/api';
@@ -60,8 +60,8 @@ export default function VerifyEmailPage() {
       <div className="w-full max-w-md text-center">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <FlowaLogo size={36} />
-          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Flowa</span>
+          <FluxionLogo size={36} />
+          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Fluxion</span>
         </div>
 
         <div className="card p-8">

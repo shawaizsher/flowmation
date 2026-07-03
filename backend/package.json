@@ -1,7 +1,7 @@
 {
-  "name": "flowa-backend",
+  "name": "fluxion-backend",
   "version": "1.0.0",
-  "description": "Flowa – AI-native workflow automation platform (backend)",
+  "description": "Fluxion – AI-native workflow automation platform (backend)",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

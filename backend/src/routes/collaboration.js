@@ -136,7 +136,7 @@ router.post('/invites', requireRole('owner', 'admin', 'editor'), async (req, res
     sendWorkspaceInviteEmail({
       toEmail: email,
       inviterName: req.user.name,
-      workspaceName: req.workspace?.name || 'Flowa workspace',
+      workspaceName: req.workspace?.name || 'Fluxion workspace',
       role,
       message,
       inviteToken: token,

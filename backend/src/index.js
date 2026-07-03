@@ -156,7 +156,7 @@ async function start() {
     }
 
     server.listen(PORT, () => {
-      logger.info(`🚀 Flowa backend running on port ${PORT}`);
+      logger.info(`🚀 Fluxion backend running on port ${PORT}`);
       logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (err) {

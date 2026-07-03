@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'flowa-api',
+      name: 'fluxion-api',
       script: 'src/index.js',
       instances: 1,
       autorestart: true,
@@ -9,7 +9,7 @@ module.exports = {
       env: { NODE_ENV: 'production' }
     },
     {
-      name: 'flowa-worker',
+      name: 'fluxion-worker',
       script: 'src/worker.js',
       instances: 1,
       autorestart: true,

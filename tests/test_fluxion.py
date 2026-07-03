@@ -1,5 +1,5 @@
 """
-Assignment 3 (CLO-2) — Selenium Test Suite for Flowa Automation Platform
+Assignment 3 (CLO-2) — Selenium Test Suite for Fluxion Automation Platform
 =========================================================================
 Task 1a — Application Architecture:
   Framework : React 18 + TypeScript + Vite          (Frontend)
@@ -28,7 +28,7 @@ CRUD Test Plan
 How to run
 ----------
   pip install -r tests/requirements.txt
-  python tests/test_flowa.py
+  python tests/test_fluxion.py
 
 Prerequisites: app running at http://localhost:3000 with seed data loaded.
   cd backend && npm run seed:users
@@ -46,7 +46,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # ── Configuration ────────────────────────────────────────────────────────────
 BASE_URL      = "http://localhost:3000"
-TEST_EMAIL    = "admin@flowa.dev"
+TEST_EMAIL    = "admin@fluxion.dev"
 TEST_PASSWORD = "admin123"
 WF_NAME       = "Selenium CRUD Test"
 WF_UPDATED    = "Selenium CRUD Updated"
@@ -389,7 +389,7 @@ def test_logout(driver):
 # ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     print("=" * 60)
-    print("  FLOWA — Selenium Test Suite  (Assignment 3 · CLO-2)")
+    print("  FLUXION — Selenium Test Suite  (Assignment 3 · CLO-2)")
     print("=" * 60)
     print(f"  Target : {BASE_URL}")
     print(f"  User   : {TEST_EMAIL}")

@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════════════
-  FLOWA DOCKER & DOCKER HUB SETUP - COMPLETE
+  FLUXION DOCKER & DOCKER HUB SETUP - COMPLETE
 ═══════════════════════════════════════════════════════════════════════════════
 
 ✅ DOCKER FILES CREATED:
@@ -111,7 +111,7 @@ QUICKSTART.md (5-Minute Setup)
 STEP 1: Setup (2 minutes)
 ```bash
 git clone <your-repo>
-cd flowa-automation-platform
+cd fluxion-automation-platform
 cp .env.example .env
 nano .env  # Configure with your values
 ```
@@ -133,7 +133,7 @@ DOCKER_USERNAME=yourusername VERSION=1.0.0 ./docker-push.sh
 ```
 
 STEP 5: Share with Others
-- Users pull from Docker Hub: docker pull yourusername/flowa-backend
+- Users pull from Docker Hub: docker pull yourusername/fluxion-backend
 - Run with provided docker-compose.yml
 - No need to build from scratch
 

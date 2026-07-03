@@ -13,8 +13,8 @@ interface Step {
 const STEPS: Step[] = [
   {
     icon: <Sparkles size={32} />,
-    title: 'Welcome to Flowa!',
-    description: 'Flowa is a visual workflow automation platform. You can automate repetitive tasks by connecting different apps and services together — no coding required.',
+    title: 'Welcome to Fluxion!',
+    description: 'Fluxion is a visual workflow automation platform. You can automate repetitive tasks by connecting different apps and services together — no coding required.',
     tip: 'Think of it like building a recipe: "When X happens, do Y, then Z."',
     color: 'brand',
   },

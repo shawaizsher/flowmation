@@ -12,7 +12,7 @@ import {
   Store,
   Shield,
 } from 'lucide-react';
-import FlowaLogo from './FlowaLogo';
+import FluxionLogo from './FluxionLogo';
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import toast from 'react-hot-toast';
@@ -86,11 +86,11 @@ export default function AppShell() {
       >
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 py-5 border-b border-surface-border">
-          <FlowaLogo size={32} className="min-w-[32px]" />
+          <FluxionLogo size={32} className="min-w-[32px]" />
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <span className="font-body text-lg font-bold tracking-tight text-foreground truncate block">
-                Flowa
+              <span className="font-accent text-2xl font-bold tracking-tight text-foreground truncate block">
+                Fluxion
               </span>
               {workspaces.length > 0 && (
                 <div className="relative mt-2">

@@ -643,8 +643,8 @@ function generateTestFixtures(graph) {
       payload: {
         body: hasLead
           ? { email: 'lead@example.com', status: 'hot', score: 92, source: 'website' }
-          : { message: 'hello from Flowa', status: 'ok' },
-        headers: { 'x-flowa-test': 'true' },
+          : { message: 'hello from Fluxion', status: 'ok' },
+        headers: { 'x-fluxion-test': 'true' },
         query: {},
         method: 'POST',
         trigger: trigger ? getNodeType(trigger) : 'manual'
@@ -667,7 +667,7 @@ function generateTestFixtures(graph) {
 function makeReleasePlan(workflow, compile) {
   const blocked = compile.status === 'blocked';
   return {
-    environment: process.env.FLOWA_RELEASE_ENV || 'local',
+    environment: process.env.FLUXION_RELEASE_ENV || 'local',
     recommendation: blocked ? 'Do not publish yet' : compile.status === 'review' ? 'Publish to staging first' : 'Ready for production publish',
     canary: {
       enabled: !blocked,
@@ -690,7 +690,7 @@ function makeEdgeRunnerPlan(graph, compile) {
   );
   return {
     mode: privateNodes.length ? 'recommended' : 'optional',
-    runnerName: `flowa-edge-${Date.now()}`,
+    runnerName: `fluxion-edge-${Date.now()}`,
     reason: privateNodes.length
       ? 'Workflow touches private databases/storage; run close to the data source.'
       : 'No private-data connector detected, but edge execution can still reduce latency.',
@@ -1038,7 +1038,7 @@ router.get('/templates/marketplace', async (req, res) => {
       requiredCredentials: t.requiredCredentials,
       nodeCount:           t.graph.nodes.length,
       edgeCount:           t.graph.edges.length,
-      owner:               'Flowa Team',
+      owner:               'Fluxion Team',
       isBuiltIn:           true,
       avgRating:           builtInRatings[t.id]?.avgRating   ?? 0,
       ratingCount:         builtInRatings[t.id]?.ratingCount ?? 0,

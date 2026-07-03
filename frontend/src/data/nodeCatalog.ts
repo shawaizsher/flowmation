@@ -419,7 +419,7 @@ export const nodeCatalog: NodeDefinition[] = [
     configSchema: {
       webhookUrl: { type: 'string', label: 'Webhook URL', default: '', required: true },
       content: { type: 'code', label: 'Message', default: '' },
-      username: { type: 'string', label: 'Username Override', default: 'Flowa Bot' },
+      username: { type: 'string', label: 'Username Override', default: 'Fluxion Bot' },
     },
   },
   {

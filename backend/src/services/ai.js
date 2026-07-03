@@ -77,7 +77,7 @@ async function generateWorkflow(prompt) {
   const context = retrieveContext(prompt, 8);
   const catalog = nodeCatalogSummary();
 
-  const system = `You are Flowa's workflow generation engine. Output a valid workflow JSON for the user's automation request.
+  const system = `You are Fluxion's workflow generation engine. Output a valid workflow JSON for the user's automation request.
 
 RETURN ONLY JSON — no markdown, no explanation. Start your response with {
 
@@ -152,7 +152,7 @@ async function workflowChat({ message, history = [], workflow = { nodes: [], edg
     .map(n => `- ${n.data?.label || n.label || n.id} (${n.type || n.data?.type})`)
     .join('\n') || 'No nodes yet';
 
-  const system = `You are Freckles, the AI assistant inside Flowa workflow automation platform.
+  const system = `You are Freckles, the AI assistant inside Fluxion workflow automation platform.
 
 CURRENT WORKFLOW NODES:
 ${nodeList}
@@ -221,7 +221,7 @@ async function explainError(execution, failedLogs) {
     `Node: ${l.node_label} (${l.node_type})\nError: ${l.error}\nInput: ${JSON.stringify(l.input || {}).slice(0, 300)}`
   ).join('\n\n');
 
-  const system = `You are a workflow debugging assistant for Flowa. Explain the error clearly and provide actionable fix steps.
+  const system = `You are a workflow debugging assistant for Fluxion. Explain the error clearly and provide actionable fix steps.
 
 Respond with JSON:
 {
@@ -250,7 +250,7 @@ Respond with JSON:
 async function debugNode({ nodeType, nodeLabel, config, error, input, configSchema }) {
   const context = retrieveContext(`${nodeType} ${error}`, 3);
 
-  const system = `You are a Flowa node debugger. Diagnose why a node failed and provide exact config fixes.
+  const system = `You are a Fluxion node debugger. Diagnose why a node failed and provide exact config fixes.
 
 Respond with JSON:
 {
@@ -281,7 +281,7 @@ async function suggestNodes(graph) {
   const nodeList = (graph.nodes || []).map(n => n.type || n.data?.type).join(', ');
   const context = retrieveContext(`next node after ${nodeList}`, 4);
 
-  const system = `You are a Flowa workflow advisor. Given the current workflow nodes, suggest what nodes to add next.
+  const system = `You are a Fluxion workflow advisor. Given the current workflow nodes, suggest what nodes to add next.
 
 Respond with JSON array:
 [{"type": "node_type", "label": "Display name", "reason": "Why this node makes sense here"}]`;

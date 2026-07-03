@@ -4,27 +4,27 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: flowa-postgres
+    container_name: fluxion-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-flowa_db}
-      POSTGRES_USER: ${DB_USER:-flowa_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-flowa_password}
+      POSTGRES_DB: ${DB_NAME:-fluxion_db}
+      POSTGRES_USER: ${DB_USER:-fluxion_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fluxion_password}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-flowa_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fluxion_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - flowa-network
+      - fluxion-network
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: flowa-redis
+    container_name: fluxion-redis
     ports:
       - "6379:6379"
     volumes:
@@ -35,15 +35,15 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - flowa-network
+      - fluxion-network
 
   # Consolidated Backend + Frontend (single image from Docker Hub)
   app:
-    image: shawaizsher/flowa:1.0.0
-    container_name: flowa-app
+    image: shawaizsher/fluxion:1.0.0
+    container_name: fluxion-app
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: postgresql://${DB_USER:-flowa_user}:${DB_PASSWORD:-flowa_password}@postgres:5432/${DB_NAME:-flowa_db}
+      DATABASE_URL: postgresql://${DB_USER:-fluxion_user}:${DB_PASSWORD:-fluxion_password}@postgres:5432/${DB_NAME:-fluxion_db}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       API_PORT: 4000
@@ -60,7 +60,7 @@ services:
       - ./backend/src:/app/src
       - /app/node_modules
     networks:
-      - flowa-network
+      - fluxion-network
     restart: unless-stopped
 
 volumes:
@@ -68,5 +68,5 @@ volumes:
   redis_data:
 
 networks:
-  flowa-network:
+  fluxion-network:
     driver: bridge

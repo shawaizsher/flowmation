@@ -50,7 +50,7 @@ export default function DraggableJsonTree({
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData('text/plain', token);
-          e.dataTransfer.setData('application/flowa-token', token);
+          e.dataTransfer.setData('application/fluxion-token', token);
           e.dataTransfer.effectAllowed = 'copy';
         }}
         title={`Drag into an input → ${token}`}
@@ -128,7 +128,7 @@ export default function DraggableJsonTree({
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', keyToken);
-                    e.dataTransfer.setData('application/flowa-token', keyToken);
+                    e.dataTransfer.setData('application/fluxion-token', keyToken);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   title={`Drag → ${keyToken}`}

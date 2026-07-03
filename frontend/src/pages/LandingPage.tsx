@@ -12,7 +12,7 @@ import {
   SiDiscord, SiZapier, SiJira, SiTwilio, SiAirtable,
   SiHubspot, SiShopify, SiPostgresql, SiRedis, SiDocker,
 } from 'react-icons/si';
-import FlowaLogo from '../components/FlowaLogo';
+import FluxionLogo from '../components/FluxionLogo';
 import { Radar, IconContainer } from '../components/Radar';
 import WorkflowAnimation from '../components/WorkflowAnimation';
 import { useTheme } from '../hooks/useTheme';
@@ -26,14 +26,14 @@ function mkTheme(dark: boolean) {
     textMuted:   dark ? 'rgba(255,255,255,0.42)' : 'rgba(15,23,42,0.55)',
     textDim:     dark ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.35)',
     border:      dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.09)',
-    borderHover: dark ? 'rgba(246,48,73,0.25)'   : 'rgba(246,48,73,0.35)',
+    borderHover: dark ? 'rgba(139,92,246,0.25)'   : 'rgba(139,92,246,0.35)',
     navBg:       dark ? 'rgba(0,0,0,0.88)'        : 'rgba(255,255,255,0.92)',
     dotGrid:     dark ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)',
     faqBg:       (open: boolean) => open
-      ? (dark ? 'rgba(246,48,73,0.04)' : 'rgba(246,48,73,0.03)')
+      ? (dark ? 'rgba(139,92,246,0.04)' : 'rgba(139,92,246,0.03)')
       : (dark ? '#0a0a0a' : '#ffffff'),
     faqBorder:   (open: boolean) => open
-      ? 'rgba(246,48,73,0.22)'
+      ? 'rgba(139,92,246,0.22)'
       : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.09)'),
     tagBorder:   dark ? 'rgba(255,255,255,0.08)'  : 'rgba(15,23,42,0.1)',
     tagColor:    dark ? 'rgba(255,255,255,0.45)'  : 'rgba(15,23,42,0.5)',
@@ -54,7 +54,7 @@ const features = [
 const steps = [
   { num: '01', title: 'Design',    desc: 'Drag nodes onto the canvas and wire them together visually.',          icon: MousePointerClick },
   { num: '02', title: 'Configure', desc: 'Set triggers, conditions, and AI prompts per node.',                   icon: Layers },
-  { num: '03', title: 'Deploy',    desc: 'One-click deploy — Flowa runs your pipeline in parallel.',             icon: Globe },
+  { num: '03', title: 'Deploy',    desc: 'One-click deploy — Fluxion runs your pipeline in parallel.',             icon: Globe },
 ];
 
 const marqueeItems = [
@@ -107,7 +107,7 @@ const dayOneChecklist = [
 ];
 
 const faqs = [
-  { q: 'Can I self-host Flowa in my own infrastructure?',  a: 'Yes. Flowa is built for self-hosting with Docker Compose and environment-based configuration for backend, worker, database, and Redis services.' },
+  { q: 'Can I self-host Fluxion in my own infrastructure?',  a: 'Yes. Fluxion is built for self-hosting with Docker Compose and environment-based configuration for backend, worker, database, and Redis services.' },
   { q: 'Is this only for engineers?',                      a: 'No. Engineers can extend nodes and APIs, while product and operations teams can build flows visually with no-code style configuration.' },
   { q: 'How do I monitor failures and retries?',           a: 'Each run includes status tracking and logs. You can inspect execution state, identify failed nodes, and replay flows with controlled retries.' },
   { q: 'Can I connect external tools and custom APIs?',    a: 'Yes. Use the HTTP/API nodes and webhook triggers to integrate external services, then combine them with built-in nodes for orchestration.' },
@@ -118,17 +118,17 @@ const TAG_CLASSES = ['tag-brand', 'tag-cyan', 'tag-rose'];
 
 /* ── Highlight icon accent colours ── */
 const HIGHLIGHT_ACCENTS = [
-  { bg: 'rgba(246,48,73,0.08)',   border: 'rgba(246,48,73,0.15)',  color: '#F63049' },
+  { bg: 'rgba(139,92,246,0.08)',   border: 'rgba(139,92,246,0.15)',  color: '#8B5CF6' },
   { bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.15)',  color: '#06B6D4' },
   { bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.15)',  color: '#06B6D4' },
-  { bg: 'rgba(246,48,73,0.08)',   border: 'rgba(246,48,73,0.15)',  color: '#F63049' },
+  { bg: 'rgba(139,92,246,0.08)',   border: 'rgba(139,92,246,0.15)',  color: '#8B5CF6' },
 ];
 
 /* ── Step number accent colours ── */
 const STEP_NUM_COLORS = [
-  'rgba(246,48,73,0.08)',
+  'rgba(139,92,246,0.08)',
   'rgba(6,182,212,0.07)',
-  'rgba(246,48,73,0.08)',
+  'rgba(139,92,246,0.08)',
 ];
 
 /* ── Hooks ── */
@@ -275,8 +275,8 @@ export default function LandingPage() {
         style={{ background: t.navBg, backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)', borderColor: t.border, transition: 'background 0.4s ease, border-color 0.4s ease' }}>
         <div className="flex items-center justify-between px-4 sm:px-8 py-4 max-w-7xl mx-auto animate-fade-in">
           <div className="flex items-center gap-3 group cursor-default">
-            <FlowaLogo size={32} className="group-hover:scale-110 transition-transform duration-300" />
-            <span className="font-body text-lg font-bold tracking-tight" style={{ color: t.text }}>Flowa</span>
+            <FluxionLogo size={32} className="group-hover:scale-110 transition-transform duration-300" />
+            <span className="font-body text-lg font-bold tracking-tight" style={{ color: t.text }}>Fluxion</span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -297,7 +297,7 @@ export default function LandingPage() {
             <Link
               to="/register"
               className="landing-nav-cta btn-shimmer relative text-xs px-6 py-2.5 rounded-lg font-semibold uppercase tracking-widest transition-all duration-300 text-white border"
-              style={{ background: '#F63049', borderColor: 'rgba(246,48,73,0.5)', boxShadow: '0 4px 24px rgba(246,48,73,0.28)' }}
+              style={{ background: '#8B5CF6', borderColor: 'rgba(139,92,246,0.5)', boxShadow: '0 4px 24px rgba(139,92,246,0.28)' }}
             >
               Get Started
             </Link>
@@ -312,12 +312,12 @@ export default function LandingPage() {
       >
         {/* Badge */}
         <div className="landing-chip relative inline-flex items-center gap-2.5 rounded-full px-5 py-2 mb-10 animate-scale-in cursor-default border"
-          style={{ borderColor: 'rgba(246,48,73,0.28)', background: 'rgba(246,48,73,0.07)', backdropFilter: 'blur(8px)' }}>
+          style={{ borderColor: 'rgba(139,92,246,0.28)', background: 'rgba(139,92,246,0.07)', backdropFilter: 'blur(8px)' }}>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F63049' }} />
-            <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#F63049' }} />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#8B5CF6' }} />
+            <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#8B5CF6' }} />
           </span>
-          <span className="font-accent text-base" style={{ color: 'rgba(246,48,73,0.9)' }}>
+          <span className="font-accent text-base" style={{ color: 'rgba(139,92,246,0.9)' }}>
             AI-Native Automation Platform
           </span>
         </div>
@@ -325,12 +325,12 @@ export default function LandingPage() {
         {/* Headline */}
         <h1 className="landing-hero-title font-display font-bold leading-[1.03] mb-8" style={{ fontSize: 'clamp(2.45rem, 8.2vw, 7.25rem)' }}>
           <span className="block hero-text-reveal" style={{ color: t.text, animationDelay: '0.15s' }}>
-            <span className="block sm:inline">Flowa</span>{' '}
+            <span className="block sm:inline">Fluxion</span>{' '}
             <span className="block sm:inline">automates work.</span>
           </span>
           <span className="block hero-text-reveal italic" style={{ color: t.text, animationDelay: '0.35s' }}>
             With{' '}
-            <span className="not-italic" style={{ color: '#F63049' }}>
+            <span className="not-italic" style={{ color: '#8B5CF6' }}>
               {typed}<span className="typewriter-cursor">|</span>
             </span>
           </span>
@@ -339,7 +339,7 @@ export default function LandingPage() {
         {/* Subline */}
         <p className="landing-hero-copy text-lg md:text-xl max-w-2xl mx-auto mb-14 font-body leading-relaxed hero-text-reveal font-light"
           style={{ color: t.textMuted, animationDelay: '0.6s' }}>
-          Flowa is a visual, AI-powered workflow automation platform.
+          Fluxion is a visual, AI-powered workflow automation platform.
           Drag, connect, and let artificial intelligence debug your pipelines - all in real time.
         </p>
 
@@ -348,7 +348,7 @@ export default function LandingPage() {
           <Link
             to="/register"
             className="cta-primary group relative inline-flex items-center gap-2 text-white px-8 py-4 rounded-xl text-sm font-bold transition-all duration-300"
-            style={{ background: '#F63049', boxShadow: '0 8px 36px rgba(246,48,73,0.38)' }}
+            style={{ background: '#8B5CF6', boxShadow: '0 8px 36px rgba(139,92,246,0.38)' }}
           >
             <span className="relative z-10 flex items-center gap-2">
               Start Building Free <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
@@ -358,7 +358,7 @@ export default function LandingPage() {
             to="/login"
             className="group inline-flex items-center gap-2 text-sm font-medium rounded-xl px-8 py-4 border transition-all duration-300"
             style={{ color: t.textMuted, borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(246,48,73,0.25)'; e.currentTarget.style.color = t.text; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.25)'; e.currentTarget.style.color = t.text; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textMuted; }}
           >
             Sign In <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform duration-200" />
@@ -368,20 +368,20 @@ export default function LandingPage() {
         {/* Terminal preview */}
         <div className="mt-16 mx-auto max-w-3xl hero-text-reveal" style={{ animationDelay: '1s' }}>
           <div className="landing-terminal rounded-2xl overflow-hidden border"
-            style={{ borderColor: t.border, background: t.cardBg, boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(246,48,73,0.06)' : '0 16px 48px rgba(0,0,0,0.08)', transition: 'background 0.4s ease' }}>
+            style={{ borderColor: t.border, background: t.cardBg, boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(139,92,246,0.06)' : '0 16px 48px rgba(0,0,0,0.08)', transition: 'background 0.4s ease' }}>
             <div className="flex items-center gap-2 px-4 py-2.5 border-b"
               style={{ borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
               <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full" style={{ background: '#F63049', opacity: 0.8 }} />
+                <div className="w-3 h-3 rounded-full" style={{ background: '#8B5CF6', opacity: 0.8 }} />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
               </div>
-              <span className="text-xs font-mono ml-2" style={{ color: t.textDim }}>workflow.flowa</span>
+              <span className="text-xs font-mono ml-2" style={{ color: t.textDim }}>workflow.fluxion</span>
             </div>
             <div className="px-4 py-4 font-mono text-xs leading-relaxed text-left">
               <div className="flex items-center gap-2" style={{ color: t.textMuted }}>
-                <Terminal size={12} style={{ color: '#F63049' }} />
-                <span style={{ color: '#F63049' }}>flowa</span>
+                <Terminal size={12} style={{ color: '#8B5CF6' }} />
+                <span style={{ color: '#8B5CF6' }}>fluxion</span>
                 <span style={{ color: t.textDim }}>run</span>
                 <span style={{ color: '#fb7185' }}>--workflow</span>
                 <span style={{ color: t.text }}>"email-campaign"</span>
@@ -398,9 +398,9 @@ export default function LandingPage() {
         {/* Stats strip */}
         <div ref={statsObs.ref} className="mt-20 grid grid-cols-3 gap-8 max-w-lg mx-auto">
           {[
-            { value: `${count10x}x`, label: 'Faster Builds',  accent: '#F63049' },
+            { value: `${count10x}x`, label: 'Faster Builds',  accent: '#8B5CF6' },
             { value: `${count100}%`, label: 'Self-Hosted',     accent: '#06B6D4' },
-            { value: '24/7',          label: 'Workflows',       accent: '#F63049' },
+            { value: '24/7',          label: 'Workflows',       accent: '#8B5CF6' },
           ].map((stat, i) => (
             <div key={stat.label}
               className={`relative text-center transition-all duration-700 ${statsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
@@ -420,7 +420,7 @@ export default function LandingPage() {
       <section ref={radarObs.ref} className="landing-section relative z-10 py-20 overflow-hidden">
         <div className="text-center mb-4">
           <span className={`inline-block font-accent text-xl mb-1 transition-all duration-700 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}>
+            style={{ color: 'rgba(139,92,246,0.75)' }}>
             Integrations
           </span>
           <h2 className={`font-display text-3xl md:text-4xl font-bold mt-1 transition-all duration-700 delay-100 ${radarObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
@@ -446,10 +446,10 @@ export default function LandingPage() {
 
           <div className="absolute z-50 flex flex-col items-center gap-1">
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl border"
-              style={{ background: isDark ? 'rgba(246,48,73,0.12)' : 'rgba(246,48,73,0.08)', borderColor: 'rgba(246,48,73,0.3)' }}>
-              <FlowaLogo size={28} />
+              style={{ background: isDark ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.3)' }}>
+              <FluxionLogo size={28} />
             </div>
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#F63049' }}>Flowa</span>
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#8B5CF6' }}>Fluxion</span>
           </div>
         </div>
       </section>
@@ -482,17 +482,17 @@ export default function LandingPage() {
       <section ref={stepsObs.ref} className="landing-section relative z-10 max-w-5xl mx-auto px-6 py-28">
         <div className="text-center mb-20">
           <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}>How it works</span>
+            style={{ color: 'rgba(139,92,246,0.75)' }}>How it works</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${stepsObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Three steps to<br />
-            <span className="italic" style={{ color: '#F63049' }}>automate anything.</span>
+            <span className="italic" style={{ color: '#8B5CF6' }}>automate anything.</span>
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
           <div className={`hidden md:block absolute top-14 left-[16%] right-[16%] h-px transition-all duration-1000 delay-500 ${stepsObs.inView ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}`}>
-            <div className="h-full w-full animated-line" style={{ background: 'linear-gradient(90deg, rgba(246,48,73,0.4), rgba(6,182,212,0.25), rgba(246,48,73,0.08))' }} />
+            <div className="h-full w-full animated-line" style={{ background: 'linear-gradient(90deg, rgba(139,92,246,0.4), rgba(6,182,212,0.25), rgba(139,92,246,0.08))' }} />
           </div>
 
           {steps.map((s, i) => (
@@ -503,8 +503,8 @@ export default function LandingPage() {
               onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
               <span className="absolute top-3 right-4 text-6xl font-bold font-display leading-none select-none" style={{ color: STEP_NUM_COLORS[i] }}>{s.num}</span>
               <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6 border transition-all duration-300"
-                style={{ background: i === 1 ? 'rgba(6,182,212,0.07)' : 'rgba(246,48,73,0.06)', borderColor: i === 1 ? 'rgba(6,182,212,0.15)' : 'rgba(246,48,73,0.15)' }}>
-                <s.icon size={22} style={{ color: i === 1 ? '#06B6D4' : 'rgba(246,48,73,0.8)' }} />
+                style={{ background: i === 1 ? 'rgba(6,182,212,0.07)' : 'rgba(139,92,246,0.06)', borderColor: i === 1 ? 'rgba(6,182,212,0.15)' : 'rgba(139,92,246,0.15)' }}>
+                <s.icon size={22} style={{ color: i === 1 ? '#06B6D4' : 'rgba(139,92,246,0.8)' }} />
               </div>
               <h3 className="font-display text-xl font-bold mb-3" style={{ color: t.text }}>{s.title}</h3>
               <p className="text-sm font-body leading-relaxed font-light" style={{ color: t.textMuted }}>{s.desc}</p>
@@ -518,7 +518,7 @@ export default function LandingPage() {
         <div className="text-center mb-12">
           <span
             className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}
+            style={{ color: 'rgba(139,92,246,0.75)' }}
           >
             Live Preview
           </span>
@@ -527,7 +527,7 @@ export default function LandingPage() {
             style={{ color: t.text }}
           >
             Watch a workflow<br />
-            <span className="italic" style={{ color: '#F63049' }}>execute in real time.</span>
+            <span className="italic" style={{ color: '#8B5CF6' }}>execute in real time.</span>
           </h2>
           <p
             className={`max-w-lg mx-auto font-body text-base font-light transition-all duration-700 delay-150 ${workflowObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
@@ -567,11 +567,11 @@ export default function LandingPage() {
       <section ref={featObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 py-28">
         <div className="text-center mb-20">
           <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}>Core Capabilities</span>
+            style={{ color: 'rgba(139,92,246,0.75)' }}>Core Capabilities</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Everything you need.<br />
-            <span className="italic" style={{ color: '#F63049' }}>Nothing you don't.</span>
+            <span className="italic" style={{ color: '#8B5CF6' }}>Nothing you don't.</span>
           </h2>
           <p className={`max-w-lg mx-auto font-body text-base font-light transition-all duration-700 delay-200 ${featObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.textMuted }}>
@@ -591,14 +591,14 @@ export default function LandingPage() {
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.gradient} flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
                     <f.icon size={20} className="text-white" />
                   </div>
-                  <span className="text-3xl font-bold font-display leading-none select-none" style={{ color: 'rgba(246,48,73,0.07)' }}>
+                  <span className="text-3xl font-bold font-display leading-none select-none" style={{ color: 'rgba(139,92,246,0.07)' }}>
                     {String(i + 1).padStart(2, '0')}
                   </span>
                 </div>
                 <h3 className="font-display text-lg font-bold mb-2" style={{ color: t.text }}>{f.title}</h3>
                 <p className="text-sm leading-relaxed font-body font-light" style={{ color: t.textMuted }}>{f.desc}</p>
                 <div className="mt-5 inline-flex items-center gap-1 text-xs font-semibold opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300"
-                  style={{ color: '#F63049' }}>
+                  style={{ color: '#8B5CF6' }}>
                   Learn more <ChevronRight size={12} />
                 </div>
               </div>
@@ -634,15 +634,15 @@ export default function LandingPage() {
       <section ref={useCasesObs.ref} className="landing-section relative z-10 max-w-6xl mx-auto px-6 pb-28">
         <div className="text-center mb-14">
           <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}>Use Cases</span>
+            style={{ color: 'rgba(139,92,246,0.75)' }}>Use Cases</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] mb-4 transition-all duration-700 delay-100 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Built for real work.<br />
-            <span className="italic" style={{ color: '#F63049' }}>Real automation.</span>
+            <span className="italic" style={{ color: '#8B5CF6' }}>Real automation.</span>
           </h2>
           <p className={`max-w-2xl mx-auto font-body text-base font-light transition-all duration-700 delay-150 ${useCasesObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.textMuted }}>
-            From customer communication to AI-assisted operations, Flowa helps teams automate repetitive work with confidence.
+            From customer communication to AI-assisted operations, Fluxion helps teams automate repetitive work with confidence.
           </p>
         </div>
 
@@ -654,8 +654,8 @@ export default function LandingPage() {
               onMouseEnter={e => { e.currentTarget.style.borderColor = t.borderHover; e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.transform = ''; }}>
               <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 border"
-                style={{ background: 'rgba(246,48,73,0.08)', borderColor: 'rgba(246,48,73,0.15)' }}>
-                <item.icon size={20} style={{ color: '#F63049' }} />
+                style={{ background: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.15)' }}>
+                <item.icon size={20} style={{ color: '#8B5CF6' }} />
               </div>
               <h3 className="font-display text-lg font-bold mb-2" style={{ color: t.text }}>{item.title}</h3>
               <p className="text-sm leading-relaxed mb-4" style={{ color: t.textMuted }}>{item.desc}</p>
@@ -678,11 +678,11 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
             <div>
               <span className={`inline-block font-accent text-xl mb-4 transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-                style={{ color: 'rgba(246,48,73,0.75)' }}>What You Get</span>
+                style={{ color: 'rgba(139,92,246,0.75)' }}>What You Get</span>
               <h2 className={`font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-4 transition-all duration-700 delay-100 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ color: t.text }}>
                 Everything you need.<br />
-                <span className="italic" style={{ color: '#F63049' }}>From day one.</span>
+                <span className="italic" style={{ color: '#8B5CF6' }}>From day one.</span>
               </h2>
               <p className={`font-body text-base leading-relaxed font-light transition-all duration-700 delay-150 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ color: t.textMuted }}>
@@ -694,9 +694,9 @@ export default function LandingPage() {
                 <div key={item}
                   className={`flex items-start gap-3 rounded-xl px-4 py-3.5 border transition-all duration-700 ${valueObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
                   style={{ transitionDelay: `${220 + i * 90}ms`, borderColor: t.border, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = i % 2 === 0 ? 'rgba(246,48,73,0.18)' : 'rgba(6,182,212,0.18)')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = i % 2 === 0 ? 'rgba(139,92,246,0.18)' : 'rgba(6,182,212,0.18)')}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = t.border)}>
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0" style={{ color: i % 2 === 0 ? 'rgba(246,48,73,0.75)' : 'rgba(6,182,212,0.75)' }} />
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0" style={{ color: i % 2 === 0 ? 'rgba(139,92,246,0.75)' : 'rgba(6,182,212,0.75)' }} />
                   <span className="text-sm leading-relaxed font-light" style={{ color: t.textMuted }}>{item}</span>
                 </div>
               ))}
@@ -709,11 +709,11 @@ export default function LandingPage() {
       <section ref={faqObs.ref} className="landing-section relative z-10 max-w-4xl mx-auto px-6 pb-28">
         <div className="text-center mb-12">
           <span className={`inline-block font-accent text-xl mb-3 transition-all duration-700 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-            style={{ color: 'rgba(246,48,73,0.75)' }}>FAQ</span>
+            style={{ color: 'rgba(139,92,246,0.75)' }}>FAQ</span>
           <h2 className={`font-display text-4xl md:text-5xl font-bold leading-[1.15] transition-all duration-700 delay-100 ${faqObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             style={{ color: t.text }}>
             Questions teams ask before{' '}
-            <span style={{ color: '#F63049' }}>launching</span>
+            <span style={{ color: '#8B5CF6' }}>launching</span>
           </h2>
         </div>
         <div className="space-y-3">
@@ -726,7 +726,7 @@ export default function LandingPage() {
                 style={{ transitionDelay: `${220 + idx * 100}ms`, background: t.faqBg(isOpen), borderColor: t.faqBorder(isOpen) }}>
                 <div className="flex items-center justify-between gap-6">
                   <h3 className="font-display text-base md:text-lg font-bold" style={{ color: t.text }}>{item.q}</h3>
-                  <span className="shrink-0" style={{ color: '#F63049' }}>{isOpen ? <Minus size={18} /> : <Plus size={18} />}</span>
+                  <span className="shrink-0" style={{ color: '#8B5CF6' }}>{isOpen ? <Minus size={18} /> : <Plus size={18} />}</span>
                 </div>
                 <div className={`grid transition-all duration-300 ${isOpen ? 'grid-rows-[1fr] mt-3' : 'grid-rows-[0fr]'}`}>
                   <p className="overflow-hidden text-sm leading-relaxed" style={{ color: t.textMuted }}>{item.a}</p>
@@ -742,23 +742,23 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center rounded-3xl p-10 md:p-14 border"
           style={{ background: t.cardBg, borderColor: t.border }}>
           <div>
-            <span className="inline-block font-accent text-xl mb-6" style={{ color: 'rgba(246,48,73,0.75)' }}>Our Belief</span>
+            <span className="inline-block font-accent text-xl mb-6" style={{ color: 'rgba(139,92,246,0.75)' }}>Our Belief</span>
             <h2 className="font-display text-3xl md:text-4xl font-bold leading-[1.18] mb-6" style={{ color: t.text }}>
               We used to build things.<br />
-              <span className="italic" style={{ color: '#F63049' }}>Then we automated them.</span>
+              <span className="italic" style={{ color: '#8B5CF6' }}>Then we automated them.</span>
             </h2>
             <p className="font-body font-light leading-relaxed text-sm mb-4" style={{ color: t.textMuted }}>
               A few years ago, teams spent weeks writing the same glue code — connecting APIs, retrying failed jobs, syncing data between tools.
             </p>
             <p className="font-body font-light leading-relaxed text-sm" style={{ color: t.textMuted }}>
-              We realised the problem wasn't the tools — it was the missing orchestration layer. So we built Flowa: one visual canvas to design, run, and monitor any workflow.
+              We realised the problem wasn't the tools — it was the missing orchestration layer. So we built Fluxion: one visual canvas to design, run, and monitor any workflow.
             </p>
           </div>
           <div className="pl-0 md:pl-10 border-t md:border-t-0 md:border-l pt-8 md:pt-0" style={{ borderColor: t.border }}>
             <blockquote className="font-display text-2xl md:text-3xl italic font-bold leading-relaxed mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.75)' : 'rgba(15,23,42,0.75)' }}>
               "Teams do not want automation. They want results, reliably."
             </blockquote>
-            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'rgba(246,48,73,0.6)' }}>Flowa Team</p>
+            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'rgba(139,92,246,0.6)' }}>Fluxion Team</p>
           </div>
         </div>
       </section>
@@ -771,19 +771,19 @@ export default function LandingPage() {
 
           {/* Decorative rings */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden" aria-hidden="true">
-            <div style={{ width: 700, height: 700, borderRadius: '50%', border: '1px solid rgba(246,48,73,0.06)', position: 'absolute' }} />
+            <div style={{ width: 700, height: 700, borderRadius: '50%', border: '1px solid rgba(139,92,246,0.06)', position: 'absolute' }} />
             <div style={{ width: 950, height: 950, borderRadius: '50%', border: '1px solid rgba(6,182,212,0.04)', position: 'absolute' }} />
-            <div style={{ width: 1200, height: 1200, borderRadius: '50%', border: '1px solid rgba(246,48,73,0.03)', position: 'absolute' }} />
+            <div style={{ width: 1200, height: 1200, borderRadius: '50%', border: '1px solid rgba(139,92,246,0.03)', position: 'absolute' }} />
           </div>
 
           <div className={`max-w-4xl mx-auto px-6 py-32 md:py-44 text-center relative z-10 transition-all duration-1000 ${ctaObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-8 border"
-              style={{ borderColor: 'rgba(246,48,73,0.3)', background: 'rgba(246,48,73,0.08)' }}>
+              style={{ borderColor: 'rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.08)' }}>
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F63049' }} />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#F63049' }} />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#8B5CF6' }} />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#8B5CF6' }} />
               </span>
-              <span className="font-accent text-base" style={{ color: 'rgba(246,48,73,0.9)' }}>Free to start · Self-hosted</span>
+              <span className="font-accent text-base" style={{ color: 'rgba(139,92,246,0.9)' }}>Free to start · Self-hosted</span>
             </div>
 
             <h2
@@ -791,7 +791,7 @@ export default function LandingPage() {
               style={{ color: t.text }}
             >
               Ready to automate?<br />
-              <span className="italic" style={{ color: '#F63049' }}>Let's build.</span>
+              <span className="italic" style={{ color: '#8B5CF6' }}>Let's build.</span>
             </h2>
             <p className="mb-10 max-w-md mx-auto font-body text-base font-light" style={{ color: t.textMuted }}>
               Create your free account and start building intelligent workflows in seconds.
@@ -799,7 +799,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/register"
                 className="cta-primary group relative inline-flex items-center gap-2 text-white px-10 py-4 rounded-xl text-sm font-bold transition-all duration-300"
-                style={{ background: '#F63049', boxShadow: '0 8px 40px rgba(246,48,73,0.45)' }}>
+                style={{ background: '#8B5CF6', boxShadow: '0 8px 40px rgba(139,92,246,0.45)' }}>
                 <span className="relative z-10 flex items-center gap-2">
                   Get Started Free <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
                 </span>
@@ -821,9 +821,9 @@ export default function LandingPage() {
         <div className={`max-w-7xl mx-auto px-8 transition-all duration-700 ${footerObs.inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <FlowaLogo size={22} />
+              <FluxionLogo size={22} />
               <span className="font-body text-sm font-medium" style={{ color: t.textDim }}>
-                Flowa &copy; {new Date().getFullYear()}
+                Fluxion &copy; {new Date().getFullYear()}
               </span>
             </div>
             <div className="flex items-center gap-6">

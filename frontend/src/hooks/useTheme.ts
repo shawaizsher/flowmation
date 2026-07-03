@@ -5,11 +5,11 @@ export type Theme = 'dark' | 'light' | 'system';
 export type AccentTheme = 'rose' | 'ocean' | 'amber' | 'emerald' | 'slate';
 
 // Keys are scoped per user so each account remembers its own preference
-function themeKey(userId?: string | null)  { return userId ? `flowa-theme-${userId}`        : 'flowa-theme'; }
-function accentKey(userId?: string | null) { return userId ? `flowa-accent-${userId}`       : 'flowa-accent-theme'; }
+function themeKey(userId?: string | null)  { return userId ? `fluxion-theme-${userId}`        : 'fluxion-theme'; }
+function accentKey(userId?: string | null) { return userId ? `fluxion-accent-${userId}`       : 'fluxion-accent-theme'; }
 
-const STORAGE_KEY = 'flowa-theme';        // kept for back-compat reads
-const ACCENT_STORAGE_KEY = 'flowa-accent-theme';
+const STORAGE_KEY = 'fluxion-theme';        // kept for back-compat reads
+const ACCENT_STORAGE_KEY = 'fluxion-accent-theme';
 
 type Palette = {
   label: string;

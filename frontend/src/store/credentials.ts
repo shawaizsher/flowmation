@@ -793,7 +793,7 @@ export const useCredentialStore = create<CredentialState>()(
       },
     }),
     {
-      name: 'flowa-credentials',
+      name: 'fluxion-credentials',
       // Never persist raw secrets to localStorage in production — this is a demo store.
       // In production you'd encrypt or use a backend vault.
     }

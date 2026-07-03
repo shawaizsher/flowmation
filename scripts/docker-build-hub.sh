@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Script to build Flowa Docker image (consolidated - backend + frontend)
+# Script to build Fluxion Docker image (consolidated - backend + frontend)
 # Usage: ./scripts/docker-build-hub.sh yourusername 1.0.0
 
 DOCKER_USERNAME=${1:-yourusername}
 VERSION=${2:-latest}
 
 echo "════════════════════════════════════════════════════════════"
-echo "🔨 Building Flowa Docker Image (Backend + Frontend)"
+echo "🔨 Building Fluxion Docker Image (Backend + Frontend)"
 echo "════════════════════════════════════════════════════════════"
 echo "Username: $DOCKER_USERNAME"
 echo "Version: $VERSION"
@@ -34,12 +34,12 @@ echo ""
 echo "────────────────────────────────────────────────────────────"
 echo "📦 Building Consolidated Image"
 echo "────────────────────────────────────────────────────────────"
-echo "Building ${DOCKER_USERNAME}/flowa:${VERSION}..."
+echo "Building ${DOCKER_USERNAME}/fluxion:${VERSION}..."
 echo ""
 
 docker build \
-    --tag ${DOCKER_USERNAME}/flowa:${VERSION} \
-    --tag ${DOCKER_USERNAME}/flowa:latest \
+    --tag ${DOCKER_USERNAME}/fluxion:${VERSION} \
+    --tag ${DOCKER_USERNAME}/fluxion:latest \
     --file Dockerfile \
     .
 
@@ -56,7 +56,7 @@ echo "✅ Build Complete!"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 echo "Image created:"
-docker images | grep ${DOCKER_USERNAME}/flowa: || true
+docker images | grep ${DOCKER_USERNAME}/fluxion: || true
 echo ""
 echo "Next steps:"
 echo "  1. Test locally (optional):"
@@ -64,5 +64,5 @@ echo "     docker-compose up -d"
 echo "  2. Push to Docker Hub:"
 echo "     ./scripts/docker-push-hub.sh ${DOCKER_USERNAME} ${VERSION}"
 echo "  3. Verify on Docker Hub:"
-echo "     https://hub.docker.com/r/${DOCKER_USERNAME}/flowa"
+echo "     https://hub.docker.com/r/${DOCKER_USERNAME}/fluxion"
 echo ""
