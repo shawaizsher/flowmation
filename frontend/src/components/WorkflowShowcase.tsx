@@ -1,16 +1,17 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type PanInfo } from 'framer-motion';
+import { useRef, useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
+import { ArrowRight } from 'lucide-react';
 
 interface WfNode {
   id: string;
   label: string;
-  sub?: string;
+  sub: string;
   icon: string;
-  x: number;
-  y: number;
+  position: { x: number; y: number };
 }
 
-interface WfEdge {
+interface WfConnection {
   from: string;
   to: string;
 }
@@ -19,22 +20,25 @@ interface Workflow {
   field: string;
   tagline: string;
   nodes: WfNode[];
-  edges: WfEdge[];
+  connections: WfConnection[];
 }
+
+const NODE_WIDTH = 190;
+const NODE_HEIGHT = 92;
 
 const WORKFLOWS: Workflow[] = [
   {
     field: 'IT Ops',
     tagline: 'On-board new employees automatically',
     nodes: [
-      { id: 'webhook', label: 'HR Webhook', sub: 'New hire event', icon: '⚡', x: 40, y: 120 },
-      { id: 'account', label: 'Create Account', sub: 'Google Workspace', icon: '👤', x: 230, y: 50 },
-      { id: 'access', label: 'Assign Access', sub: 'Okta SSO', icon: '🔑', x: 230, y: 190 },
-      { id: 'laptop', label: 'Provision Laptop', sub: 'Jamf MDM', icon: '💻', x: 420, y: 50 },
-      { id: 'welcome', label: 'Welcome Email', sub: 'SendGrid', icon: '✉️', x: 420, y: 190 },
-      { id: 'notify', label: 'Notify Manager', sub: 'Slack #onboard', icon: '💬', x: 610, y: 120 },
+      { id: 'webhook', label: 'HR Webhook', sub: 'New hire event', icon: '⚡', position: { x: 40, y: 120 } },
+      { id: 'account', label: 'Create Account', sub: 'Google Workspace', icon: '👤', position: { x: 270, y: 40 } },
+      { id: 'access', label: 'Assign Access', sub: 'Okta SSO', icon: '🔑', position: { x: 270, y: 200 } },
+      { id: 'laptop', label: 'Provision Laptop', sub: 'Jamf MDM', icon: '💻', position: { x: 500, y: 40 } },
+      { id: 'welcome', label: 'Welcome Email', sub: 'SendGrid', icon: '✉️', position: { x: 500, y: 200 } },
+      { id: 'notify', label: 'Notify Manager', sub: 'Slack #onboard', icon: '💬', position: { x: 730, y: 120 } },
     ],
-    edges: [
+    connections: [
       { from: 'webhook', to: 'account' },
       { from: 'webhook', to: 'access' },
       { from: 'account', to: 'laptop' },
@@ -47,14 +51,14 @@ const WORKFLOWS: Workflow[] = [
     field: 'Sales',
     tagline: 'Generate customer insights from reviews',
     nodes: [
-      { id: 'reviews', label: 'Get Reviews', sub: 'Trustpilot API', icon: '⭐', x: 40, y: 120 },
-      { id: 'cluster', label: 'Cluster Topics', sub: 'K-means', icon: '📊', x: 210, y: 50 },
-      { id: 'ai', label: 'AI Analysis', sub: 'OpenAI GPT-4', icon: '🧠', x: 210, y: 190 },
-      { id: 'insights', label: 'Extract Insights', sub: 'AI Agent', icon: '💡', x: 410, y: 120 },
-      { id: 'sheets', label: 'Save to Sheets', sub: 'Google Sheets', icon: '📋', x: 600, y: 50 },
-      { id: 'crm', label: 'Update CRM', sub: 'HubSpot', icon: '📇', x: 600, y: 190 },
+      { id: 'reviews', label: 'Get Reviews', sub: 'Trustpilot API', icon: '⭐', position: { x: 40, y: 120 } },
+      { id: 'cluster', label: 'Cluster Topics', sub: 'K-means', icon: '📊', position: { x: 260, y: 40 } },
+      { id: 'ai', label: 'AI Analysis', sub: 'OpenAI GPT-4', icon: '🧠', position: { x: 260, y: 200 } },
+      { id: 'insights', label: 'Extract Insights', sub: 'AI Agent', icon: '💡', position: { x: 490, y: 120 } },
+      { id: 'sheets', label: 'Save to Sheets', sub: 'Google Sheets', icon: '📋', position: { x: 720, y: 40 } },
+      { id: 'crm', label: 'Update CRM', sub: 'HubSpot', icon: '📇', position: { x: 720, y: 200 } },
     ],
-    edges: [
+    connections: [
       { from: 'reviews', to: 'cluster' },
       { from: 'reviews', to: 'ai' },
       { from: 'cluster', to: 'insights' },
@@ -67,14 +71,14 @@ const WORKFLOWS: Workflow[] = [
     field: 'Dev Ops',
     tagline: 'Auto-deploy on every PR merge',
     nodes: [
-      { id: 'gh', label: 'GitHub Webhook', sub: 'PR merged', icon: '🔀', x: 40, y: 120 },
-      { id: 'test', label: 'Run Tests', sub: 'Jest + Cypress', icon: '✅', x: 210, y: 50 },
-      { id: 'lint', label: 'Lint & Type Check', sub: 'ESLint + TSC', icon: '🔍', x: 210, y: 190 },
-      { id: 'build', label: 'Build Image', sub: 'Docker', icon: '🐳', x: 410, y: 120 },
-      { id: 'deploy', label: 'Deploy', sub: 'Kubernetes', icon: '🚀', x: 600, y: 50 },
-      { id: 'slack', label: 'Notify Team', sub: 'Slack #deploys', icon: '💬', x: 600, y: 190 },
+      { id: 'gh', label: 'GitHub Webhook', sub: 'PR merged', icon: '🔀', position: { x: 40, y: 120 } },
+      { id: 'test', label: 'Run Tests', sub: 'Jest + Cypress', icon: '✅', position: { x: 260, y: 40 } },
+      { id: 'lint', label: 'Lint & Type Check', sub: 'ESLint + TSC', icon: '🔍', position: { x: 260, y: 200 } },
+      { id: 'build', label: 'Build Image', sub: 'Docker', icon: '🐳', position: { x: 490, y: 120 } },
+      { id: 'deploy', label: 'Deploy', sub: 'Kubernetes', icon: '🚀', position: { x: 720, y: 40 } },
+      { id: 'slack', label: 'Notify Team', sub: 'Slack #deploys', icon: '💬', position: { x: 720, y: 200 } },
     ],
-    edges: [
+    connections: [
       { from: 'gh', to: 'test' },
       { from: 'gh', to: 'lint' },
       { from: 'test', to: 'build' },
@@ -87,14 +91,14 @@ const WORKFLOWS: Workflow[] = [
     field: 'Marketing',
     tagline: 'Automate social content pipeline',
     nodes: [
-      { id: 'calendar', label: 'Content Calendar', sub: 'Notion DB', icon: '📅', x: 40, y: 120 },
-      { id: 'gen', label: 'Generate Copy', sub: 'Claude AI', icon: '✍️', x: 220, y: 50 },
-      { id: 'image', label: 'Create Visual', sub: 'Canva API', icon: '🎨', x: 220, y: 190 },
-      { id: 'schedule', label: 'Schedule Post', sub: 'Buffer', icon: '📤', x: 420, y: 120 },
-      { id: 'analytics', label: 'Track Metrics', sub: 'Google Analytics', icon: '📈', x: 610, y: 50 },
-      { id: 'report', label: 'Weekly Report', sub: 'Slack #marketing', icon: '📊', x: 610, y: 190 },
+      { id: 'calendar', label: 'Content Calendar', sub: 'Notion DB', icon: '📅', position: { x: 40, y: 120 } },
+      { id: 'gen', label: 'Generate Copy', sub: 'Claude AI', icon: '✍️', position: { x: 270, y: 40 } },
+      { id: 'image', label: 'Create Visual', sub: 'Canva API', icon: '🎨', position: { x: 270, y: 200 } },
+      { id: 'schedule', label: 'Schedule Post', sub: 'Buffer', icon: '📤', position: { x: 500, y: 120 } },
+      { id: 'analytics', label: 'Track Metrics', sub: 'Google Analytics', icon: '📈', position: { x: 730, y: 40 } },
+      { id: 'report', label: 'Weekly Report', sub: 'Slack #marketing', icon: '📊', position: { x: 730, y: 200 } },
     ],
-    edges: [
+    connections: [
       { from: 'calendar', to: 'gen' },
       { from: 'calendar', to: 'image' },
       { from: 'gen', to: 'schedule' },
@@ -107,14 +111,14 @@ const WORKFLOWS: Workflow[] = [
     field: 'Security',
     tagline: 'Enrich and triage incident tickets',
     nodes: [
-      { id: 'alert', label: 'Security Alert', sub: 'PagerDuty', icon: '🚨', x: 40, y: 120 },
-      { id: 'enrich', label: 'Enrich IOCs', sub: 'VirusTotal', icon: '🔬', x: 220, y: 50 },
-      { id: 'classify', label: 'Classify Severity', sub: 'AI Triage', icon: '⚖️', x: 220, y: 190 },
-      { id: 'ticket', label: 'Create Ticket', sub: 'Jira', icon: '🎫', x: 420, y: 120 },
-      { id: 'block', label: 'Block IP', sub: 'Cloudflare', icon: '🛡️', x: 610, y: 50 },
-      { id: 'report', label: 'Incident Report', sub: 'Confluence', icon: '📝', x: 610, y: 190 },
+      { id: 'alert', label: 'Security Alert', sub: 'PagerDuty', icon: '🚨', position: { x: 40, y: 120 } },
+      { id: 'enrich', label: 'Enrich IOCs', sub: 'VirusTotal', icon: '🔬', position: { x: 270, y: 40 } },
+      { id: 'classify', label: 'Classify Severity', sub: 'AI Triage', icon: '⚖️', position: { x: 270, y: 200 } },
+      { id: 'ticket', label: 'Create Ticket', sub: 'Jira', icon: '🎫', position: { x: 500, y: 120 } },
+      { id: 'block', label: 'Block IP', sub: 'Cloudflare', icon: '🛡️', position: { x: 730, y: 40 } },
+      { id: 'report', label: 'Incident Report', sub: 'Confluence', icon: '📝', position: { x: 730, y: 200 } },
     ],
-    edges: [
+    connections: [
       { from: 'alert', to: 'enrich' },
       { from: 'alert', to: 'classify' },
       { from: 'enrich', to: 'ticket' },
@@ -125,64 +129,112 @@ const WORKFLOWS: Workflow[] = [
   },
 ];
 
-const NODE_W = 146;
-const NODE_H = 58;
-
-function getCenter(node: WfNode) {
-  return { cx: node.x + NODE_W / 2, cy: node.y + NODE_H / 2 };
+function getContentSize(nodes: WfNode[]) {
+  const maxX = Math.max(...nodes.map((n) => n.position.x + NODE_WIDTH));
+  const maxY = Math.max(...nodes.map((n) => n.position.y + NODE_HEIGHT));
+  return { width: maxX + 40, height: maxY + 40 };
 }
 
-function WorkflowDiagram({ workflow }: { workflow: Workflow }) {
+function ConnectionLine({ from, to, nodes }: { from: string; to: string; nodes: WfNode[] }) {
+  const fromNode = nodes.find((n) => n.id === from);
+  const toNode = nodes.find((n) => n.id === to);
+  if (!fromNode || !toNode) return null;
+
+  const startX = fromNode.position.x + NODE_WIDTH;
+  const startY = fromNode.position.y + NODE_HEIGHT / 2;
+  const endX = toNode.position.x;
+  const endY = toNode.position.y + NODE_HEIGHT / 2;
+
+  const cp1X = startX + (endX - startX) * 0.5;
+  const cp2X = endX - (endX - startX) * 0.5;
+  const path = `M${startX},${startY} C${cp1X},${startY} ${cp2X},${endY} ${endX},${endY}`;
+
+  return <path d={path} fill="none" stroke="#D45060" strokeWidth={2} strokeDasharray="7,5" strokeLinecap="round" opacity={0.4} />;
+}
+
+function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
+  const [nodes, setNodes] = useState<WfNode[]>(workflow.nodes);
+  const [contentSize, setContentSize] = useState(() => getContentSize(workflow.nodes));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setNodes(workflow.nodes);
+    setContentSize(getContentSize(workflow.nodes));
+  }, [workflow]);
+
+  const handleDragStart = (nodeId: string) => {
+    setDraggingId(nodeId);
+    const node = nodes.find((n) => n.id === nodeId);
+    if (node) dragStart.current = { x: node.position.x, y: node.position.y };
+  };
+
+  const handleDrag = (nodeId: string, { offset }: PanInfo) => {
+    if (draggingId !== nodeId || !dragStart.current) return;
+    const newX = Math.max(0, dragStart.current.x + offset.x);
+    const newY = Math.max(0, dragStart.current.y + offset.y);
+
+    flushSync(() => {
+      setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, position: { x: newX, y: newY } } : n)));
+    });
+
+    setContentSize((prev) => ({
+      width: Math.max(prev.width, newX + NODE_WIDTH + 40),
+      height: Math.max(prev.height, newY + NODE_HEIGHT + 40),
+    }));
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    dragStart.current = null;
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="wf-diagram"
-    >
-      <svg viewBox="0 0 756 270" fill="none" className="wf-diagram__svg">
-        <defs>
-          <linearGradient id="wf-edge-g" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#D45060" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#800020" stopOpacity="0.5" />
-          </linearGradient>
-        </defs>
-        {workflow.edges.map((edge) => {
-          const fromNode = workflow.nodes.find((n) => n.id === edge.from)!;
-          const toNode = workflow.nodes.find((n) => n.id === edge.to)!;
-          const from = getCenter(fromNode);
-          const to = getCenter(toNode);
-          const midX = (from.cx + to.cx) / 2;
+    <div ref={canvasRef} className="wf-canvas" role="region" aria-label="Workflow canvas">
+      <div className="wf-canvas__content" style={{ minWidth: contentSize.width, minHeight: contentSize.height }}>
+        <svg className="wf-canvas__svg" width={contentSize.width} height={contentSize.height} style={{ overflow: 'visible' }} aria-hidden="true">
+          {workflow.connections.map((c) => (
+            <ConnectionLine key={`${c.from}-${c.to}`} from={c.from} to={c.to} nodes={nodes} />
+          ))}
+        </svg>
+
+        {nodes.map((node) => {
+          const isDragging = draggingId === node.id;
           return (
-            <g key={`${edge.from}-${edge.to}`}>
-              <path
-                d={`M${from.cx},${from.cy} C${midX},${from.cy} ${midX},${to.cy} ${to.cx},${to.cy}`}
-                stroke="url(#wf-edge-g)"
-                strokeWidth="2"
-              />
-              <circle cx={to.cx - (to.cx - from.cx) * 0.02} cy={to.cy - (to.cy - from.cy) * 0.02} r="3" fill="#D45060" opacity="0.6" />
-            </g>
+            <motion.div
+              key={node.id}
+              drag
+              dragMomentum={false}
+              dragConstraints={{ left: 0, top: 0, right: 100000, bottom: 100000 }}
+              onDragStart={() => handleDragStart(node.id)}
+              onDrag={(_, info) => handleDrag(node.id, info)}
+              onDragEnd={handleDragEnd}
+              style={{ x: node.position.x, y: node.position.y, width: NODE_WIDTH, transformOrigin: '0 0' }}
+              className="wf-canvas__node-wrap"
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              whileHover={{ scale: 1.02 }}
+              whileDrag={{ scale: 1.05, zIndex: 50, cursor: 'grabbing' }}
+              aria-grabbed={isDragging}
+            >
+              <div className={`wf-canvas__node${isDragging ? ' wf-canvas__node--dragging' : ''}`}>
+                <div className="wf-canvas__node-head">
+                  <span className="wf-canvas__node-icon">{node.icon}</span>
+                  <span className="wf-canvas__node-label">{node.label}</span>
+                </div>
+                <p className="wf-canvas__node-sub">{node.sub}</p>
+                <div className="wf-canvas__node-foot">
+                  <ArrowRight size={10} />
+                  <span>Connected</span>
+                </div>
+              </div>
+            </motion.div>
           );
         })}
-      </svg>
-
-      {workflow.nodes.map((node, i) => (
-        <motion.div
-          key={node.id}
-          className="wf-node"
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.07, duration: 0.3 }}
-          style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H }}
-        >
-          <span className="wf-node__icon">{node.icon}</span>
-          <div className="wf-node__text">
-            <span className="wf-node__label">{node.label}</span>
-            {node.sub && <span className="wf-node__sub">{node.sub}</span>}
-          </div>
-        </motion.div>
-      ))}
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -204,8 +256,9 @@ export default function WorkflowShowcase() {
         ))}
       </div>
 
-      <div className="wf-showcase__canvas">
-        <WorkflowDiagram key={active} workflow={WORKFLOWS[active]} />
+      <div className="wf-showcase__canvas-wrap">
+        <div className="wf-showcase__hint">Drag nodes to reposition</div>
+        <WorkflowCanvas key={active} workflow={WORKFLOWS[active]} />
       </div>
     </div>
   );
