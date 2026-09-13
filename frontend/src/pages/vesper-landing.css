@@ -1256,3 +1256,124 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
     min-width: 180px;
   }
 }
+
+/* ═══════════════ How It Works — Pinned Cards ═══════════════ */
+.hiw-pins {
+  position: relative;
+  max-width: 1000px;
+  margin: 32px auto 0;
+  padding: 40px 0;
+}
+
+.hiw-pins__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: linear-gradient(#F3E6D5 1px, transparent 1px);
+  background-size: 100% 32px;
+}
+
+.hiw-pins__inner {
+  position: relative;
+  width: 100%;
+  min-height: 780px;
+}
+
+.hiw-pins__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hiw-card {
+  position: relative;
+  width: 280px;
+  transition: transform 0.3s ease, z-index 0s;
+}
+
+.hiw-card:hover {
+  transform: scale(1.05) rotate(0deg) !important;
+  z-index: 30;
+}
+
+.hiw-card--rot-r { transform: rotate(6deg); }
+.hiw-card--rot-l { transform: rotate(-6deg); }
+
+.hiw-card--p1 { position: absolute; top: 0; left: 6%; }
+.hiw-card--p2 { position: absolute; top: 90px; right: 6%; }
+.hiw-card--p3 { position: absolute; top: 300px; left: 6%; }
+.hiw-card--p4 { position: absolute; top: 410px; right: 2%; }
+.hiw-card--p5 { position: absolute; top: 610px; left: 10%; }
+
+.hiw-card__frame {
+  background: rgba(255, 249, 242, 0.03);
+  padding: 8px;
+  border-radius: 25px;
+  border: 1px solid rgba(212, 80, 96, 0.18);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.hiw-card__pin {
+  width: 30px;
+  height: 30px;
+  color: #D45060;
+  margin: 0 auto 20px;
+  display: block;
+}
+
+.hiw-card__body {
+  background: linear-gradient(135deg, rgba(128, 0, 32, 0.18), rgba(212, 80, 96, 0.06));
+  border: 1px solid rgba(212, 80, 96, 0.2);
+  border-radius: 17px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.hiw-card__number {
+  font-family: "Instrument Serif", serif;
+  font-style: italic;
+  font-size: 38px;
+  color: #D45060;
+  margin-bottom: 14px;
+  line-height: 1;
+}
+
+.hiw-card__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #FFF9F2;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.hiw-card__desc {
+  font-size: 13.5px;
+  color: #F3E6D5;
+  opacity: 0.65;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .hiw-pins__inner {
+    min-height: auto;
+  }
+  .hiw-pins__svg {
+    display: none;
+  }
+  .hiw-card,
+  .hiw-card--p1, .hiw-card--p2, .hiw-card--p3, .hiw-card--p4, .hiw-card--p5 {
+    position: static;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto 20px;
+    transform: none !important;
+  }
+}

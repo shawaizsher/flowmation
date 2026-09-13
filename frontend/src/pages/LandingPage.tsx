@@ -4,6 +4,7 @@ import FluxionLogo from '../components/FluxionLogo';
 import IntegrationCard from '../components/IntegrationCard';
 import ScrollChoreography from '../components/ScrollChoreography';
 import WorkflowShowcase from '../components/WorkflowShowcase';
+import HowItWorksPins from '../components/HowItWorksPins';
 import './vesper-landing.css';
 
 const VIDEO_SRC = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260818_072341_50851634-bbc3-4c33-9acc-7647d4db44aa.mp4';
@@ -62,12 +63,6 @@ const BENEFITS = [
       </svg>
     ),
   },
-];
-
-const STEPS = [
-  { num: '01', title: 'Design', desc: 'Drag nodes onto the visual canvas. Configure triggers, logic branches, and actions with a few clicks.' },
-  { num: '02', title: 'Connect', desc: 'Link your tools — APIs, databases, AI models, messaging platforms. Credentials are encrypted and stored securely.' },
-  { num: '03', title: 'Deploy', desc: 'Activate your workflow. It runs on schedule, webhook, or manual trigger. Monitor every execution in real time.' },
 ];
 
 const FAQS = [
@@ -255,16 +250,8 @@ export default function LandingPage() {
       <section className="vp-section" id="how-it-works">
         <div className="section-inner">
           <p className="section-eyebrow reveal">How It Works</p>
-          <h2 className="section-title reveal">Three steps to your first automation</h2>
-          <div className="steps-row">
-            {STEPS.map((s, i) => (
-              <div key={i} className="step-card reveal" style={{ '--reveal-d': `${i * 0.12}s` } as React.CSSProperties}>
-                <span className="step-num">{s.num}</span>
-                <h3>{s.title}</h3>
-                <p>{s.desc}</p>
-              </div>
-            ))}
-          </div>
+          <h2 className="section-title reveal">Five steps to your first automation</h2>
+          <HowItWorksPins />
           <div className="steps-cta reveal" style={{ '--reveal-d': '0.36s' } as React.CSSProperties}>
             <Link to="/register" className="btn btn-solid">Start Building — Free</Link>
           </div>
