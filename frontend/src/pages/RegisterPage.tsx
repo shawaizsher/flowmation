@@ -216,7 +216,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <FluxionLogo size={36} />
-          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Fluxion</span>
+          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Flowmation</span>
         </div>
 
         <div className="card p-8">

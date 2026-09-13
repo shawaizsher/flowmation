@@ -90,7 +90,7 @@ export default function AppShell() {
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <span className="font-accent text-2xl font-bold tracking-tight text-foreground truncate block">
-                Fluxion
+                Flowmation
               </span>
               {workspaces.length > 0 && (
                 <div className="relative mt-2">

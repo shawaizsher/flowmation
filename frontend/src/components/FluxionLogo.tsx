@@ -1,7 +1,5 @@
 /**
- * Fluxion brand logo — matches favicon.svg exactly.
- * Glassy violet badge with an infinity-flow loop mark: white input node,
- * cyan "charged" output node — literalizes flux (flow) + ion (charge).
+ * Flowmation brand logo — warm maroon badge with an infinity-flow loop mark.
  */
 export default function FluxionLogo({ size = 32, className = '' }: { size?: number; className?: string }) {
   return (
@@ -15,14 +13,14 @@ export default function FluxionLogo({ size = 32, className = '' }: { size?: numb
     >
       <defs>
         <linearGradient id="fx-bg" x1="4" y1="2" x2="36" y2="38" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#A78BFA" />
-          <stop offset="55%" stopColor="#7C3AED" />
-          <stop offset="100%" stopColor="#4C1D95" />
+          <stop offset="0%" stopColor="#D45060" />
+          <stop offset="55%" stopColor="#800020" />
+          <stop offset="100%" stopColor="#4a0012" />
         </linearGradient>
         <linearGradient id="fx-mark" x1="9" y1="27" x2="31" y2="13" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="60%" stopColor="#E0E7FF" />
-          <stop offset="100%" stopColor="#22D3EE" />
+          <stop offset="0%" stopColor="#FFF9F2" />
+          <stop offset="60%" stopColor="#F3E6D5" />
+          <stop offset="100%" stopColor="#D45060" />
         </linearGradient>
         <linearGradient id="fx-sheen" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
@@ -47,8 +45,8 @@ export default function FluxionLogo({ size = 32, className = '' }: { size?: numb
           strokeLinecap="round"
         />
       </g>
-      <circle cx="9" cy="20" r="2.6" fill="#ffffff" />
-      <circle cx="31" cy="20" r="2.6" fill="#22D3EE" />
+      <circle cx="9" cy="20" r="2.6" fill="#FFF9F2" />
+      <circle cx="31" cy="20" r="2.6" fill="#D45060" />
     </svg>
   );
 }

@@ -61,7 +61,7 @@ export default function VerifyEmailPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
           <FluxionLogo size={36} />
-          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Fluxion</span>
+          <span className="font-display text-2xl font-bold text-foreground tracking-tight">Flowmation</span>
         </div>
 
         <div className="card p-8">

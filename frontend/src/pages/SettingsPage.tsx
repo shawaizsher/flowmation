@@ -887,7 +887,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="font-display text-lg font-bold text-foreground">Notifications</h2>
-                  <p className="text-sm text-foreground-muted mt-0.5">Control how and when Fluxion contacts you</p>
+                  <p className="text-sm text-foreground-muted mt-0.5">Control how and when Flowmation contacts you</p>
                 </div>
                 <SavedBadge show={notifSaved} />
               </div>
@@ -950,7 +950,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="font-display text-lg font-bold text-foreground">Appearance</h2>
-                  <p className="text-sm text-foreground-muted mt-0.5">Customize how Fluxion looks for you</p>
+                  <p className="text-sm text-foreground-muted mt-0.5">Customize how Flowmation looks for you</p>
                 </div>
                 <SavedBadge show={appearanceSaved} />
               </div>
