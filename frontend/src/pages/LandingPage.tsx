@@ -252,9 +252,6 @@ export default function LandingPage() {
           <p className="section-eyebrow reveal">How It Works</p>
           <h2 className="section-title reveal">Five steps to your first automation</h2>
           <HowItWorksPins />
-          <div className="steps-cta reveal" style={{ '--reveal-d': '0.36s' } as React.CSSProperties}>
-            <Link to="/register" className="btn btn-solid">Start Building — Free</Link>
-          </div>
         </div>
       </section>
 
