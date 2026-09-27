@@ -1,13 +1,13 @@
 import { motion, type PanInfo } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BarChart3, Brain, CalendarDays, CheckCircle2, Contact, Container, FileText, GitMerge, KeyRound, Laptop, Lightbulb, Mail, MessageSquare, Microscope, Palette, PenLine, Rocket, Scale, SearchCode, Send, Sheet, ShieldCheck, Siren, Star, Ticket, TrendingUp, UserPlus, Zap, type LucideIcon } from 'lucide-react';
 
 interface WfNode {
   id: string;
   label: string;
   sub: string;
-  icon: string;
+  icon: LucideIcon;
   position: { x: number; y: number };
 }
 
@@ -31,12 +31,12 @@ const WORKFLOWS: Workflow[] = [
     field: 'IT Ops',
     tagline: 'On-board new employees automatically',
     nodes: [
-      { id: 'webhook', label: 'HR Webhook', sub: 'New hire event', icon: '⚡', position: { x: 40, y: 120 } },
-      { id: 'account', label: 'Create Account', sub: 'Google Workspace', icon: '👤', position: { x: 270, y: 40 } },
-      { id: 'access', label: 'Assign Access', sub: 'Okta SSO', icon: '🔑', position: { x: 270, y: 200 } },
-      { id: 'laptop', label: 'Provision Laptop', sub: 'Jamf MDM', icon: '💻', position: { x: 500, y: 40 } },
-      { id: 'welcome', label: 'Welcome Email', sub: 'SendGrid', icon: '✉️', position: { x: 500, y: 200 } },
-      { id: 'notify', label: 'Notify Manager', sub: 'Slack #onboard', icon: '💬', position: { x: 730, y: 120 } },
+      { id: 'webhook', label: 'HR Webhook', sub: 'New hire event', icon: Zap, position: { x: 40, y: 120 } },
+      { id: 'account', label: 'Create Account', sub: 'Google Workspace', icon: UserPlus, position: { x: 270, y: 40 } },
+      { id: 'access', label: 'Assign Access', sub: 'Okta SSO', icon: KeyRound, position: { x: 270, y: 200 } },
+      { id: 'laptop', label: 'Provision Laptop', sub: 'Jamf MDM', icon: Laptop, position: { x: 500, y: 40 } },
+      { id: 'welcome', label: 'Welcome Email', sub: 'SendGrid', icon: Mail, position: { x: 500, y: 200 } },
+      { id: 'notify', label: 'Notify Manager', sub: 'Slack #onboard', icon: MessageSquare, position: { x: 730, y: 120 } },
     ],
     connections: [
       { from: 'webhook', to: 'account' },
@@ -51,12 +51,12 @@ const WORKFLOWS: Workflow[] = [
     field: 'Sales',
     tagline: 'Generate customer insights from reviews',
     nodes: [
-      { id: 'reviews', label: 'Get Reviews', sub: 'Trustpilot API', icon: '⭐', position: { x: 40, y: 120 } },
-      { id: 'cluster', label: 'Cluster Topics', sub: 'K-means', icon: '📊', position: { x: 260, y: 40 } },
-      { id: 'ai', label: 'AI Analysis', sub: 'OpenAI GPT-4', icon: '🧠', position: { x: 260, y: 200 } },
-      { id: 'insights', label: 'Extract Insights', sub: 'AI Agent', icon: '💡', position: { x: 490, y: 120 } },
-      { id: 'sheets', label: 'Save to Sheets', sub: 'Google Sheets', icon: '📋', position: { x: 720, y: 40 } },
-      { id: 'crm', label: 'Update CRM', sub: 'HubSpot', icon: '📇', position: { x: 720, y: 200 } },
+      { id: 'reviews', label: 'Get Reviews', sub: 'Trustpilot API', icon: Star, position: { x: 40, y: 120 } },
+      { id: 'cluster', label: 'Cluster Topics', sub: 'K-means', icon: BarChart3, position: { x: 260, y: 40 } },
+      { id: 'ai', label: 'AI Analysis', sub: 'OpenAI GPT-4', icon: Brain, position: { x: 260, y: 200 } },
+      { id: 'insights', label: 'Extract Insights', sub: 'AI Agent', icon: Lightbulb, position: { x: 490, y: 120 } },
+      { id: 'sheets', label: 'Save to Sheets', sub: 'Google Sheets', icon: Sheet, position: { x: 720, y: 40 } },
+      { id: 'crm', label: 'Update CRM', sub: 'HubSpot', icon: Contact, position: { x: 720, y: 200 } },
     ],
     connections: [
       { from: 'reviews', to: 'cluster' },
@@ -71,12 +71,12 @@ const WORKFLOWS: Workflow[] = [
     field: 'Dev Ops',
     tagline: 'Auto-deploy on every PR merge',
     nodes: [
-      { id: 'gh', label: 'GitHub Webhook', sub: 'PR merged', icon: '🔀', position: { x: 40, y: 120 } },
-      { id: 'test', label: 'Run Tests', sub: 'Jest + Cypress', icon: '✅', position: { x: 260, y: 40 } },
-      { id: 'lint', label: 'Lint & Type Check', sub: 'ESLint + TSC', icon: '🔍', position: { x: 260, y: 200 } },
-      { id: 'build', label: 'Build Image', sub: 'Docker', icon: '🐳', position: { x: 490, y: 120 } },
-      { id: 'deploy', label: 'Deploy', sub: 'Kubernetes', icon: '🚀', position: { x: 720, y: 40 } },
-      { id: 'slack', label: 'Notify Team', sub: 'Slack #deploys', icon: '💬', position: { x: 720, y: 200 } },
+      { id: 'gh', label: 'GitHub Webhook', sub: 'PR merged', icon: GitMerge, position: { x: 40, y: 120 } },
+      { id: 'test', label: 'Run Tests', sub: 'Jest + Cypress', icon: CheckCircle2, position: { x: 260, y: 40 } },
+      { id: 'lint', label: 'Lint & Type Check', sub: 'ESLint + TSC', icon: SearchCode, position: { x: 260, y: 200 } },
+      { id: 'build', label: 'Build Image', sub: 'Docker', icon: Container, position: { x: 490, y: 120 } },
+      { id: 'deploy', label: 'Deploy', sub: 'Kubernetes', icon: Rocket, position: { x: 720, y: 40 } },
+      { id: 'slack', label: 'Notify Team', sub: 'Slack #deploys', icon: MessageSquare, position: { x: 720, y: 200 } },
     ],
     connections: [
       { from: 'gh', to: 'test' },
@@ -91,12 +91,12 @@ const WORKFLOWS: Workflow[] = [
     field: 'Marketing',
     tagline: 'Automate social content pipeline',
     nodes: [
-      { id: 'calendar', label: 'Content Calendar', sub: 'Notion DB', icon: '📅', position: { x: 40, y: 120 } },
-      { id: 'gen', label: 'Generate Copy', sub: 'Claude AI', icon: '✍️', position: { x: 270, y: 40 } },
-      { id: 'image', label: 'Create Visual', sub: 'Canva API', icon: '🎨', position: { x: 270, y: 200 } },
-      { id: 'schedule', label: 'Schedule Post', sub: 'Buffer', icon: '📤', position: { x: 500, y: 120 } },
-      { id: 'analytics', label: 'Track Metrics', sub: 'Google Analytics', icon: '📈', position: { x: 730, y: 40 } },
-      { id: 'report', label: 'Weekly Report', sub: 'Slack #marketing', icon: '📊', position: { x: 730, y: 200 } },
+      { id: 'calendar', label: 'Content Calendar', sub: 'Notion DB', icon: CalendarDays, position: { x: 40, y: 120 } },
+      { id: 'gen', label: 'Generate Copy', sub: 'Claude AI', icon: PenLine, position: { x: 270, y: 40 } },
+      { id: 'image', label: 'Create Visual', sub: 'Canva API', icon: Palette, position: { x: 270, y: 200 } },
+      { id: 'schedule', label: 'Schedule Post', sub: 'Buffer', icon: Send, position: { x: 500, y: 120 } },
+      { id: 'analytics', label: 'Track Metrics', sub: 'Google Analytics', icon: TrendingUp, position: { x: 730, y: 40 } },
+      { id: 'report', label: 'Weekly Report', sub: 'Slack #marketing', icon: BarChart3, position: { x: 730, y: 200 } },
     ],
     connections: [
       { from: 'calendar', to: 'gen' },
@@ -111,12 +111,12 @@ const WORKFLOWS: Workflow[] = [
     field: 'Security',
     tagline: 'Enrich and triage incident tickets',
     nodes: [
-      { id: 'alert', label: 'Security Alert', sub: 'PagerDuty', icon: '🚨', position: { x: 40, y: 120 } },
-      { id: 'enrich', label: 'Enrich IOCs', sub: 'VirusTotal', icon: '🔬', position: { x: 270, y: 40 } },
-      { id: 'classify', label: 'Classify Severity', sub: 'AI Triage', icon: '⚖️', position: { x: 270, y: 200 } },
-      { id: 'ticket', label: 'Create Ticket', sub: 'Jira', icon: '🎫', position: { x: 500, y: 120 } },
-      { id: 'block', label: 'Block IP', sub: 'Cloudflare', icon: '🛡️', position: { x: 730, y: 40 } },
-      { id: 'report', label: 'Incident Report', sub: 'Confluence', icon: '📝', position: { x: 730, y: 200 } },
+      { id: 'alert', label: 'Security Alert', sub: 'PagerDuty', icon: Siren, position: { x: 40, y: 120 } },
+      { id: 'enrich', label: 'Enrich IOCs', sub: 'VirusTotal', icon: Microscope, position: { x: 270, y: 40 } },
+      { id: 'classify', label: 'Classify Severity', sub: 'AI Triage', icon: Scale, position: { x: 270, y: 200 } },
+      { id: 'ticket', label: 'Create Ticket', sub: 'Jira', icon: Ticket, position: { x: 500, y: 120 } },
+      { id: 'block', label: 'Block IP', sub: 'Cloudflare', icon: ShieldCheck, position: { x: 730, y: 40 } },
+      { id: 'report', label: 'Incident Report', sub: 'Confluence', icon: FileText, position: { x: 730, y: 200 } },
     ],
     connections: [
       { from: 'alert', to: 'enrich' },
@@ -221,7 +221,7 @@ function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
             >
               <div className={`wf-canvas__node${isDragging ? ' wf-canvas__node--dragging' : ''}`}>
                 <div className="wf-canvas__node-head">
-                  <span className="wf-canvas__node-icon">{node.icon}</span>
+                  <span className="wf-canvas__node-icon"><node.icon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
                   <span className="wf-canvas__node-label">{node.label}</span>
                 </div>
                 <p className="wf-canvas__node-sub">{node.sub}</p>
