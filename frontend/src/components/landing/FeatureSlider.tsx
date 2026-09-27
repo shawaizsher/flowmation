@@ -14,8 +14,8 @@ const FEATURES: Feature[] = [
   {
     tag: 'BUILD',
     title: 'A canvas that thinks in flows',
-    desc: 'Drag triggers, logic branches and actions onto an infinite canvas. See your teammates’ cursors live while you wire it together.',
-    chips: ['Drag & drop', 'Multiplayer', 'Branching logic'],
+    desc: 'Drag triggers, logic branches and actions onto the canvas. See who else is on the flow, comment on nodes and get notified the moment a teammate publishes.',
+    chips: ['Drag & drop', 'Presence & comments', 'Branching logic'],
     art: <CanvasIllustration />,
   },
   {
@@ -28,8 +28,8 @@ const FEATURES: Feature[] = [
   {
     tag: 'CONNECT',
     title: '50+ tools, one hub',
-    desc: 'Slack, GitHub, Stripe, OpenAI, Postgres and more — or any API via HTTP and webhook nodes. Credentials are AES-256 encrypted at rest.',
-    chips: ['50+ connectors', 'HTTP & webhooks', 'Encrypted secrets'],
+    desc: 'Slack, GitHub, Stripe, OpenAI, Postgres and more — or any API via HTTP and webhook nodes. Keep credentials in one manager and health-check them before a run.',
+    chips: ['50+ connectors', 'HTTP & webhooks', 'Credential health checks'],
     art: <ConnectIllustration />,
   },
   {

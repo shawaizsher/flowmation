@@ -554,11 +554,6 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
   color: var(--muted);
   margin-bottom: 24px;
 }
-.integration-cta {
-  display: inline-flex;
-  border-radius: 999px;
-  padding: 0 24px;
-}
 
 @media (max-width: 560px) {
   .integration-node {

@@ -1,6 +1,6 @@
 import { animate, motion, useInView, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Lock, Plug, Users, Zap, type LucideIcon } from 'lucide-react';
+import { Layers, Plug, Users, Zap, type LucideIcon } from 'lucide-react';
 
 interface Stat {
   value: number;
@@ -12,9 +12,9 @@ interface Stat {
 
 const STATS: Stat[] = [
   { value: 50, suffix: '+', label: 'Integrations', detail: 'Plus any API over HTTP', icon: Plug },
-  { value: 256, suffix: '-bit', label: 'AES encryption', detail: 'Credentials encrypted at rest', icon: Lock },
-  { value: 3, suffix: '', label: 'Trigger types', detail: 'Schedule, webhook, manual', icon: Zap },
-  { value: 1, suffix: ' canvas', label: 'Live multiplayer', detail: 'Everyone edits together', icon: Users },
+  { value: 23, suffix: '', label: 'Node categories', detail: 'AI, data, messaging, payments…', icon: Layers },
+  { value: 4, suffix: '', label: 'Trigger types', detail: 'Webhook, schedule, email, manual', icon: Zap },
+  { value: 4, suffix: '', label: 'Workspace roles', detail: 'Owner, Admin, Editor, Viewer', icon: Users },
 ];
 
 function Counter({ to, suffix }: { to: number; suffix: string }) {

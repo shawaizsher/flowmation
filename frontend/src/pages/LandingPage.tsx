@@ -8,11 +8,13 @@ import Hero from '../components/landing/Hero';
 import Marquee from '../components/landing/Marquee';
 import FeatureSlider from '../components/landing/FeatureSlider';
 import TiltStats from '../components/landing/TiltStats';
+import ToolsBento from '../components/landing/ToolsBento';
 import './vesper-landing.css';
 import './landing-next.css';
 
 const NAV_ITEMS = [
   { label: 'Features', href: '#features' },
+  { label: 'Tools', href: '#tools' },
   { label: 'Integrations', href: '#integrations' },
   { label: 'Use Cases', href: '#example' },
   { label: 'FAQs', href: '#faqs' },
@@ -23,7 +25,7 @@ const FAQS = [
   { q: 'Do I need coding experience?', a: 'Not at all. Flowmation is designed for both technical and non-technical users. The visual builder lets you create complex workflows by connecting nodes — no code required. For advanced users, we support custom JavaScript nodes and API integrations.' },
   { q: 'How does the AI debugger work?', a: 'Describe what your workflow should do in plain English, and our AI agent will generate, debug, or optimize it for you. It can identify broken connections, suggest missing nodes, and fix execution errors automatically.' },
   { q: 'What integrations are supported?', a: 'Flowmation supports 50+ integrations including Slack, GitHub, Stripe, OpenAI, Google Sheets, PostgreSQL, Redis, Telegram, and many more. You can also connect any service via HTTP/webhook nodes.' },
-  { q: 'Is my data secure?', a: 'Yes. All credentials are encrypted at rest using AES-256. Workflows run in isolated environments, and we never store your API responses. Self-hosted deployment is available for Enterprise plans.' },
+  { q: 'Is my data secure?', a: 'Workspaces are access-controlled with Owner, Admin, Editor and Viewer roles, and credentials live in a dedicated manager rather than inside your workflow definitions. Risky steps can be gated behind a human approval before they run.' },
 ];
 
 export default function LandingPage() {
@@ -133,6 +135,16 @@ export default function LandingPage() {
       </div>
       <FeatureSlider />
 
+      {/* ── Tools ── */}
+      <section className="vp-section" id="tools">
+        <div className="section-inner section-inner--wide">
+          <p className="section-eyebrow reveal">The toolkit</p>
+          <h2 className="section-title reveal">Everything inside Flowmation</h2>
+          <p className="section-sub reveal">One workspace for building, testing, shipping and running automations with your team.</p>
+          <ToolsBento />
+        </div>
+      </section>
+
       {/* ── Stats ── */}
       <section className="vp-section" id="numbers">
         <div className="section-inner">
@@ -216,6 +228,7 @@ export default function LandingPage() {
           </div>
           <div className="footer-links">
             <a href="#features">Features</a>
+            <a href="#tools">Tools</a>
             <a href="#integrations">Integrations</a>
             <a href="#how-it-works">How It Works</a>
             <a href="#example">Use Cases</a>

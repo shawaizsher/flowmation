@@ -66,7 +66,7 @@ export default function Hero() {
           <Link to="/register" className="btn btn-solid btn-lg fx-hero__cta">
             Start building free <ArrowRight size={16} aria-hidden="true" />
           </Link>
-          <a href="#features" className="btn btn-hero-ghost btn-lg">
+          <a href="#how-it-works" className="btn btn-hero-ghost btn-lg">
             See how it works
           </a>
         </motion.div>

@@ -36,10 +36,14 @@ export function CanvasIllustration() {
       <rect x="340" y="132" width="36" height="36" rx="18" fill="none" stroke={BEIGE} strokeOpacity="0.5" strokeDasharray="3 4" />
       <path d="M358 142 v16 M350 150 h16" stroke={BEIGE} strokeOpacity="0.7" strokeWidth="1.5" />
       <g className="fx-ill__cursor">
-        <path d="M250 190 l0 22 l6 -6 l5 11 l4 -2 l-5 -11 l8 0 z" fill={BEIGE} />
-        <rect x="266" y="210" width="44" height="16" rx="4" fill={ROSE} />
-        <text x="272" y="221" fill="#1a0008" fontSize="8" fontFamily="JetBrains Mono, monospace" fontWeight="700">SARA</text>
+        <path d="M262 176 l-10 12 h12 z" fill="#0d0003" stroke={ROSE} strokeOpacity="0.6" />
+        <rect x="236" y="186" width="118" height="30" rx="8" fill="#0d0003" stroke={ROSE} strokeOpacity="0.6" />
+        <text x="246" y="205" fill={BEIGE} fontSize="9" fontFamily="JetBrains Mono, monospace">add retry here?</text>
       </g>
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={322 + i * 16} cy={32} r="10" fill={i === 0 ? ROSE : i === 1 ? BEIGE : MAROON} stroke="#0d0003" strokeWidth="2" />
+      ))}
+      <text x="298" y="36" textAnchor="end" fill={BEIGE} fillOpacity="0.6" fontSize="8.5" fontFamily="JetBrains Mono, monospace">3 here</text>
     </svg>
   );
 }

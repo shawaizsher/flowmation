@@ -143,7 +143,6 @@ export default function IntegrationCard() {
         <div className="integration-body">
           <h3>Seamless Integrations</h3>
           <p>Connect Slack, GitHub, Gmail, Stripe, OpenAI, databases, and dozens more — keep your workflows unified without switching between platforms.</p>
-          <a href="#benefits" className="btn btn-solid integration-cta">Explore Integrations</a>
         </div>
       </div>
     </div>

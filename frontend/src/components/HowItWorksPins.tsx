@@ -17,7 +17,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Connect Your Tools',
-    description: 'Link Slack, GitHub, Stripe, OpenAI, and 50+ other integrations. Credentials stay encrypted.',
+    description: 'Link Slack, GitHub, Stripe, OpenAI, and 50+ other integrations from one credentials manager.',
   },
   {
     title: 'Let AI Debug It',
@@ -29,7 +29,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Scale With Your Team',
-    description: 'Invite collaborators, watch cursors move live, and ship automations together.',
+    description: 'Invite collaborators with roles, comment on nodes, and ship automations together.',
   },
 ];
 
