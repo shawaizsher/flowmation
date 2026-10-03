@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="frontend/public/favicon.svg" alt="Fluxion Logo" width="80" height="80" />
+  <img src="frontend/public/favicon.svg" alt="Flowmation Logo" width="80" height="80" />
 </p>
 
-<h1 align="center">Fluxion</h1>
+<h1 align="center">Flowmation</h1>
 
 <p align="center">
   <strong>AI-Native Workflow Automation Platform</strong>
 </p>
 
 <p align="center">
-  Build and automate, and orchestrate complex workflows visually — powered by AI.
+  Build, automate, and orchestrate complex workflows visually — powered by AI.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-8B5CF6?style=flat-square&labelColor=111113" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.0-800020?style=flat-square&labelColor=111113" alt="Version" />
   <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=white&labelColor=111113" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white&labelColor=111113" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=nodedotjs&logoColor=white&labelColor=111113" alt="Node.js" />
@@ -21,14 +21,14 @@
   <img src="https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white&labelColor=111113" alt="Redis" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white&labelColor=111113" alt="Docker" />
   <img src="https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white&labelColor=111113" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/License-MIT-22D3EE?style=flat-square&labelColor=111113" alt="License" />
+  <img src="https://img.shields.io/badge/License-MIT-D45060?style=flat-square&labelColor=111113" alt="License" />
 </p>
 
 ---
 
 ## Overview
 
-**Fluxion** is a full-stack, AI-native workflow automation platform that lets you visually design, connect, and execute workflows using a drag-and-drop canvas editor. With **173+ integration nodes** across **23 categories**, Fluxion connects your entire tech stack — from AI/ML models and databases to cloud services, social media, e-commerce, and more.
+**Flowmation** is a full-stack, AI-native workflow automation platform that lets you visually design, connect, and execute workflows using a drag-and-drop canvas editor. With **173+ integration nodes** across **23 categories**, Flowmation connects your entire tech stack — from AI/ML models and databases to cloud services, social media, e-commerce, and more.
 
 Think **n8n** meets **AI-first design** — with a sleek dark UI, real-time execution, and a credentials vault built in.
 
@@ -71,10 +71,10 @@ Think **n8n** meets **AI-first design** — with a sleek dark UI, real-time exec
 | 🛠️ Utilities | 7 | Delay, Merge, Split, Crypto, Date/Time, Regex, HTTP Poll |
 
 ### Credentials Vault
-- **52+ service credential types** with encrypted storage
+- **52+ service credential types**
 - Per-node credential selection in the configuration panel
 - Centralized Credentials Manager modal
-- AES-256 encryption for stored secrets
+- Credential health check before a run
 
 ### Modern Dark UI
 - Neutral grey dark theme with Inter font
@@ -120,10 +120,10 @@ Think **n8n** meets **AI-first design** — with a sleek dark UI, real-time exec
 ## 📂 Project Structure
 
 ```
-Fluxion-Automation-Platform/
+Flowa-Automation-Platform/
 ├── frontend/                       # React + TypeScript + Vite
 │   ├── public/
-│   │   └── favicon.svg             # Fluxion logo
+│   │   └── favicon.svg             # Flowmation logo
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── AppShell.tsx        # Layout wrapper with sidebar
@@ -199,8 +199,8 @@ Fluxion-Automation-Platform/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/Fluxion-Automation-Platform.git
-cd Fluxion-Automation-Platform
+git clone https://github.com/shawaizsher/Flowa-Automation-Platform.git
+cd Flowa-Automation-Platform
 ```
 
 ### 2. Configure Environment
@@ -214,7 +214,6 @@ Edit `.env` and add your API keys:
 ```dotenv
 # Required
 JWT_SECRET=your-secure-jwt-secret
-ENCRYPTION_KEY=your-32-char-encryption-key
 
 # Optional — for AI features
 OPENAI_API_KEY=sk-...
@@ -338,7 +337,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `PORT` | `4000` | Backend port |
 | `JWT_SECRET` | — | **Required.** JWT signing key |
 | `CORS_ORIGIN` | `http://localhost:3000` | Allowed frontend origin |
-| `ENCRYPTION_KEY` | — | **Required.** AES key for credentials vault |
 | `OPENAI_API_KEY` | — | Optional. For AI features |
 | `ANTHROPIC_API_KEY` | — | Optional. For AI features |
 | `VITE_API_URL` | `http://localhost:4000` | Frontend → Backend URL |
@@ -458,7 +456,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 ---
 
 <p align="center">
-  <img src="frontend/public/favicon.svg" alt="Fluxion" width="24" height="24" />
+  <img src="frontend/public/favicon.svg" alt="Flowmation" width="24" height="24" />
   <br />
-  <sub>Built with ❤️ by the Fluxion team</sub>
+  <sub>Built with ❤️ by the Flowmation team</sub>
 </p>
