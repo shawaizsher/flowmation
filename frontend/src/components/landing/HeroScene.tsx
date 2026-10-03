@@ -1,9 +1,8 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Line, MeshDistortMaterial, Sparkles, Trail } from '@react-three/drei';
+import { Line, MeshDistortMaterial } from '@react-three/drei';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import type { Line2 } from 'three-stdlib';
 
 const ROSE = '#D45060';
 const MAROON = '#800020';
@@ -11,6 +10,9 @@ const BEIGE = '#F3E6D5';
 const WHITE = '#FFF9F2';
 
 const NODE_COUNT = 22;
+
+// Cap per-frame deltas so the scene never lurches after the tab/canvas was paused.
+const dtOf = (delta: number) => Math.min(delta, 0.05);
 
 function seeded(i: number) {
   const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
@@ -69,9 +71,9 @@ const fresnelFragment = /* glsl */ `
   varying vec3 vNormal;
   varying vec3 vView;
   void main() {
-    float f = pow(1.0 - max(dot(vNormal, vView), 0.0), 2.6);
-    float pulse = 0.85 + 0.15 * sin(uTime * 1.6);
-    gl_FragColor = vec4(uColor * f * 1.6 * pulse, f * pulse);
+    float f = pow(1.0 - max(dot(vNormal, vView), 0.0), 2.4);
+    float breathe = 0.94 + 0.06 * sin(uTime * 0.7);
+    gl_FragColor = vec4(uColor * f * 1.15 * breathe, f * 0.9 * breathe);
   }
 `;
 
@@ -82,10 +84,10 @@ function Core({ reduced }: { reduced: boolean }) {
   const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(ROSE) }, uTime: { value: 0 } }), []);
 
   const energyPositions = useMemo(() => {
-    const n = 500;
+    const n = 420;
     const arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      const r = 0.25 + seeded(i + 900) * 0.8;
+      const r = 0.25 + seeded(i + 900) * 0.7;
       const t = seeded(i + 1900) * Math.PI * 2;
       const p = Math.acos(2 * seeded(i + 2900) - 1);
       arr[i * 3] = r * Math.sin(p) * Math.cos(t);
@@ -98,29 +100,31 @@ function Core({ reduced }: { reduced: boolean }) {
   useFrame(({ clock }, delta) => {
     if (shell.current) shell.current.uniforms.uTime.value = clock.getElapsedTime();
     if (reduced) return;
-    if (cage.current) { cage.current.rotation.y -= delta * 0.18; cage.current.rotation.x += delta * 0.07; }
-    if (energy.current) energy.current.rotation.y += delta * 0.6;
+    const dt = dtOf(delta);
+    if (cage.current) { cage.current.rotation.y -= dt * 0.08; cage.current.rotation.x += dt * 0.03; }
+    if (energy.current) energy.current.rotation.y += dt * 0.22;
   });
 
   return (
     <group>
       <mesh>
-        <icosahedronGeometry args={[0.95, 12]} />
-        <MeshDistortMaterial color={MAROON} emissive={MAROON} emissiveIntensity={0.55} roughness={0.2} metalness={0.8} distort={reduced ? 0 : 0.42} speed={1.8} />
+        <icosahedronGeometry args={[0.95, 10]} />
+        {/* Non-metallic + self-lit: a metal with no environment map renders black. */}
+        <MeshDistortMaterial color={MAROON} emissive="#a3112f" emissiveIntensity={0.7} roughness={0.55} metalness={0.1} distort={reduced ? 0 : 0.28} speed={0.9} />
       </mesh>
       <points ref={energy}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[energyPositions, 3]} />
         </bufferGeometry>
-        <pointsMaterial size={0.028} color={WHITE} transparent opacity={0.85} depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
+        <pointsMaterial size={0.03} color={BEIGE} transparent opacity={0.55} depthWrite={false} sizeAttenuation />
       </points>
-      <mesh scale={1.22}>
+      <mesh scale={1.2}>
         <sphereGeometry args={[1, 48, 48]} />
         <shaderMaterial ref={shell} vertexShader={fresnelVertex} fragmentShader={fresnelFragment} uniforms={uniforms} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh ref={cage} scale={1.42}>
         <icosahedronGeometry args={[1, 1]} />
-        <meshBasicMaterial color={BEIGE} wireframe transparent opacity={0.16} />
+        <meshBasicMaterial color={BEIGE} wireframe transparent opacity={0.1} />
       </mesh>
     </group>
   );
@@ -135,21 +139,19 @@ function Satellite({ radius, speed, phase, tilt, reduced }: { radius: number; sp
     ref.current?.position.copy(v);
   });
   return (
-    <Trail width={0.22} length={4} decay={1.5} color={ROSE} attenuation={(w) => w * w}>
-      <mesh ref={ref}>
-        <sphereGeometry args={[0.05, 12, 12]} />
-        <meshBasicMaterial color={WHITE} toneMapped={false} />
-      </mesh>
-    </Trail>
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.065, 16, 16]} />
+      <meshBasicMaterial color={WHITE} toneMapped={false} />
+    </mesh>
   );
 }
 
 function Orbits({ reduced }: { reduced: boolean }) {
   const rings = useMemo(
     () => [
-      { r: 1.75, tilt: new THREE.Euler(1.2, 0.2, 0), speed: 0.9 },
-      { r: 2.05, tilt: new THREE.Euler(-0.6, 0.9, 0.3), speed: -0.65 },
-      { r: 2.3, tilt: new THREE.Euler(0.3, -0.5, 1.1), speed: 0.5 },
+      { r: 1.75, tilt: new THREE.Euler(1.2, 0.2, 0), speed: 0.45 },
+      { r: 2.05, tilt: new THREE.Euler(-0.6, 0.9, 0.3), speed: -0.32 },
+      { r: 2.3, tilt: new THREE.Euler(0.3, -0.5, 1.1), speed: 0.25 },
     ],
     []
   );
@@ -157,85 +159,95 @@ function Orbits({ reduced }: { reduced: boolean }) {
     <>
       {rings.map((ring, i) => (
         <group key={i}>
+          {/* tube is thick enough to antialias cleanly; hairline geometry shimmers as it rotates */}
           <mesh rotation={ring.tilt}>
-            <torusGeometry args={[ring.r, 0.006, 8, 200]} />
-            <meshBasicMaterial color={i === 1 ? BEIGE : ROSE} transparent opacity={i === 1 ? 0.25 : 0.5} toneMapped={false} />
+            <torusGeometry args={[ring.r, 0.012, 8, 220]} />
+            <meshBasicMaterial color={i === 1 ? BEIGE : ROSE} transparent opacity={i === 1 ? 0.18 : 0.38} />
           </mesh>
-          {[0, Math.PI].map((phase) => (
-            <Satellite key={phase} radius={ring.r} speed={ring.speed} phase={phase + i} tilt={ring.tilt} reduced={reduced} />
-          ))}
+          <Satellite radius={ring.r} speed={ring.speed} phase={i * 1.3} tilt={ring.tilt} reduced={reduced} />
         </group>
       ))}
     </>
   );
 }
 
-function FlowEdge({ curve, reduced }: { curve: THREE.QuadraticBezierCurve3; reduced: boolean }) {
-  const ref = useRef<Line2>(null);
-  const points = useMemo(() => curve.getPoints(32), [curve]);
-  useFrame((_, delta) => {
-    if (reduced || !ref.current) return;
-    ref.current.material.dashOffset -= delta * 0.6;
-  });
-  return <Line ref={ref} points={points} color={ROSE} lineWidth={0.9} dashed dashSize={0.1} gapSize={0.09} transparent opacity={0.4} />;
+function FlowEdge({ curve }: { curve: THREE.QuadraticBezierCurve3 }) {
+  const points = useMemo(() => curve.getPoints(40), [curve]);
+  return <Line points={points} color={ROSE} lineWidth={1.4} transparent opacity={0.3} />;
 }
 
 function Packet({ curve, offset, reduced }: { curve: THREE.QuadraticBezierCurve3; offset: number; reduced: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   const p = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ clock }) => {
-    const k = reduced ? 0.5 : (clock.getElapsedTime() * 0.35 + offset) % 1;
+    const k = reduced ? 0.5 : (clock.getElapsedTime() * 0.16 + offset) % 1;
     curve.getPoint(k, p);
     ref.current?.position.copy(p);
   });
   return (
-    <Trail width={0.12} length={2.5} decay={1.5} color={ROSE} attenuation={(w) => w * w}>
-      <mesh ref={ref}>
-        <sphereGeometry args={[0.04, 10, 10]} />
-        <meshBasicMaterial color={WHITE} toneMapped={false} />
-      </mesh>
-    </Trail>
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.055, 14, 14]} />
+      <meshBasicMaterial color={BEIGE} toneMapped={false} />
+    </mesh>
   );
 }
 
-function GraphNode({ position, i, reduced }: { position: THREE.Vector3; i: number; reduced: boolean }) {
-  const ref = useRef<THREE.Mesh>(null);
+function GraphNode({ position, i }: { position: THREE.Vector3; i: number }) {
   const big = i % 5 === 0;
   const color = i % 3 === 0 ? BEIGE : ROSE;
-  useFrame(({ clock }, delta) => {
-    const m = ref.current;
-    if (!m || reduced) return;
-    const s = 1 + Math.sin(clock.getElapsedTime() * 2 + i) * 0.18;
-    m.scale.setScalar(s);
-    m.rotation.x += delta * 0.8;
-    m.rotation.y += delta * 0.5;
-  });
   return (
-    <mesh ref={ref} position={position}>
-      <octahedronGeometry args={[big ? 0.13 : 0.075, 0]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={big ? 2.2 : 1.4} flatShading toneMapped={false} />
+    <mesh position={position}>
+      {/* unlit + smooth: lit, flat-shaded facets flash as they move */}
+      <icosahedronGeometry args={[big ? 0.12 : 0.07, 2]} />
+      <meshBasicMaterial color={color} toneMapped={false} />
     </mesh>
+  );
+}
+
+function Stars({ count }: { count: number }) {
+  const ref = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const r = 4.2 + seeded(i + 40) * 4;
+      const t = seeded(i + 140) * Math.PI * 2;
+      const p = Math.acos(2 * seeded(i + 240) - 1);
+      arr[i * 3] = r * Math.sin(p) * Math.cos(t);
+      arr[i * 3 + 1] = r * Math.sin(p) * Math.sin(t) * 0.7;
+      arr[i * 3 + 2] = r * Math.cos(p);
+    }
+    return arr;
+  }, [count]);
+  useFrame((_, delta) => { if (ref.current) ref.current.rotation.y += dtOf(delta) * 0.02; });
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.026} color={BEIGE} transparent opacity={0.35} sizeAttenuation depthWrite={false} />
+    </points>
   );
 }
 
 function Rig({ reduced, children }: { reduced: boolean; children: React.ReactNode }) {
   const group = useRef<THREE.Group>(null);
   const { camera } = useThree();
-  const startZ = reduced ? 7 : 13;
+  const startZ = reduced ? 7 : 12;
   useEffect(() => { camera.position.set(0, 0, startZ); }, [camera, startZ]);
 
   useFrame(({ clock, pointer }, delta) => {
     const g = group.current;
     if (!g) return;
+    const dt = dtOf(delta);
     const scroll = Math.min(1, window.scrollY / window.innerHeight);
     const targetZ = 7 + scroll * 3;
-    camera.position.z += (targetZ - camera.position.z) * Math.min(1, delta * 1.6);
-    camera.position.x += (pointer.x * 0.6 - camera.position.x) * Math.min(1, delta * 2);
-    camera.position.y += (pointer.y * 0.4 - camera.position.y) * Math.min(1, delta * 2);
+    camera.position.z += (targetZ - camera.position.z) * Math.min(1, dt * 1.2);
+    camera.position.x += (pointer.x * 0.5 - camera.position.x) * Math.min(1, dt * 1.5);
+    camera.position.y += (pointer.y * 0.35 - camera.position.y) * Math.min(1, dt * 1.5);
     camera.lookAt(0, 0, 0);
-    const base = reduced ? 0 : clock.getElapsedTime() * 0.1;
-    g.rotation.y += (base + pointer.x * 0.35 - g.rotation.y) * Math.min(1, delta * 2.5);
-    g.rotation.x += (-pointer.y * 0.25 + scroll * 0.4 - g.rotation.x) * Math.min(1, delta * 2.5);
+    const base = reduced ? 0 : clock.getElapsedTime() * 0.06;
+    g.rotation.y += (base + pointer.x * 0.25 - g.rotation.y) * Math.min(1, dt * 1.8);
+    g.rotation.x += (-pointer.y * 0.18 + scroll * 0.4 - g.rotation.x) * Math.min(1, dt * 1.8);
   });
 
   return <group ref={group}>{children}</group>;
@@ -244,16 +256,16 @@ function Rig({ reduced, children }: { reduced: boolean; children: React.ReactNod
 function Scene({ reduced, lite }: { reduced: boolean; lite: boolean }) {
   const nodes = useMemo(() => shellPoints(NODE_COUNT), []);
   const curves = useMemo(() => buildCurves(nodes), [nodes]);
-  const packetCurves = useMemo(() => curves.filter((_, i) => i % 2 === 0).slice(0, lite ? 6 : 12), [curves, lite]);
+  const packetCurves = useMemo(() => curves.filter((_, i) => i % 2 === 0).slice(0, lite ? 5 : 8), [curves, lite]);
 
   return (
     <Rig reduced={reduced}>
       <Core reduced={reduced} />
       <Orbits reduced={reduced} />
-      {curves.map((c, i) => <FlowEdge key={i} curve={c} reduced={reduced} />)}
-      {packetCurves.map((c, i) => <Packet key={i} curve={c} offset={i * 0.17} reduced={reduced} />)}
-      {nodes.map((p, i) => <GraphNode key={i} position={p} i={i} reduced={reduced} />)}
-      <Sparkles count={lite ? 60 : 140} scale={[11, 7, 8]} size={2.2} speed={reduced ? 0 : 0.35} color={BEIGE} opacity={0.55} />
+      {curves.map((c, i) => <FlowEdge key={i} curve={c} />)}
+      {packetCurves.map((c, i) => <Packet key={i} curve={c} offset={i * 0.21} reduced={reduced} />)}
+      {nodes.map((p, i) => <GraphNode key={i} position={p} i={i} />)}
+      <Stars count={lite ? 220 : 420} />
     </Rig>
   );
 }
@@ -275,17 +287,18 @@ export default function HeroScene() {
   return (
     <div ref={wrapRef} className="fx-scene" aria-hidden="true">
       <Canvas
-        dpr={[1, lite ? 1.5 : 1.75]}
-        camera={{ position: [0, 0, 13], fov: 45 }}
+        dpr={[1, lite ? 1.5 : 2]}
+        camera={{ position: [0, 0, 12], fov: 45 }}
         gl={{ antialias: false, alpha: true, powerPreference: 'high-performance' }}
         frameloop={visible ? 'always' : 'never'}
       >
-        <ambientLight intensity={0.3} />
-        <pointLight position={[4, 4, 5]} intensity={45} color={ROSE} />
-        <pointLight position={[-5, -3, 3]} intensity={25} color={BEIGE} />
+        <ambientLight intensity={0.5} />
+        <pointLight position={[4, 4, 5]} intensity={40} color={ROSE} />
+        <pointLight position={[-5, -3, 3]} intensity={22} color={BEIGE} />
         <Scene reduced={reduced} lite={lite} />
-        <EffectComposer multisampling={lite ? 0 : 4}>
-          <Bloom mipmapBlur luminanceThreshold={0.25} luminanceSmoothing={0.3} intensity={1.15} radius={0.7} />
+        {/* High threshold: only the brightest points glow, so the bloom doesn't twinkle with every small highlight. */}
+        <EffectComposer multisampling={lite ? 2 : 8}>
+          <Bloom mipmapBlur luminanceThreshold={0.7} luminanceSmoothing={0.5} intensity={0.75} radius={0.65} />
         </EffectComposer>
       </Canvas>
     </div>

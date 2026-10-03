@@ -190,18 +190,31 @@ export default function LandingPage() {
           <p className="section-eyebrow reveal">FAQs</p>
           <h2 className="section-title reveal">Frequently asked questions</h2>
           <div className="faq-list">
-            {FAQS.map((f, i) => (
-              <div key={i} className={`faq-item reveal${openFaq === i ? ' faq-item--open' : ''}`}
-                style={{ '--reveal-d': `${i * 0.08}s` } as React.CSSProperties}>
-                <button className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i}>
-                  <span>{f.q}</span>
-                  <svg className="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                <div className="faq-a"><p>{f.a}</p></div>
-              </div>
-            ))}
+            {FAQS.map((f, i) => {
+              const open = openFaq === i;
+              return (
+                // The reveal wrapper keeps a static className: the IntersectionObserver adds "revealed"
+                // imperatively, and React would strip it if it lived on the toggling .faq-item.
+                <div key={i} className="faq-reveal reveal" style={{ '--reveal-d': `${i * 0.08}s` } as React.CSSProperties}>
+                  <div className={`faq-item${open ? ' faq-item--open' : ''}`}>
+                    <button
+                      className="faq-q"
+                      id={`faq-q-${i}`}
+                      aria-expanded={open}
+                      aria-controls={`faq-a-${i}`}
+                      onClick={() => setOpenFaq(open ? null : i)}
+                    >
+                      <span className="faq-idx fx-mono">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="faq-q-text">{f.q}</span>
+                      <span className="faq-toggle" aria-hidden="true" />
+                    </button>
+                    <div className="faq-a" id={`faq-a-${i}`} role="region" aria-labelledby={`faq-q-${i}`}>
+                      <div className="faq-a-inner"><p>{f.a}</p></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

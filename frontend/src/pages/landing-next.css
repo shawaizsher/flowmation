@@ -122,10 +122,15 @@ body.vesper-page .hiw-card__number { font-family: var(--font-mono); font-style: 
 .fx-hero__line {
   display: block;
   overflow: hidden;
-  padding-bottom: 0.06em;
+  /* room for descenders (y, g) inside the reveal mask; negative margin keeps the tight line spacing */
+  padding-bottom: 0.2em;
+  margin-bottom: -0.16em;
 }
 
 .fx-hero__accent {
+  /* gradient text only paints inside its own box, so the box must include the descender */
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
   background: linear-gradient(100deg, #D45060 0%, #F3E6D5 55%, #D45060 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -640,4 +645,10 @@ body.vesper-page button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .tb-editor__wires path, .tb-approve__status::before { animation: none; }
   .tb-card:hover { transform: none; }
+}
+
+@media (max-width: 560px) {
+  .faq-q { padding: 16px 16px; gap: 12px; font-size: 15px; }
+  .faq-a-inner { padding-left: 16px; padding-right: 16px; }
+  .faq-idx { display: none; }
 }
