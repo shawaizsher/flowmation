@@ -1,8 +1,11 @@
 import { useState, FormEvent, useRef, KeyboardEvent, ClipboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft, Mail, RefreshCw, CheckCircle2, Zap, Sparkles } from 'lucide-react';
-import FluxionLogo from '../components/FluxionLogo';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, CheckCircle2, Lock, Mail, RefreshCw, Sparkles, User, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { AuthShell, AuthPanel, AuthHeading, AuthSubmit, rise } from '../components/auth/AuthShell';
+import { AuthField } from '../components/auth/AuthField';
+import { OtpBoxes } from '../components/auth/OtpBoxes';
 import { authApi } from '../utils/api';
 import { useStore } from '../store';
 
@@ -10,50 +13,48 @@ const OTP_LENGTH = 6;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_PATTERN = /^[a-zA-Z\s'\-]+$/;
 
+const ART = {
+  form: { eyebrow: 'create account', title: 'Automate your first workflow in minutes.', sub: 'Drag, connect and deploy. No code needed.' },
+  otp: { eyebrow: 'verify email', title: 'One quick check, then you are in.', sub: 'We sent a 6-digit code to confirm it is really you.' },
+  experience: { eyebrow: 'almost there', title: 'Let us tailor your first steps.', sub: 'Tell us how familiar you are with automation tools.' },
+};
+
 export default function RegisterPage() {
-  const navigate  = useNavigate();
-  const setAuth   = useStore((s) => s.setAuth);
+  const navigate = useNavigate();
+  const setAuth = useStore((s) => s.setAuth);
   const setShowTutorial = useStore((s) => s.setShowTutorial);
 
   // Registration form state
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName]   = useState('');
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [showPw, setShowPw]       = useState(false);
-  const [loading, setLoading]     = useState(false);
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [touched, setTouched] = useState({ firstName: false, lastName: false, email: false, password: false });
 
   // Step state: form → otp → experience
-  const [step, setStep]           = useState<'form' | 'otp' | 'experience'>('form');
-  const [digits, setDigits]       = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const [step, setStep] = useState<'form' | 'otp' | 'experience'>('form');
+  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
-  const inputRefs                 = useRef<(HTMLInputElement | null)[]>([]);
-  const [otpError, setOtpError]   = useState('');
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [otpError, setOtpError] = useState('');
 
   // Pending auth data — held until experience is selected
   const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any; workspaces: any[] } | null>(null);
 
   /* ── Validators ── */
-  const validateFirstName = (value: string) => {
+  const validateName = (label: string) => (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed) return 'First name is required.';
+    if (!trimmed) return `${label} is required.`;
     if (trimmed.length < 2) return 'Must be at least 2 characters.';
     if (trimmed.length > 40) return 'Must be 40 characters or fewer.';
     if (!NAME_PATTERN.test(trimmed)) return 'Only letters, hyphens, or apostrophes allowed.';
     return '';
   };
-
-  const validateLastName = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return 'Last name is required.';
-    if (trimmed.length < 2) return 'Must be at least 2 characters.';
-    if (trimmed.length > 40) return 'Must be 40 characters or fewer.';
-    if (!NAME_PATTERN.test(trimmed)) return 'Only letters, hyphens, or apostrophes allowed.';
-    return '';
-  };
+  const validateFirstName = validateName('First name');
+  const validateLastName = validateName('Last name');
 
   const validateEmail = (value: string) => {
     const trimmed = value.trim();
@@ -72,9 +73,9 @@ export default function RegisterPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const firstNameError = validateFirstName(firstName);
-    const lastNameError  = validateLastName(lastName);
-    const emailError     = validateEmail(email);
-    const passwordError  = validatePassword(password);
+    const lastNameError = validateLastName(lastName);
+    const emailError = validateEmail(email);
+    const passwordError = validatePassword(password);
     setShowErrors(true);
     setTouched({ firstName: true, lastName: true, email: true, password: true });
 
@@ -84,7 +85,7 @@ export default function RegisterPage() {
     }
 
     const normalizedEmail = email.trim();
-    const normalizedName  = `${firstName.trim()} ${lastName.trim()}`;
+    const normalizedName = `${firstName.trim()} ${lastName.trim()}`;
     setEmail(normalizedEmail);
 
     setLoading(true);
@@ -115,7 +116,7 @@ export default function RegisterPage() {
     setDigits(next);
     if (otpError) setOtpError('');
     if (char && idx < OTP_LENGTH - 1) focusBox(idx + 1);
-    if (char && next.every(d => d !== '') && idx === OTP_LENGTH - 1) submitOtp(next.join(''));
+    if (char && next.every((d) => d !== '') && idx === OTP_LENGTH - 1) submitOtp(next.join(''));
   };
 
   const handleDigitKeyDown = (idx: number, e: KeyboardEvent<HTMLInputElement>) => {
@@ -194,262 +195,168 @@ export default function RegisterPage() {
     navigate('/dashboard');
   };
 
-  const firstNameError  = validateFirstName(firstName);
-  const lastNameError   = validateLastName(lastName);
-  const emailError      = validateEmail(email);
-  const passwordError   = validatePassword(password);
-  const showFirstNameError  = (showErrors || touched.firstName) && firstNameError;
-  const showLastNameError   = (showErrors || touched.lastName) && lastNameError;
-  const showEmailError      = (showErrors || touched.email) && emailError;
-  const showPasswordError   = (showErrors || touched.password) && passwordError;
+  const firstNameError = validateFirstName(firstName);
+  const lastNameError = validateLastName(lastName);
+  const emailError = validateEmail(email);
+  const passwordError = validatePassword(password);
+  const showFirstNameError = (showErrors || touched.firstName) && firstNameError;
+  const showLastNameError = (showErrors || touched.lastName) && lastNameError;
+  const showEmailError = (showErrors || touched.email) && emailError;
+  const showPasswordError = (showErrors || touched.password) && passwordError;
 
   return (
-    <div className="min-h-screen bg-surface-base flex items-center justify-center px-4 relative">
-      <Link
-        to="/"
-        className="absolute top-6 left-6 flex items-center gap-2 text-foreground-muted hover:text-foreground transition-colors duration-200 group"
-      >
-        <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
-        <span className="text-sm font-medium">Home</span>
-      </Link>
+    <AuthShell art={ART[step]}>
+      <AnimatePresence mode="wait">
+        {step === 'form' && (
+          <AuthPanel key="form">
+            <AuthHeading eyebrow="sign up" title="Create your account" sub="Start building workflows in seconds." />
 
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <FluxionLogo size={36} />
-          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Flowmation</span>
-        </div>
-
-        <div className="card p-8">
-
-          {/* ── Experience step ── */}
-          {step === 'experience' && (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-full bg-brand-500/10 flex items-center justify-center mb-4">
-                <Sparkles size={28} className="text-brand-500" />
+            <form onSubmit={handleSubmit} noValidate className="au-form">
+              <div className="au-row2">
+                <AuthField
+                  id="reg-first"
+                  label="First name"
+                  icon={User}
+                  placeholder="Jane"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  onBlur={() => setTouched((p) => ({ ...p, firstName: true }))}
+                  autoComplete="given-name"
+                  error={showFirstNameError}
+                />
+                <AuthField
+                  id="reg-last"
+                  label="Last name"
+                  icon={User}
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  onBlur={() => setTouched((p) => ({ ...p, lastName: true }))}
+                  autoComplete="family-name"
+                  error={showLastNameError}
+                />
               </div>
-              <h2 className="font-body text-xl font-bold text-foreground mb-2">
-                Welcome, {pendingAuth?.user?.name?.split(' ')[0]}!
-              </h2>
-              <p className="text-sm text-foreground-muted mb-8">
-                Have you used workflow automation tools before?<br />
-                <span className="text-xs">(e.g. Zapier, Make, n8n)</span>
-              </p>
+              <AuthField
+                id="reg-email"
+                label="Email"
+                icon={Mail}
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched((p) => ({ ...p, email: true }))}
+                autoComplete="email"
+                error={showEmailError}
+                hint="We'll send a 6-digit code to this email."
+              />
+              <AuthField
+                id="reg-password"
+                label="Password"
+                icon={Lock}
+                reveal
+                placeholder="Min 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => setTouched((p) => ({ ...p, password: true }))}
+                autoComplete="new-password"
+                error={showPasswordError}
+                hint="Use at least 8 characters."
+              />
+              <AuthSubmit loading={loading} loadingLabel="Creating account…">Create account</AuthSubmit>
+            </form>
 
-              <div className="flex flex-col gap-3 w-full">
-                <button
-                  onClick={() => handleExperienceSelect(false)}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-surface-border hover:border-brand-500 hover:bg-brand-500/5 transition-all duration-200 text-left group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center shrink-0 group-hover:bg-brand-500/20 transition">
-                    <Zap size={20} className="text-brand-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-0.5">Yes, I'm familiar</p>
-                    <p className="text-xs text-foreground-muted">I've used tools like this before — take me straight to the canvas.</p>
-                  </div>
-                </button>
+            <motion.p variants={rise} className="au-foot">
+              Already have an account? <Link to="/login" className="au-link">Sign in</Link>
+            </motion.p>
+          </AuthPanel>
+        )}
 
-                <button
-                  onClick={() => handleExperienceSelect(true)}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-surface-border hover:border-green-500 hover:bg-green-500/5 transition-all duration-200 text-left group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0 group-hover:bg-green-500/20 transition">
-                    <Sparkles size={20} className="text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-0.5">No, I'm new to this</p>
-                    <p className="text-xs text-foreground-muted">Show me a quick tour so I can get started confidently.</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
+        {step === 'otp' && (
+          <AuthPanel key="otp" className="au-center">
+            <motion.div variants={rise} className="au-badge-row">
+              <div className="au-icon-badge"><Mail size={26} aria-hidden="true" /></div>
+            </motion.div>
+            <AuthHeading
+              eyebrow="verify"
+              title="Check your email"
+              sub={<>We sent a 6-digit code to <span className="au-strong">{email}</span></>}
+            />
 
-          {/* ── OTP step ── */}
-          {step === 'otp' && (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-full bg-brand-500/10 flex items-center justify-center mb-4">
-                <Mail size={28} className="text-brand-500" />
-              </div>
-              <h2 className="font-body text-xl font-bold text-foreground mb-1">Check your email</h2>
-              <p className="text-sm text-foreground-muted mb-1">We sent a 6-digit code to</p>
-              <p className="text-sm font-semibold text-foreground mb-6">{email}</p>
+            <OtpBoxes
+              digits={digits}
+              inputRefs={inputRefs}
+              onChange={handleDigitChange}
+              onKeyDown={handleDigitKeyDown}
+              onPaste={handlePaste}
+              disabled={verifying}
+              invalid={Boolean(otpError)}
+            />
 
-              <div className="flex items-center gap-2.5 mb-3">
-                {digits.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={el => { inputRefs.current[i] = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={d}
-                    autoFocus={i === 0}
-                    onChange={e => handleDigitChange(i, e.target.value)}
-                    onKeyDown={e => handleDigitKeyDown(i, e)}
-                    onPaste={i === 0 ? handlePaste : undefined}
-                    className={`w-11 h-13 text-center text-xl font-bold rounded-lg border-2 bg-surface-input text-foreground outline-none transition-all duration-150
-                      ${d ? 'border-brand-500 bg-brand-500/5' : 'border-surface-border'}
-                      focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20`}
-                    style={{ height: '52px' }}
-                    disabled={verifying}
-                  />
-                ))}
-              </div>
+            <motion.div variants={rise} aria-live="polite">
+              {otpError ? <p className="au-error" role="alert">{otpError}</p> : <p className="au-hint" style={{ marginTop: 0 }}>Enter all 6 digits to continue. The code expires in 15 minutes.</p>}
+            </motion.div>
 
-              {otpError ? (
-                <p className="text-xs text-red-400 mb-3">{otpError}</p>
-              ) : (
-                <p className="text-xs text-foreground-muted mb-3">Enter all 6 digits to continue.</p>
-              )}
-
+            <motion.div variants={rise}>
               <button
+                type="button"
                 onClick={() => submitOtp(digits.join(''))}
-                disabled={digits.some(d => !d) || verifying}
-                className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm mb-4 disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={digits.some((d) => !d) || verifying}
+                className="au-submit"
               >
-                {verifying
-                  ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Verifying…</>
-                  : <><CheckCircle2 size={15} /> Verify Email</>
-                }
+                <span className="au-submit__label">
+                  {verifying ? (<><span className="au-spinner" aria-hidden="true" />Verifying…</>) : (<><CheckCircle2 size={17} aria-hidden="true" />Verify email</>)}
+                </span>
               </button>
+            </motion.div>
 
-              <p className="text-xs text-foreground-muted mb-3">Code expires in 15 minutes.</p>
-
-              <button
-                onClick={handleResend}
-                disabled={resending}
-                className="inline-flex items-center gap-2 text-sm text-brand-500 hover:text-brand-400 font-medium transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={resending ? 'animate-spin' : ''} />
+            <motion.div variants={rise} className="au-stack">
+              <button type="button" onClick={handleResend} disabled={resending} className="au-ghost">
+                <RefreshCw size={14} aria-hidden="true" className={resending ? 'au-spin-icon' : ''} />
                 {resending ? 'Sending…' : 'Resend code'}
               </button>
-
-              <div className="mt-6 pt-4 border-t border-surface-border w-full">
+              <div className="au-divider">
                 <button
-                  onClick={() => { setStep('form'); setDigits(Array(OTP_LENGTH).fill('')); }}
-                  onMouseDown={() => setOtpError('')}
-                  className="text-sm text-foreground-muted hover:text-foreground transition-colors"
+                  type="button"
+                  className="au-ghost au-ghost--muted"
+                  onClick={() => { setStep('form'); setDigits(Array(OTP_LENGTH).fill('')); setOtpError(''); }}
                 >
-                  ← Use a different email
+                  <ArrowLeft size={14} aria-hidden="true" /> Use a different email
                 </button>
               </div>
-            </div>
-          )}
+            </motion.div>
+          </AuthPanel>
+        )}
 
-          {/* ── Registration form ── */}
-          {step === 'form' && (
-            <>
-              <h2 className="font-body text-xl font-bold text-foreground text-center mb-1">
-                Create your account
-              </h2>
-              <p className="text-sm text-foreground-muted text-center mb-6">
-                Start building workflows in seconds
-              </p>
+        {step === 'experience' && (
+          <AuthPanel key="experience" className="au-center">
+            <motion.div variants={rise} className="au-badge-row">
+              <div className="au-icon-badge"><Sparkles size={26} aria-hidden="true" /></div>
+            </motion.div>
+            <AuthHeading
+              eyebrow="welcome"
+              title={`Welcome, ${pendingAuth?.user?.name?.split(' ')[0] ?? 'there'}!`}
+              sub={<>Have you used workflow automation tools before? <span className="au-mono">(Zapier, Make, n8n)</span></>}
+            />
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* First + Last name side by side */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-1.5">First Name *</label>
-                    <input
-                      type="text"
-                      className={`input-field w-full ${showFirstNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                      placeholder="Jane"
-                      value={firstName}
-                      onChange={e => setFirstName(e.target.value)}
-                      onBlur={() => setTouched(prev => ({ ...prev, firstName: true }))}
-                      autoComplete="given-name"
-                      aria-invalid={Boolean(showFirstNameError)}
-                    />
-                    {showFirstNameError && (
-                      <p className="mt-1 text-xs text-red-400">{firstNameError}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Last Name *</label>
-                    <input
-                      type="text"
-                      className={`input-field w-full ${showLastNameError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={e => setLastName(e.target.value)}
-                      onBlur={() => setTouched(prev => ({ ...prev, lastName: true }))}
-                      autoComplete="family-name"
-                      aria-invalid={Boolean(showLastNameError)}
-                    />
-                    {showLastNameError && (
-                      <p className="mt-1 text-xs text-red-400">{lastNameError}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Email *</label>
-                  <input
-                    type="email"
-                    className={`input-field w-full ${showEmailError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
-                    autoComplete="email"
-                    aria-invalid={Boolean(showEmailError)}
-                  />
-                  {showEmailError ? (
-                    <p className="mt-1 text-xs text-red-400">{emailError}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-foreground-muted">We'll send a 6-digit code to this email.</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Password *</label>
-                  <div className="relative">
-                    <input
-                      type={showPw ? 'text' : 'password'}
-                      className={`input-field w-full pr-10 ${showPasswordError ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20' : ''}`}
-                      placeholder="Min 8 characters"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
-                      autoComplete="new-password"
-                      aria-invalid={Boolean(showPasswordError)}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-secondary"
-                      onClick={() => setShowPw(!showPw)}
-                      tabIndex={-1}
-                    >
-                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {showPasswordError ? (
-                    <p className="mt-1 text-xs text-red-400">{passwordError}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-foreground-muted">Use at least 8 characters.</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50"
-                >
-                  {loading ? 'Creating account…' : 'Create Account'}
-                </button>
-              </form>
-
-              <p className="text-sm text-foreground-muted text-center mt-6">
-                Already have an account?{' '}
-                <Link to="/login" className="text-brand-500 hover:text-brand-400 font-medium">Sign in</Link>
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+            <motion.div variants={rise} className="au-choices">
+              <button type="button" onClick={() => handleExperienceSelect(false)} className="au-choice">
+                <span className="au-choice__icon"><Zap size={20} aria-hidden="true" /></span>
+                <span>
+                  <span className="au-choice__title">Yes, I'm familiar</span>
+                  <span className="au-choice__desc">I've used tools like this before — take me straight to the canvas.</span>
+                </span>
+              </button>
+              <button type="button" onClick={() => handleExperienceSelect(true)} className="au-choice">
+                <span className="au-choice__icon"><Sparkles size={20} aria-hidden="true" /></span>
+                <span>
+                  <span className="au-choice__title">No, I'm new to this</span>
+                  <span className="au-choice__desc">Show me a quick tour so I can get started confidently.</span>
+                </span>
+              </button>
+            </motion.div>
+          </AuthPanel>
+        )}
+      </AnimatePresence>
+    </AuthShell>
   );
 }

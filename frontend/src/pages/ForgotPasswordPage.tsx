@@ -1,13 +1,23 @@
-import { useState, useRef, KeyboardEvent, ClipboardEvent } from 'react';
+import { useState, useRef, FormEvent, KeyboardEvent, ClipboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Eye, EyeOff, CheckCircle2, RefreshCw } from 'lucide-react';
-import FluxionLogo from '../components/FluxionLogo';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, CheckCircle2, KeyRound, Lock, Mail, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { AuthShell, AuthPanel, AuthHeading, AuthSubmit, rise } from '../components/auth/AuthShell';
+import { AuthField } from '../components/auth/AuthField';
+import { OtpBoxes } from '../components/auth/OtpBoxes';
 import { authApi } from '../utils/api';
 
 const OTP_LENGTH = 6;
 
 type Step = 'email' | 'otp' | 'password' | 'done';
+
+const ART: Record<Step, { eyebrow: string; title: string; sub: string }> = {
+  email: { eyebrow: 'account recovery', title: 'Locked out? Back in a minute.', sub: 'Reset your password with a 6-digit code.' },
+  otp: { eyebrow: 'check your inbox', title: 'Code on its way.', sub: 'It expires in 15 minutes, so use it soon.' },
+  password: { eyebrow: 'almost done', title: 'Choose a strong new password.', sub: 'At least 8 characters. Make it one you will remember.' },
+  done: { eyebrow: 'all set', title: 'Password updated.', sub: 'Sign in and get back to your workflows.' },
+};
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -17,8 +27,6 @@ export default function ForgotPasswordPage() {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -26,7 +34,8 @@ export default function ForgotPasswordPage() {
   const focusBox = (idx: number) => inputRefs.current[idx]?.focus();
 
   /* ── Step 1: Send reset email ── */
-  const handleSendCode = async () => {
+  const handleSendCode = async (e?: FormEvent) => {
+    e?.preventDefault();
     if (!email) return toast.error('Enter your email address');
     setLoading(true);
     try {
@@ -47,7 +56,7 @@ export default function ForgotPasswordPage() {
     next[idx] = char;
     setDigits(next);
     if (char && idx < OTP_LENGTH - 1) focusBox(idx + 1);
-    if (char && next.every(d => d !== '') && idx === OTP_LENGTH - 1) {
+    if (char && next.every((d) => d !== '') && idx === OTP_LENGTH - 1) {
       setStep('password');
     }
   };
@@ -60,7 +69,7 @@ export default function ForgotPasswordPage() {
       else if (idx > 0) { next[idx - 1] = ''; setDigits(next); focusBox(idx - 1); }
     } else if (e.key === 'ArrowLeft' && idx > 0) focusBox(idx - 1);
     else if (e.key === 'ArrowRight' && idx < OTP_LENGTH - 1) focusBox(idx + 1);
-    else if (e.key === 'Enter' && digits.every(d => d)) setStep('password');
+    else if (e.key === 'Enter' && digits.every((d) => d)) setStep('password');
   };
 
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
@@ -89,7 +98,8 @@ export default function ForgotPasswordPage() {
   };
 
   /* ── Step 3: Set new password ── */
-  const handleResetPassword = async () => {
+  const handleResetPassword = async (e?: FormEvent) => {
+    e?.preventDefault();
     if (newPassword.length < 8) return toast.error('Password must be at least 8 characters');
     if (newPassword !== confirmPassword) return toast.error('Passwords do not match');
     setLoading(true);
@@ -108,191 +118,118 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword ? 'Passwords do not match.' : false;
+
   return (
-    <div className="min-h-screen bg-surface-base flex items-center justify-center px-4 relative">
-      <Link
-        to="/login"
-        className="absolute top-6 left-6 flex items-center gap-2 text-foreground-muted hover:text-foreground transition-colors duration-200 group"
-      >
-        <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
-        <span className="text-sm font-medium">Back to login</span>
-      </Link>
+    <AuthShell art={ART[step]} backTo="/login" backLabel="Back to login">
+      <AnimatePresence mode="wait">
+        {step === 'email' && (
+          <AuthPanel key="email">
+            <AuthHeading eyebrow="reset password" title="Forgot your password?" sub="Enter your email and we'll send you a 6-digit reset code." />
+            <form onSubmit={handleSendCode} noValidate className="au-form">
+              <AuthField
+                id="fp-email"
+                label="Email"
+                icon={Mail}
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                autoFocus
+              />
+              <AuthSubmit loading={loading} loadingLabel="Sending…" disabled={!email}>Send reset code</AuthSubmit>
+            </form>
+            <motion.p variants={rise} className="au-foot">
+              Remember your password? <Link to="/login" className="au-link">Sign in</Link>
+            </motion.p>
+          </AuthPanel>
+        )}
 
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <FluxionLogo size={36} />
-          <span className="font-body text-2xl font-bold text-foreground tracking-tight">Flowmation</span>
-        </div>
-
-        <div className="card p-8">
-
-          {/* ── Step 1: Email ── */}
-          {step === 'email' && (
-            <div>
-              <div className="w-14 h-14 rounded-full bg-brand-500/10 flex items-center justify-center mb-4 mx-auto">
-                <Mail size={28} className="text-brand-500" />
-              </div>
-              <h2 className="font-body text-xl font-bold text-foreground text-center mb-2">Forgot your password?</h2>
-              <p className="text-sm text-foreground-muted text-center mb-6">
-                Enter your email and we'll send you a 6-digit reset code.
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Email</label>
-                  <input
-                    type="email"
-                    className="input-field w-full"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendCode()}
-                    autoFocus
-                  />
-                </div>
-                <button
-                  onClick={handleSendCode}
-                  disabled={loading || !email}
-                  className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50"
-                >
-                  {loading ? 'Sending…' : 'Send Reset Code'}
-                </button>
-              </div>
-              <p className="text-sm text-foreground-muted text-center mt-6">
-                Remember your password?{' '}
-                <Link to="/login" className="text-brand-500 hover:text-brand-400 font-medium">Sign in</Link>
-              </p>
-            </div>
-          )}
-
-          {/* ── Step 2: OTP ── */}
-          {step === 'otp' && (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-full bg-brand-500/10 flex items-center justify-center mb-4">
-                <Mail size={28} className="text-brand-500" />
-              </div>
-              <h2 className="font-body text-xl font-bold text-foreground mb-1">Check your email</h2>
-              <p className="text-sm text-foreground-muted mb-1">We sent a 6-digit code to</p>
-              <p className="text-sm font-semibold text-foreground mb-6">{email}</p>
-
-              <div className="flex items-center gap-2.5 mb-6">
-                {digits.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={el => { inputRefs.current[i] = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={d}
-                    autoFocus={i === 0}
-                    onChange={e => handleDigitChange(i, e.target.value)}
-                    onKeyDown={e => handleDigitKeyDown(i, e)}
-                    onPaste={i === 0 ? handlePaste : undefined}
-                    className={`w-11 text-center text-xl font-bold rounded-lg border-2 bg-surface-input text-foreground outline-none transition-all duration-150
-                      ${d ? 'border-brand-500 bg-brand-500/5' : 'border-surface-border'}
-                      focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20`}
-                    style={{ height: '52px' }}
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={() => setStep('password')}
-                disabled={!digits.every(d => d)}
-                className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm mb-4 disabled:opacity-50"
-              >
-                Continue
+        {step === 'otp' && (
+          <AuthPanel key="otp" className="au-center">
+            <motion.div variants={rise} className="au-badge-row">
+              <div className="au-icon-badge"><Mail size={26} aria-hidden="true" /></div>
+            </motion.div>
+            <AuthHeading
+              eyebrow="verify"
+              title="Check your email"
+              sub={<>We sent a 6-digit code to <span className="au-strong">{email}</span></>}
+            />
+            <OtpBoxes
+              digits={digits}
+              inputRefs={inputRefs}
+              onChange={handleDigitChange}
+              onKeyDown={handleDigitKeyDown}
+              onPaste={handlePaste}
+            />
+            <motion.p variants={rise} className="au-hint" style={{ marginTop: 0 }}>
+              Code expires in 15 minutes. Check your spam folder.
+            </motion.p>
+            <motion.div variants={rise}>
+              <button type="button" onClick={() => setStep('password')} disabled={!digits.every((d) => d)} className="au-submit">
+                <span className="au-submit__label">Continue</span>
               </button>
-
-              <p className="text-xs text-foreground-muted mb-3">Code expires in 15 minutes. Check your spam folder.</p>
-
-              <button
-                onClick={handleResend}
-                disabled={resending}
-                className="inline-flex items-center gap-2 text-sm text-brand-500 hover:text-brand-400 font-medium transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={resending ? 'animate-spin' : ''} />
+            </motion.div>
+            <motion.div variants={rise} className="au-stack">
+              <button type="button" onClick={handleResend} disabled={resending} className="au-ghost">
+                <RefreshCw size={14} aria-hidden="true" className={resending ? 'au-spin-icon' : ''} />
                 {resending ? 'Sending…' : 'Resend code'}
               </button>
-            </div>
-          )}
+            </motion.div>
+          </AuthPanel>
+        )}
 
-          {/* ── Step 3: New password ── */}
-          {step === 'password' && (
-            <div>
-              <h2 className="font-body text-xl font-bold text-foreground text-center mb-2">Set new password</h2>
-              <p className="text-sm text-foreground-muted text-center mb-6">Choose a strong password for your account.</p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">New Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPw ? 'text' : 'password'}
-                      className="input-field w-full pr-10"
-                      placeholder="Min 8 characters"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      autoFocus
-                    />
-                    <button type="button" onClick={() => setShowPw(!showPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-secondary" tabIndex={-1}>
-                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Confirm Password</label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPw ? 'text' : 'password'}
-                      className="input-field w-full pr-10"
-                      placeholder="Repeat your password"
-                      value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
-                    />
-                    <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-secondary" tabIndex={-1}>
-                      {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleResetPassword}
-                  disabled={loading || !newPassword || !confirmPassword}
-                  className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading
-                    ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Resetting…</>
-                    : 'Reset Password'
-                  }
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 4: Done ── */}
-          {step === 'done' && (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mb-4">
-                <CheckCircle2 size={36} className="text-green-500" />
-              </div>
-              <h2 className="font-body text-xl font-bold text-foreground mb-2">Password reset!</h2>
-              <p className="text-sm text-foreground-muted mb-6">
-                Your password has been updated. You can now sign in with your new password.
-              </p>
-              <button
-                onClick={() => navigate('/login')}
-                className="btn-primary w-full py-2.5 rounded-lg font-semibold text-sm"
-              >
-                Sign In
+        {step === 'password' && (
+          <AuthPanel key="password">
+            <AuthHeading eyebrow="new password" title="Set new password" sub="Choose a strong password for your account." />
+            <form onSubmit={handleResetPassword} noValidate className="au-form">
+              <AuthField
+                id="fp-new"
+                label="New password"
+                icon={Lock}
+                reveal
+                placeholder="Min 8 characters"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                autoFocus
+              />
+              <AuthField
+                id="fp-confirm"
+                label="Confirm password"
+                icon={KeyRound}
+                reveal
+                placeholder="Repeat your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                error={mismatch}
+              />
+              <AuthSubmit loading={loading} loadingLabel="Resetting…" disabled={!newPassword || !confirmPassword}>Reset password</AuthSubmit>
+            </form>
+            <motion.div variants={rise} className="au-stack">
+              <button type="button" className="au-ghost au-ghost--muted" onClick={() => setStep('otp')}>
+                <ArrowLeft size={14} aria-hidden="true" /> Back to code
               </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+            </motion.div>
+          </AuthPanel>
+        )}
+
+        {step === 'done' && (
+          <AuthPanel key="done" className="au-center">
+            <motion.div variants={rise} className="au-badge-row">
+              <div className="au-icon-badge au-icon-badge--ok"><CheckCircle2 size={28} aria-hidden="true" /></div>
+            </motion.div>
+            <AuthHeading eyebrow="done" title="Password reset!" sub="Your password has been updated. You can now sign in with your new password." />
+            <motion.div variants={rise}>
+              <button type="button" onClick={() => navigate('/login')} className="au-submit">
+                <span className="au-submit__label">Sign in</span>
+              </button>
+            </motion.div>
+          </AuthPanel>
+        )}
+      </AnimatePresence>
+    </AuthShell>
   );
 }
