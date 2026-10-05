@@ -729,10 +729,11 @@ body.vesper-page button:focus-visible {
 }
 @keyframes ix-spin { to { transform: rotate(360deg); } }
 
-.ix__node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
+.ix__visual { --ix-tile: 52px; }
+.ix__node { position: absolute; margin-top: calc(var(--ix-tile) / -2); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
 .ix__tile {
-  width: 52px;
-  height: 52px;
+  width: var(--ix-tile);
+  height: var(--ix-tile);
   display: grid;
   place-items: center;
   border-radius: 14px;
@@ -752,7 +753,8 @@ body.vesper-page button:focus-visible {
 }
 @media (max-width: 480px) {
   .ix__stack li { grid-template-columns: 1fr; gap: 4px; }
-  .ix__tile { width: 42px; height: 42px; border-radius: 12px; }
+  .ix__visual { --ix-tile: 42px; }
+  .ix__tile { border-radius: 12px; }
   .ix__icon { width: 20px; height: 20px; }
   .ix__label { font-size: 10px; }
 }

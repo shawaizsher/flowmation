@@ -112,7 +112,8 @@ export default function IntegrationCard() {
             <motion.div
               key={n.id}
               className="ix__node"
-              style={{ left: `${n.x}%`, top: `${n.y}%` }}
+              // framer owns `transform`, so centering must go through its x/y, not a CSS translate (it gets overwritten).
+              style={{ left: `${n.x}%`, top: `${n.y}%`, x: '-50%' }}
               initial={reduced ? false : { opacity: 0, scale: 0.8 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true, margin: '-40px' }}
