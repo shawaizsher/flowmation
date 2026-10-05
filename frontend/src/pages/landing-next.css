@@ -652,3 +652,110 @@ body.vesper-page button:focus-visible {
   .faq-a-inner { padding-left: 16px; padding-right: 16px; }
   .faq-idx { display: none; }
 }
+
+/* ═══════════════ Integrations hub ═══════════════ */
+.ix {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: 56px;
+  margin-top: 8px;
+  padding: 48px;
+  border-radius: 28px;
+  border: 1px solid rgba(212, 80, 96, 0.16);
+  background:
+    radial-gradient(ellipse 60% 70% at 85% 50%, rgba(128, 0, 32, 0.22), transparent 70%),
+    linear-gradient(165deg, #0e0306 0%, #060203 100%);
+}
+.ix__title { font-size: clamp(26px, 2.6vw, 36px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; color: #FFF9F2; margin-bottom: 14px; text-wrap: balance; }
+.ix__lede { font-size: 16px; line-height: 1.65; color: rgba(243, 230, 213, 0.66); margin-bottom: 28px; max-width: 46ch; }
+.ix__stack { display: flex; flex-direction: column; }
+.ix__stack li {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid rgba(243, 230, 213, 0.08);
+  font-size: 14px;
+}
+.ix__stack li:last-child { border-bottom: 1px solid rgba(243, 230, 213, 0.08); }
+.ix__cat { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #D45060; padding-top: 2px; }
+.ix__tools { color: #F3E6D5; }
+
+.ix__visual { position: relative; aspect-ratio: 5 / 4; width: 100%; }
+.ix__grid {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background-image: radial-gradient(rgba(243, 230, 213, 0.12) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 40%, transparent 85%);
+}
+.ix__lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ix__line { fill: none; stroke: rgba(212, 80, 96, 0.28); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ix__flow {
+  fill: none;
+  stroke: #F3E6D5;
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 6 94;
+  stroke-dashoffset: 100;
+  animation: ix-flow 2.8s linear infinite;
+  opacity: 0.85;
+}
+.ix__flow--static { animation: none; opacity: 0; }
+@keyframes ix-flow { to { stroke-dashoffset: 0; } }
+
+.ix__hub { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; z-index: 2; }
+.ix__hub-core {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: #12040a;
+  border: 1px solid rgba(212, 80, 96, 0.5);
+  box-shadow: 0 0 0 6px rgba(128, 0, 32, 0.18), 0 18px 40px rgba(128, 0, 32, 0.45);
+}
+.ix__hub-ring {
+  position: absolute;
+  width: 140%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px dashed rgba(212, 80, 96, 0.4);
+  animation: ix-spin 24s linear infinite;
+}
+@keyframes ix-spin { to { transform: rotate(360deg); } }
+
+.ix__node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2; }
+.ix__tile {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #FFF9F2;
+  background: linear-gradient(160deg, #1c070e, #0b0306);
+  border: 1px solid rgba(243, 230, 213, 0.14);
+  box-shadow: 0 10px 24px rgba(20, 0, 6, 0.6);
+  transition: border-color 0.25s, transform 0.25s var(--ease-out), box-shadow 0.25s;
+}
+.ix__node:hover .ix__tile { border-color: rgba(212, 80, 96, 0.7); transform: translateY(-3px); box-shadow: 0 14px 30px rgba(128, 0, 32, 0.45); }
+.ix__icon { width: 24px; height: 24px; }
+.ix__label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: rgba(243, 230, 213, 0.65); }
+
+@media (max-width: 900px) {
+  .ix { grid-template-columns: 1fr; padding: 28px; gap: 32px; }
+  .ix__visual { max-width: 520px; margin: 0 auto; }
+}
+@media (max-width: 480px) {
+  .ix__stack li { grid-template-columns: 1fr; gap: 4px; }
+  .ix__tile { width: 42px; height: 42px; border-radius: 12px; }
+  .ix__icon { width: 20px; height: 20px; }
+  .ix__label { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ix__flow, .ix__hub-ring { animation: none; }
+}

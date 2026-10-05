@@ -1,14 +1,13 @@
-import { useId } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import FluxionLogo from './FluxionLogo';
 
-interface IntegrationItem {
+interface HubNode {
   id: string;
+  label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** Position in % of the visual box; lines and tiles share this coordinate system. */
   x: number;
   y: number;
-  path: string;
-  delay: number;
 }
 
 const SlackIcon = ({ className }: { className?: string }) => (
@@ -47,103 +46,83 @@ const PostgresIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const integrations: IntegrationItem[] = [
-  { id: 'slack', icon: SlackIcon, x: 110, y: 90, path: 'M 270 205 V 105 Q 270 90 255 90 H 110', delay: 0.1 },
-  { id: 'github', icon: GitHubIcon, x: 360, y: 70, path: 'M 294 205 V 85 Q 294 70 309 70 H 360', delay: 0.2 },
-  { id: 'gmail', icon: GmailIcon, x: 160, y: 205, path: 'M 250 205 H 160', delay: 0.3 },
-  { id: 'stripe', icon: StripeIcon, x: 480, y: 205, path: 'M 314 205 H 480', delay: 0.4 },
-  { id: 'openai', icon: OpenAIIcon, x: 282, y: 360, path: 'M 282 205 V 360', delay: 0.6 },
-  { id: 'postgres', icon: PostgresIcon, x: 460, y: 340, path: 'M 314 215 V 325 Q 314 340 329 340 H 460', delay: 0.7 },
+const NODES: HubNode[] = [
+  { id: 'slack', label: 'Slack', icon: SlackIcon, x: 16, y: 20 },
+  { id: 'github', label: 'GitHub', icon: GitHubIcon, x: 50, y: 10 },
+  { id: 'openai', label: 'OpenAI', icon: OpenAIIcon, x: 84, y: 20 },
+  { id: 'gmail', label: 'Gmail', icon: GmailIcon, x: 12, y: 74 },
+  { id: 'postgres', label: 'Postgres', icon: PostgresIcon, x: 50, y: 88 },
+  { id: 'stripe', label: 'Stripe', icon: StripeIcon, x: 88, y: 74 },
 ];
 
-function AnimatedPath({ d, id }: { d: string; id: string }) {
-  return (
-    <>
-      <path d={d} stroke="rgba(255,255,255,0.08)" strokeWidth="1" fill="none" />
-      <motion.path
-        d={d}
-        stroke={`url(#${id})`}
-        strokeWidth="2"
-        fill="none"
-        strokeDasharray="40 160"
-        initial={{ strokeDashoffset: 200 }}
-        animate={{ strokeDashoffset: -200 }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'linear', delay: Math.random() * 2 }}
-      />
-      <defs>
-        <linearGradient id={id} gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="transparent" />
-          <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="transparent" />
-        </linearGradient>
-      </defs>
-    </>
-  );
+const STACK = [
+  { cat: 'AI & ML', tools: 'OpenAI, Anthropic Claude, Gemini' },
+  { cat: 'Messaging', tools: 'Slack, Discord, Telegram, Gmail' },
+  { cat: 'Data', tools: 'PostgreSQL, MongoDB, Google Sheets' },
+  { cat: 'Payments & CRM', tools: 'Stripe, HubSpot' },
+  { cat: 'Dev & cloud', tools: 'GitHub, AWS S3, Vercel' },
+];
+
+const HUB = { x: 50, y: 48 };
+
+function spoke(n: HubNode) {
+  const mx = (n.x + HUB.x) / 2;
+  return `M ${HUB.x} ${HUB.y} C ${mx} ${HUB.y}, ${mx} ${n.y}, ${n.x} ${n.y}`;
 }
 
 export default function IntegrationCard() {
-  const containerId = useId();
+  const reduced = useReducedMotion();
 
   return (
-    <div className="integration-card-wrapper reveal">
-      <div className="integration-card">
-        <div className="integration-visual">
-          {/* Dot grid background */}
-          <div className="integration-dots" />
-          <div className="integration-gradient-overlay" />
+    <div className="ix reveal">
+      <div className="ix__copy">
+        <h3 className="ix__title">One hub for your whole stack</h3>
+        <p className="ix__lede">
+          Pre-built nodes for the tools your team already runs on. Anything without a node is one HTTP or webhook step away.
+        </p>
+        <ul className="ix__stack">
+          {STACK.map((s) => (
+            <li key={s.cat}>
+              <span className="ix__cat">{s.cat}</span>
+              <span className="ix__tools">{s.tools}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-          <div className="integration-content">
-            {/* SVG connection lines */}
-            <svg
-              className="integration-lines"
-              viewBox="0 0 564 410"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+      <div className="ix__visual" aria-hidden="true">
+        <div className="ix__grid" />
+        <svg className="ix__lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {NODES.map((n) => (
+            <g key={n.id}>
+              <path d={spoke(n)} className="ix__line" />
+              <path d={spoke(n)} pathLength={100} className={reduced ? 'ix__flow ix__flow--static' : 'ix__flow'} />
+            </g>
+          ))}
+        </svg>
+
+        <div className="ix__hub" style={{ left: `${HUB.x}%`, top: `${HUB.y}%` }}>
+          <span className="ix__hub-ring" />
+          <span className="ix__hub-core"><FluxionLogo size={40} /></span>
+        </div>
+
+        {NODES.map((n, i) => {
+          const Icon = n.icon;
+          return (
+            <motion.div
+              key={n.id}
+              className="ix__node"
+              style={{ left: `${n.x}%`, top: `${n.y}%` }}
+              initial={reduced ? false : { opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ delay: 0.1 + i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             >
-              {integrations.map((item) => (
-                <AnimatedPath key={item.id} d={item.path} id={`${containerId}-${item.id}`} />
-              ))}
-            </svg>
-
-            {/* Center Fluxion logo */}
-            <div className="integration-center">
-              <div className="integration-center-inner">
-                <FluxionLogo size={32} />
-              </div>
-              <motion.div
-                className="integration-pulse"
-                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0, 0.3] }}
-                transition={{ duration: 3, repeat: Infinity }}
-              />
-            </div>
-
-            {/* Peripheral integration icons */}
-            {integrations.map((item) => {
-              const Icon = item.icon;
-              return (
-                <motion.div
-                  key={item.id}
-                  className="integration-node"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: item.delay }}
-                  style={{
-                    left: `${(item.x / 564) * 100}%`,
-                    top: `${(item.y / 410) * 100}%`,
-                  }}
-                >
-                  <Icon className="integration-node-icon" />
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="integration-body">
-          <h3>Seamless Integrations</h3>
-          <p>Connect Slack, GitHub, Gmail, Stripe, OpenAI, databases, and dozens more — keep your workflows unified without switching between platforms.</p>
-        </div>
+              <span className="ix__tile"><Icon className="ix__icon" /></span>
+              <span className="ix__label">{n.label}</span>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
