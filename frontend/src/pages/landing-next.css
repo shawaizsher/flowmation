@@ -794,3 +794,17 @@ body.vesper-page .nav-pill[aria-current="location"] {
   transition: transform 0.2s ease;
 }
 .skip-link:focus { transform: translateY(0); }
+
+/* ═══════════════ Button typography ═══════════════ */
+body.vesper-page {
+  --font-cta: "Manrope", "Space Grotesk", system-ui, sans-serif;
+}
+body.vesper-page .btn,
+body.vesper-page .btn-solid,
+body.vesper-page .btn-hero-ghost,
+.au-root .au-submit {
+  font-family: var(--font-cta);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+body.vesper-page .btn-lg { font-size: 15px; }
