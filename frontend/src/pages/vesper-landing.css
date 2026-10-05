@@ -1024,9 +1024,22 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
 }
 
 .wf-showcase__tab--active {
-  background: linear-gradient(135deg, rgba(128, 0, 32, 0.25), rgba(212, 80, 96, 0.1));
-  border-color: rgba(212, 80, 96, 0.3);
+  position: relative;
+  background: linear-gradient(135deg, rgba(128, 0, 32, 0.32), rgba(212, 80, 96, 0.1));
+  border-color: rgba(212, 80, 96, 0.4);
 }
+.wf-showcase__tab--active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #D45060;
+  box-shadow: 0 0 12px rgba(212, 80, 96, 0.6);
+}
+.wf-showcase__tab:focus-visible { outline: 2px solid #D45060; outline-offset: 2px; }
 
 .wf-showcase__tab-field {
   font-size: 13.5px;
@@ -1066,9 +1079,8 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
   position: relative;
   width: 100%;
   min-width: 0;
-  height: 360px;
-  overflow: auto;
-  cursor: grab;
+  overflow: hidden;
+  margin: auto 0;
 }
 
 .wf-canvas__content {
@@ -1087,7 +1099,9 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
   top: 0;
   left: 0;
   cursor: grab;
+  user-select: none;
 }
+.wf-canvas__node-wrap.is-dragging { cursor: grabbing; z-index: 5; }
 
 .wf-canvas__node {
   position: relative;

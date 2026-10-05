@@ -1,6 +1,5 @@
 import { motion, type PanInfo } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
-import { flushSync } from 'react-dom';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, BarChart3, Brain, CalendarDays, CheckCircle2, Contact, Container, FileText, GitMerge, KeyRound, Laptop, Lightbulb, Mail, MessageSquare, Microscope, Palette, PenLine, Rocket, Scale, SearchCode, Send, Sheet, ShieldCheck, Siren, Star, Ticket, TrendingUp, UserPlus, Zap, type LucideIcon } from 'lucide-react';
 
 interface WfNode {
@@ -153,47 +152,51 @@ function ConnectionLine({ from, to, nodes }: { from: string; to: string; nodes: 
 }
 
 function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
+  const base = getContentSize(workflow.nodes);
   const [nodes, setNodes] = useState<WfNode[]>(workflow.nodes);
-  const [contentSize, setContentSize] = useState(() => getContentSize(workflow.nodes));
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setNodes(workflow.nodes);
-    setContentSize(getContentSize(workflow.nodes));
-  }, [workflow]);
+  // Fit the whole layout to the canvas width so every node is visible without a scrollbar.
+  useLayoutEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const fit = () => setScale(Math.min(1, el.clientWidth / base.width));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [base.width]);
 
-  const handleDragStart = (nodeId: string) => {
-    setDraggingId(nodeId);
+  const startDrag = (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
-    if (node) dragStart.current = { x: node.position.x, y: node.position.y };
+    if (!node) return;
+    setDraggingId(nodeId);
+    dragStart.current = { x: node.position.x, y: node.position.y };
   };
 
-  const handleDrag = (nodeId: string, { offset }: PanInfo) => {
+  // Pan (not drag) so framer never moves the element itself; offsets are screen px, so divide by the fit scale.
+  const moveDrag = (nodeId: string, { offset }: PanInfo) => {
     if (draggingId !== nodeId || !dragStart.current) return;
-    const newX = Math.max(0, dragStart.current.x + offset.x);
-    const newY = Math.max(0, dragStart.current.y + offset.y);
-
-    flushSync(() => {
-      setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, position: { x: newX, y: newY } } : n)));
-    });
-
-    setContentSize((prev) => ({
-      width: Math.max(prev.width, newX + NODE_WIDTH + 40),
-      height: Math.max(prev.height, newY + NODE_HEIGHT + 40),
-    }));
+    const x = Math.min(base.width - NODE_WIDTH - 8, Math.max(8, dragStart.current.x + offset.x / scale));
+    const y = Math.min(base.height - NODE_HEIGHT - 8, Math.max(8, dragStart.current.y + offset.y / scale));
+    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, position: { x, y } } : n)));
   };
 
-  const handleDragEnd = () => {
+  const endDrag = () => {
     setDraggingId(null);
     dragStart.current = null;
   };
 
   return (
-    <div ref={canvasRef} className="wf-canvas" role="region" aria-label="Workflow canvas">
-      <div className="wf-canvas__content" style={{ minWidth: contentSize.width, minHeight: contentSize.height }}>
-        <svg className="wf-canvas__svg" width={contentSize.width} height={contentSize.height} style={{ overflow: 'visible' }} aria-hidden="true">
+    <div ref={canvasRef} className="wf-canvas" role="region" aria-label="Workflow canvas" style={{ height: base.height * scale }}>
+      <div
+        className="wf-canvas__content"
+        style={{ width: base.width, height: base.height, transform: `scale(${scale})`, transformOrigin: '0 0' }}
+      >
+        <svg className="wf-canvas__svg" width={base.width} height={base.height} style={{ overflow: 'visible' }} aria-hidden="true">
           {workflow.connections.map((c) => (
             <ConnectionLine key={`${c.from}-${c.to}`} from={c.from} to={c.to} nodes={nodes} />
           ))}
@@ -204,19 +207,14 @@ function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
           return (
             <motion.div
               key={node.id}
-              drag
-              dragMomentum={false}
-              dragConstraints={{ left: 0, top: 0, right: 100000, bottom: 100000 }}
-              onDragStart={() => handleDragStart(node.id)}
-              onDrag={(_, info) => handleDrag(node.id, info)}
-              onDragEnd={handleDragEnd}
-              style={{ x: node.position.x, y: node.position.y, width: NODE_WIDTH, transformOrigin: '0 0' }}
-              className="wf-canvas__node-wrap"
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.25 }}
-              whileHover={{ scale: 1.02 }}
-              whileDrag={{ scale: 1.05, zIndex: 50, cursor: 'grabbing' }}
+              onPanStart={() => startDrag(node.id)}
+              onPan={(_, info) => moveDrag(node.id, info)}
+              onPanEnd={endDrag}
+              style={{ x: node.position.x, y: node.position.y, width: NODE_WIDTH, touchAction: 'none' }}
+              className={`wf-canvas__node-wrap${isDragging ? ' is-dragging' : ''}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
               aria-grabbed={isDragging}
             >
               <div className={`wf-canvas__node${isDragging ? ' wf-canvas__node--dragging' : ''}`}>
@@ -226,7 +224,7 @@ function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
                 </div>
                 <p className="wf-canvas__node-sub">{node.sub}</p>
                 <div className="wf-canvas__node-foot">
-                  <ArrowRight size={10} />
+                  <ArrowRight size={10} aria-hidden="true" />
                   <span>Connected</span>
                 </div>
               </div>
@@ -248,6 +246,7 @@ export default function WorkflowShowcase() {
           <button
             key={wf.field}
             className={`wf-showcase__tab${i === active ? ' wf-showcase__tab--active' : ''}`}
+            aria-pressed={i === active}
             onClick={() => setActive(i)}
           >
             <span className="wf-showcase__tab-field">{wf.field}</span>
