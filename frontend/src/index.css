@@ -7,15 +7,15 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ── Page entrance animation ── */
+/* ── Page entrance animation ──
+   Opacity only: a transform on #root (even an identity one kept by fill-mode) makes it the
+   containing block for every position:fixed descendant, so fixed headers/overlays scroll away. */
 @keyframes pageEntrance {
   0% {
     opacity: 0;
-    transform: translateY(6px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
