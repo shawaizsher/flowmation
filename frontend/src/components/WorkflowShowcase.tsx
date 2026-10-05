@@ -134,41 +134,64 @@ function getContentSize(nodes: WfNode[]) {
   return { width: maxX + 40, height: maxY + 40 };
 }
 
-function ConnectionLine({ from, to, nodes }: { from: string; to: string; nodes: WfNode[] }) {
+/** Narrow screens flow top-to-bottom: horizontal layout would scale nodes down to unreadable size. */
+const VERTICAL_BELOW = 560;
+
+function toVertical(nodes: WfNode[]): WfNode[] {
+  return nodes.map((n) => ({ ...n, position: { x: (n.position.y - 40) * 1.4 + 20, y: n.position.x } }));
+}
+
+function ConnectionLine({ from, to, nodes, vertical }: { from: string; to: string; nodes: WfNode[]; vertical: boolean }) {
   const fromNode = nodes.find((n) => n.id === from);
   const toNode = nodes.find((n) => n.id === to);
   if (!fromNode || !toNode) return null;
 
-  const startX = fromNode.position.x + NODE_WIDTH;
-  const startY = fromNode.position.y + NODE_HEIGHT / 2;
-  const endX = toNode.position.x;
-  const endY = toNode.position.y + NODE_HEIGHT / 2;
-
-  const cp1X = startX + (endX - startX) * 0.5;
-  const cp2X = endX - (endX - startX) * 0.5;
-  const path = `M${startX},${startY} C${cp1X},${startY} ${cp2X},${endY} ${endX},${endY}`;
+  let path: string;
+  if (vertical) {
+    const sx = fromNode.position.x + NODE_WIDTH / 2;
+    const sy = fromNode.position.y + NODE_HEIGHT;
+    const ex = toNode.position.x + NODE_WIDTH / 2;
+    const ey = toNode.position.y;
+    const my = (sy + ey) / 2;
+    path = `M${sx},${sy} C${sx},${my} ${ex},${my} ${ex},${ey}`;
+  } else {
+    const sx = fromNode.position.x + NODE_WIDTH;
+    const sy = fromNode.position.y + NODE_HEIGHT / 2;
+    const ex = toNode.position.x;
+    const ey = toNode.position.y + NODE_HEIGHT / 2;
+    const mx = (sx + ex) / 2;
+    path = `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`;
+  }
 
   return <path d={path} fill="none" stroke="#D45060" strokeWidth={2} strokeDasharray="7,5" strokeLinecap="round" opacity={0.4} />;
 }
 
 function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
-  const base = getContentSize(workflow.nodes);
-  const [nodes, setNodes] = useState<WfNode[]>(workflow.nodes);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const vertical = width > 0 && width < VERTICAL_BELOW;
+  const layout = vertical ? toVertical(workflow.nodes) : workflow.nodes;
+  const base = getContentSize(layout);
+  const [nodes, setNodes] = useState<WfNode[]>(layout);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const scale = width ? Math.min(1, width / base.width) : 1;
 
-  // Fit the whole layout to the canvas width so every node is visible without a scrollbar.
+  // Track the canvas width: it decides orientation and the fit scale (no scrollbars, every node visible).
   useLayoutEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const fit = () => setScale(Math.min(1, el.clientWidth / base.width));
-    fit();
-    const ro = new ResizeObserver(fit);
+    const measure = () => setWidth(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [base.width]);
+  }, []);
+
+  // Orientation flip resets the layout (dragged positions belong to the old axis).
+  useLayoutEffect(() => {
+    setNodes(vertical ? toVertical(workflow.nodes) : workflow.nodes);
+  }, [vertical, workflow]);
 
   const startDrag = (nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
@@ -198,7 +221,7 @@ function WorkflowCanvas({ workflow }: { workflow: Workflow }) {
       >
         <svg className="wf-canvas__svg" width={base.width} height={base.height} style={{ overflow: 'visible' }} aria-hidden="true">
           {workflow.connections.map((c) => (
-            <ConnectionLine key={`${c.from}-${c.to}`} from={c.from} to={c.to} nodes={nodes} />
+            <ConnectionLine key={`${c.from}-${c.to}`} from={c.from} to={c.to} nodes={nodes} vertical={vertical} />
           ))}
         </svg>
 
