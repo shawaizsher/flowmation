@@ -54,7 +54,7 @@ body.vesper-page .hiw-card__number { font-family: var(--font-mono); font-style: 
   gap: 24px;
   padding: 120px var(--section-x) 80px;
   overflow: hidden;
-  background: #000;
+  background: var(--bg);
   isolation: isolate;
 }
 
@@ -239,7 +239,7 @@ body.vesper-page .hiw-card__number { font-family: var(--font-mono); font-style: 
 .fx-marquee {
   position: relative;
   z-index: 2;
-  background: #000;
+  background: var(--bg);
   border-top: 1px solid rgba(212, 80, 96, 0.15);
   border-bottom: 1px solid rgba(212, 80, 96, 0.15);
   padding: 22px 0;
@@ -274,11 +274,11 @@ body.vesper-page .hiw-card__number { font-family: var(--font-mono); font-style: 
 .fx-features-head {
   position: relative;
   z-index: 2;
-  background: #000;
+  background: var(--bg);
   padding: var(--section-y) var(--section-x) 40px;
 }
 
-.fx-slider { position: relative; z-index: 2; background: #000; }
+.fx-slider { position: relative; z-index: 2; background: var(--bg); }
 .fx-slider__sticky {
   position: sticky;
   top: 0;
@@ -759,3 +759,36 @@ body.vesper-page button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .ix__flow, .ix__hub-ring { animation: none; }
 }
+
+/* ═══════════════ Global polish ═══════════════ */
+body.vesper-page h1,
+body.vesper-page h2,
+body.vesper-page h3 { text-wrap: balance; }
+body.vesper-page p { text-wrap: pretty; }
+
+.fx-tilt__glow { opacity: 0; transition: opacity 0.35s ease; }
+.fx-tilt:hover .fx-tilt__glow { opacity: 1; }
+.fx-tilt { transition: border-color 0.3s; }
+.fx-tilt:hover { border-color: rgba(212, 80, 96, 0.45); }
+
+body.vesper-page .nav-pill[aria-current="location"] {
+  color: #FFF9F2;
+  border-color: rgba(212, 80, 96, 0.45);
+  background: rgba(212, 80, 96, 0.1);
+}
+
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #D45060;
+  color: #1a0008;
+  font-weight: 700;
+  font-size: 14px;
+  transform: translateY(-160%);
+  transition: transform 0.2s ease;
+}
+.skip-link:focus { transform: translateY(0); }

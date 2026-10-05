@@ -3,7 +3,8 @@
 
 /* ── Tokens ── */
 body.vesper-page {
-  --bg: #000000;
+  --bg: #080304;
+  --bg-raised: #0c0507;
   --text: #ffffff;
   --muted: #9a9a9a;
   --accent: #800020;
@@ -42,7 +43,7 @@ body.vesper-page ul { list-style: none; }
 html:has(body.vesper-page) { scroll-behavior: smooth; }
 
 body.vesper-page {
-  background: #000000 !important;
+  background: var(--bg) !important;
   color: #ffffff;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -80,7 +81,7 @@ body.vesper-page {
 }
 
 .vp-header--solid {
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(8, 3, 4, 0.8);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -365,10 +366,10 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
 .vp-section {
   position: relative;
   z-index: 2;
-  background: #000;
+  background: var(--bg);
   padding: var(--section-y) var(--section-x);
 }
-.vp-section--alt { background: #050505; }
+.vp-section--alt { background: var(--bg-raised); }
 
 .section-inner {
   max-width: 1100px;
@@ -608,7 +609,9 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
   z-index: 2;
   padding: var(--section-y) var(--section-x);
   text-align: center;
-  background: linear-gradient(180deg, #050505, #1a0008 50%, #000);
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 100%, rgba(128, 0, 32, 0.35), transparent 70%),
+    var(--bg-raised);
 }
 .vp-cta-banner h2 {
   font-size: 36px;
@@ -630,7 +633,7 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
 .vp-footer {
   position: relative;
   z-index: 2;
-  background: #000;
+  background: var(--bg);
   border-top: 1px solid var(--border-soft);
   padding: 40px var(--section-x);
 }

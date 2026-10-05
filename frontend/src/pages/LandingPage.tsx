@@ -32,6 +32,7 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [activeId, setActiveId] = useState('');
 
   useEffect(() => {
     const prev = document.title;
@@ -48,6 +49,20 @@ export default function LandingPage() {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Scrollspy: mark the nav link for the section crossing the middle of the viewport.
+  useEffect(() => {
+    const ids = NAV_ITEMS.map((n) => n.href.slice(1));
+    const sections = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) setActiveId(e.target.id); }),
+      { rootMargin: '-45% 0px -50% 0px' }
+    );
+    sections.forEach((s) => obs.observe(s));
+    const onTop = () => { if (window.scrollY < 200) setActiveId(''); };
+    window.addEventListener('scroll', onTop, { passive: true });
+    return () => { obs.disconnect(); window.removeEventListener('scroll', onTop); };
   }, []);
 
   useEffect(() => {
@@ -90,6 +105,7 @@ export default function LandingPage() {
 
   return (
     <>
+      <a href="#features" className="skip-link">Skip to content</a>
       <div className="grain" />
 
       {/* ── Fixed Header ── */}
@@ -102,7 +118,8 @@ export default function LandingPage() {
         <nav id="site-nav" aria-label="Primary">
           {NAV_ITEMS.map((item, i) => (
             <a key={item.href} href={item.href} className={`nav-pill appear ${i % 2 === 0 ? 'appear--scale' : 'appear--soft'}`}
-              style={{ '--d': `${0.16 + i * 0.12}s` } as React.CSSProperties} onClick={closeMenu}>
+              style={{ '--d': `${0.16 + i * 0.12}s` } as React.CSSProperties} onClick={closeMenu}
+              aria-current={activeId === item.href.slice(1) ? 'location' : undefined}>
               {item.label}
             </a>
           ))}
@@ -150,7 +167,7 @@ export default function LandingPage() {
         <div className="section-inner">
           <p className="section-eyebrow reveal">Under the hood</p>
           <h2 className="section-title reveal">Built for teams that ship</h2>
-          <p className="section-sub reveal">Security, speed and collaboration are defaults, not add-ons.</p>
+          <p className="section-sub reveal">Roles, triggers and integrations are built in, not bolted on.</p>
           <TiltStats />
         </div>
       </section>
