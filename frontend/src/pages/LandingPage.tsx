@@ -37,7 +37,7 @@ export default function LandingPage() {
   useEffect(() => {
     const prev = document.title;
     document.body.classList.add('vesper-page');
-    document.title = 'Flowmation — AI-Powered Workflow Automation';
+    document.title = 'Flowmation';
 
     return () => {
       document.body.classList.remove('vesper-page', 'menu-open');
