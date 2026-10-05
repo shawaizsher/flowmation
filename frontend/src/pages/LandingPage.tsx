@@ -123,11 +123,19 @@ export default function LandingPage() {
               {item.label}
             </a>
           ))}
+          <Link to="/login" className="nav-pill nav-pill--mobile-only" onClick={closeMenu}>
+            Sign in
+          </Link>
         </nav>
 
-        <Link to="/register" className="btn btn-solid header-cta appear appear--scale" style={{ '--d': '0.34s' } as React.CSSProperties}>
-          Get Started
-        </Link>
+        <div className="header-actions">
+          <Link to="/login" className="btn btn-ghost header-signin appear appear--scale" style={{ '--d': '0.28s' } as React.CSSProperties}>
+            Sign in
+          </Link>
+          <Link to="/register" className="btn btn-solid header-cta appear appear--scale" style={{ '--d': '0.34s' } as React.CSSProperties}>
+            Get Started
+          </Link>
+        </div>
 
         <button className="burger appear appear--scale" style={{ '--d': '0.34s' } as React.CSSProperties}
           onClick={() => setMenuOpen((p) => !p)} aria-controls="site-nav" aria-expanded={menuOpen}

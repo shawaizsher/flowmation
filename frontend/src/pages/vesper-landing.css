@@ -214,7 +214,8 @@ body.vesper-page {
 
 .btn-lg { height: 50px; padding: 0 28px; font-size: 15px; border-radius: 10px; }
 
-.header-cta { justify-self: end; }
+.header-actions { justify-self: end; display: flex; align-items: center; gap: 10px; }
+#site-nav .nav-pill--mobile-only { display: none; }
 
 /* ── Burger ── */
 .burger {
@@ -755,9 +756,10 @@ body.menu-open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(
     padding: 14px 18px;
   }
   .logo { z-index: 80; }
-  .header-cta { z-index: 80; }
   .burger { display: grid; z-index: 80; }
   #site-nav { display: none; }
+  .header-actions { z-index: 80; }
+  .header-signin { display: none; }
 
   .menu-backdrop {
     display: block;
