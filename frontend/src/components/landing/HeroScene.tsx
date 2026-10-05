@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, MeshDistortMaterial } from '@react-three/drei';
-import { Bloom, EffectComposer } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, SMAA } from '@react-three/postprocessing';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
@@ -296,9 +296,12 @@ export default function HeroScene() {
         <pointLight position={[4, 4, 5]} intensity={40} color={ROSE} />
         <pointLight position={[-5, -3, 3]} intensity={22} color={BEIGE} />
         <Scene reduced={reduced} lite={lite} />
-        {/* High threshold: only the brightest points glow, so the bloom doesn't twinkle with every small highlight. */}
-        <EffectComposer multisampling={lite ? 2 : 8}>
+        {/* multisampling must stay 0: MSAA on the half-float composer target renders the scene black on some
+            GPU/driver paths (seen on ANGLE + D3D11). SMAA does the anti-aliasing instead. High bloom threshold
+            keeps small highlights from twinkling. */}
+        <EffectComposer multisampling={0}>
           <Bloom mipmapBlur luminanceThreshold={0.7} luminanceSmoothing={0.5} intensity={0.75} radius={0.65} />
+          <SMAA />
         </EffectComposer>
       </Canvas>
     </div>
